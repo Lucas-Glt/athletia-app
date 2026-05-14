@@ -40,7 +40,13 @@ export default {
         const data = await response.json()
         const payload = JSON.parse(atob(data.access_token.split('.')[1]))
 
-        authStore.setAuth(data.access_token, payload.role)
+        // Récupère le profil complet pour avoir le nom
+        const userResponse = await fetch('http://localhost:8000/users/me', {
+          headers: { Authorization: `Bearer ${data.access_token}` }
+        })
+        const user = await userResponse.json()
+
+        authStore.setAuth(data.access_token, payload.role, user)
 
         if (payload.role === 'athlete') router.push('/athlete')
         else if (payload.role === 'prepa') router.push('/prepa')
@@ -64,10 +70,6 @@ export default {
   flex-direction: column;
   gap: 16px;
 }
-input, button {
-  padding: 12px;
-  font-size: 16px;
-  width: 100%;
-}
+input, button { padding: 12px; font-size: 16px; width: 100%; }
 .error { color: red; }
 </style>
