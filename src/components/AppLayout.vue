@@ -26,9 +26,9 @@
           <h2>{{ title }}</h2>
           <slot name="actions" />
         </div>
-        <div class="main-content">
+        <main class="main-content">
           <slot />
-        </div>
+        </main>
       </div>
     </div>
   </div>
@@ -64,7 +64,8 @@ export default {
 
 <style scoped>
 * { box-sizing: border-box; }
-.app { display: flex; flex-direction: column; height: 100vh; background: var(--bg); }
+html, body, #app { height: 100%; margin: 0; padding: 0; }
+.app { display: flex; flex-direction: column; height: 100vh; overflow: hidden; background: var(--bg); }
 .app-header {
   padding: 14px 20px;
   border-bottom: 1px solid #e5e7eb;
@@ -82,7 +83,7 @@ export default {
   display: flex; align-items: center; justify-content: center;
   font-size: 11px; font-weight: 600;
 }
-.app-body { display: flex; flex: 1; overflow: hidden; position: relative; }
+.app-body { display: flex; flex: 1 1 0; overflow: hidden; position: relative; min-height: 0; }
 .overlay {
   display: none; position: absolute; inset: 0;
   background: rgba(0,0,0,0.2); z-index: 9;
@@ -101,7 +102,7 @@ export default {
   border-top: 1px solid #e5e7eb;
   font-size: 12px; color: #6b7280;
 }
-.main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.main { flex: 1 1 0; display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
 .topbar {
   padding: 10px 16px; border-bottom: 1px solid #e5e7eb;
   display: flex; align-items: center; gap: 10px; flex-shrink: 0;
@@ -115,5 +116,5 @@ export default {
   flex-shrink: 0;
 }
 .btn-icon:hover { background: #f3f4f6; }
-.main-content { flex: 1; overflow: hidden; display: flex; }
+.main-content { flex: 1 1 0; overflow: hidden; display: flex; min-height: 0; min-width: 0; }
 </style>
