@@ -28,7 +28,6 @@
       <ProgrammeForm v-if="vue === 'form'" @termine="onTermine" />
 
       <div v-if="vue === 'liste'" class="content-body">
-        <!-- Panel gauche -->
         <div class="panel-list">
           <div class="section-title">Mes programmes</div>
           <div v-if="programmes.length === 0" class="empty">Aucun programme.</div>
@@ -41,9 +40,6 @@
           >
             <div class="prog-card-top">
               <div class="prog-name">{{ p.nom }}</div>
-              <button v-if="editMode" class="btn-icon btn-danger" @click.stop="supprimerProgramme(p)" title="Supprimer">
-                <i class="ti ti-trash"></i>
-              </button>
             </div>
             <div class="prog-meta">
               <span class="badge" :class="p.statut === 'actif' ? 'badge-green' : 'badge-gray'">{{ p.statut }}</span>
@@ -55,7 +51,6 @@
           </button>
         </div>
 
-        <!-- Panel droit -->
         <div class="panel-detail" v-if="programmeActif">
 
           <div v-if="editMode" class="edit-banner">
@@ -76,6 +71,7 @@
               <template v-if="!editMode">
                 <button class="btn btn-sm" @click="modalAssigner = true"><i class="ti ti-user-plus"></i> Assigner</button>
                 <button class="btn btn-sm btn-primary" @click="startEditMode"><i class="ti ti-edit"></i> Modifier</button>
+                <button class="btn btn-sm btn-danger" @click="supprimerProgramme(programmeActif)"><i class="ti ti-trash"></i> Supprimer</button>
               </template>
               <template v-else>
                 <button class="btn btn-sm btn-primary" @click="sauvegarderEditMode">✓ Sauvegarder</button>
@@ -119,7 +115,6 @@
 
           <!-- TAB SÉANCES -->
           <template v-if="tabDetail === 'seances'">
-            <!-- Onglets de semaines -->
             <div class="semaines-tabs" v-if="semainesDisponibles.length > 0">
               <div
                 v-for="sem in semainesDisponibles"
@@ -129,130 +124,262 @@
                 @click="semaineActive = sem"
               >
                 <span>Semaine {{ sem }}</span>
-                <button
-                  v-if="editMode && semainesDisponibles.length > 1"
-                  class="btn-icon-tiny"
-                  @click.stop="supprimerSemaine(sem)"
-                  title="Supprimer cette semaine"
-                >
+                <button v-if="editMode && semainesDisponibles.length > 1" class="btn-icon-tiny" @click.stop="supprimerSemaine(sem)">
                   <i class="ti ti-x"></i>
                 </button>
               </div>
-              <button
-                v-if="editMode"
-                class="semaine-tab semaine-add"
-                @click="dupliquerSemaine"
-                title="Dupliquer la semaine active"
-              >
+              <button v-if="editMode" class="semaine-tab semaine-add" @click="dupliquerSemaine">
                 <i class="ti ti-plus"></i> Nouvelle semaine
               </button>
             </div>
 
             <div v-if="loadingSeances" class="empty">Chargement...</div>
 
-            <div v-for="seance in seancesFiltrees" :key="seance.id" class="seance-block">
+            <div
+              v-for="seance in seancesFiltrees"
+              :key="seance.id"
+              class="seance-block"
+              :class="`type-${seance.type_seance || 'musculation'}`"
+            >
               <div class="seance-head">
+                <span class="type-badge" :class="`type-badge-${seance.type_seance || 'musculation'}`">
+                  {{ labelType(seance.type_seance) }}
+                </span>
                 <span class="badge badge-purple" v-if="seance.jour">{{ seance.jour }}</span>
                 <span style="flex:1">{{ seance.nom }}</span>
                 <button v-if="editMode" class="btn btn-sm btn-danger" @click="supprimerSeance(seance)">
                   <i class="ti ti-trash"></i>
                 </button>
               </div>
+
               <div class="seance-body">
                 <div class="empty-seance" v-if="!seance.exercices || seance.exercices.length === 0">
                   Aucun exercice
                 </div>
-                <template v-else>
-                  <template v-for="(exo, idx) in seance.exercices" :key="exo.id">
-                    <div v-if="exo.groupe && (idx === 0 || seance.exercices[idx-1].groupe !== exo.groupe)" class="superset-label-row">
-                      <span class="superset-label">Biset / Superset</span>
-                    </div>
-                    <div class="exo-block" :class="{ 'superset-indent': exo.groupe }">
-                      <div class="exo-header">
-                        <div class="exo-num">{{ exo.ordre }}</div>
+
+                <div
+                  v-for="groupe in grouperExercices(seance.exercices)"
+                  :key="groupe.key"
+                  class="exo-group"
+                  :class="{ 'is-superset': groupe.exercices.length > 1 }"
+                >
+                  <!-- Bandeau superset -->
+                  <div v-if="groupe.exercices.length > 1" class="superset-banner">
+                    <i class="ti ti-link"></i>
+                    <span>Superset/Biset · {{ groupe.exercices.length }} exercices</span>
+                  </div>
+
+                  <!-- Liste des exos + bouton supprimer + bouton ajout superset en edit -->
+                  <div class="exo-list">
+                    <div v-for="(exo, eidx) in groupe.exercices" :key="exo.id" class="exo-block">
+                      <div class="exo-head">
+                        <span class="exo-letter" v-if="groupe.exercices.length > 1">{{ letterFor(eidx) }}</span>
+                        <span class="exo-num" v-else>{{ exo.ordre }}</span>
                         <span class="exo-name" style="flex:1">{{ exo.nom }}</span>
                         <button v-if="editMode" class="btn-icon btn-danger" @click="supprimerExercice(seance, exo)">
                           <i class="ti ti-trash"></i>
                         </button>
                       </div>
+                    </div>
+                  </div>
 
-                      <div v-if="!editMode" class="serie-chips">
-                        <span class="chip" v-for="s in exo.series" :key="s.id">
-                          <template v-if="s.nb_reps">{{ s.nb_reps }} reps</template>
-                          <template v-if="s.poids_cible"> · {{ s.poids_cible }}</template>
-                          <template v-if="s.rm"> · {{ s.rm }}</template>
-                          <template v-if="s.tempo"> · {{ s.tempo }}</template>
-                          <template v-if="s.temps_repos"> · {{ s.temps_repos }}</template>
-                        </span>
+                  <!-- Bouton ajouter au superset (mode édition, si pas encore de séries) -->
+                  <template v-if="editMode && groupe.exercices[0].series.length === 0">
+                    <button
+                      v-if="!getGroupeForm(groupe, groupe.exercices[0])._formSupersetOuvert"
+                      class="btn-secondary btn-sm"
+                      style="align-self:flex-start"
+                      @click="getGroupeForm(groupe, groupe.exercices[0])._formSupersetOuvert = true"
+                    >
+                      <i class="ti ti-link"></i> Ajouter un superset à ce groupe
+                    </button>
+                    <div v-else class="add-exo-superset-form">
+                      <input
+                        v-model="getGroupeForm(groupe, groupe.exercices[0])._nouvelExoNom"
+                        placeholder="Nom de l'exercice à enchaîner"
+                        class="input-flex"
+                      />
+                      <button @click="ajouterAuSupersetEdit(seance, groupe)" :disabled="!getGroupeForm(groupe, groupe.exercices[0])._nouvelExoNom">
+                        + Ajouter
+                      </button>
+                      <button class="btn-secondary" @click="getGroupeForm(groupe, groupe.exercices[0])._formSupersetOuvert = false">
+                        Annuler
+                      </button>
+                    </div>
+                  </template>
+
+                  <!-- SÉRIES EXISTANTES (lecture + édition inline) -->
+                  <div v-if="groupe.exercices[0].series.length > 0" class="series-display">
+                    <div class="series-summary">
+                      <span class="series-count">{{ groupe.exercices[0].series.length }} séries</span>
+                    </div>
+
+                    <div v-for="serieIdx in groupe.exercices[0].series.length" :key="serieIdx" class="serie-group-row">
+                      <div class="serie-label">Série {{ serieIdx }}</div>
+                      <div class="serie-exos">
+                        <div v-for="(exo, eidx) in groupe.exercices" :key="exo.id" class="serie-exo">
+                          <span class="exo-letter-mini" v-if="groupe.exercices.length > 1">{{ letterFor(eidx) }}</span>
+                          <strong>{{ exo.nom }}</strong>
+
+                          <!-- Lecture seule -->
+                          <template v-if="!editMode">
+                            <span class="serie-values">
+                              <template v-if="seance.type_seance === 'musculation' || !seance.type_seance">
+                                <span v-if="exo.series[serieIdx-1]?.nb_reps">{{ exo.series[serieIdx-1].nb_reps }} reps</span>
+                                <span v-if="exo.series[serieIdx-1]?.poids_cible"> · {{ exo.series[serieIdx-1].poids_cible }}</span>
+                                <span v-if="exo.series[serieIdx-1]?.rm"> · {{ exo.series[serieIdx-1].rm }}</span>
+                                <span v-if="exo.series[serieIdx-1]?.tempo"> · {{ exo.series[serieIdx-1].tempo }}</span>
+                                <!-- Repos sur l'exo si solo -->
+                                <span v-if="groupe.exercices.length === 1 && exo.series[serieIdx-1]?.temps_repos" class="repos-tag">
+                                  · repos {{ exo.series[serieIdx-1].temps_repos }}
+                                </span>
+                              </template>
+                              <template v-else-if="seance.type_seance === 'natation' || seance.type_seance === 'athletisme'">
+                                <span v-if="exo.series[serieIdx-1]?.metres">{{ exo.series[serieIdx-1].metres }}m</span>
+                                <span v-if="exo.series[serieIdx-1]?.intensite"> · {{ exo.series[serieIdx-1].intensite }}</span>
+                                <span v-if="groupe.exercices.length === 1 && exo.series[serieIdx-1]?.temps_repos" class="repos-tag">
+                                  · repos {{ exo.series[serieIdx-1].temps_repos }}
+                                </span>
+                              </template>
+                              <template v-else-if="seance.type_seance === 'pliometrie'">
+                                <span v-if="exo.series[serieIdx-1]?.bonds">{{ exo.series[serieIdx-1].bonds }} bonds</span>
+                                <span v-if="exo.series[serieIdx-1]?.intensite"> · {{ exo.series[serieIdx-1].intensite }}</span>
+                                <span v-if="groupe.exercices.length === 1 && exo.series[serieIdx-1]?.temps_repos" class="repos-tag">
+                                  · repos {{ exo.series[serieIdx-1].temps_repos }}
+                                </span>
+                              </template>
+                            </span>
+                          </template>
+
+                          <!-- Édition inline -->
+                          <template v-else>
+                            <template v-if="seance.type_seance === 'musculation' || !seance.type_seance">
+                              <input v-model="exo.series[serieIdx-1].nb_reps" @change="mettreAJourSerie(exo.series[serieIdx-1])" placeholder="reps" class="mini-input" />
+                              <input v-model="exo.series[serieIdx-1].poids_cible" @change="mettreAJourSerie(exo.series[serieIdx-1])" placeholder="charge" class="mini-input" />
+                              <input v-model="exo.series[serieIdx-1].rm" @change="mettreAJourSerie(exo.series[serieIdx-1])" placeholder="%RM" class="mini-input" />
+                              <input v-model="exo.series[serieIdx-1].tempo" @change="mettreAJourSerie(exo.series[serieIdx-1])" placeholder="tempo" class="mini-input" />
+                              <!-- Repos sur l'exo si solo -->
+                              <input v-if="groupe.exercices.length === 1" v-model="exo.series[serieIdx-1].temps_repos" @change="mettreAJourSerie(exo.series[serieIdx-1])" placeholder="repos" class="mini-input repos-input" />
+                            </template>
+                            <template v-else-if="seance.type_seance === 'natation' || seance.type_seance === 'athletisme'">
+                              <input v-model="exo.series[serieIdx-1].metres" @change="mettreAJourSerie(exo.series[serieIdx-1])" placeholder="mètres" class="mini-input" />
+                              <input v-model="exo.series[serieIdx-1].intensite" @change="mettreAJourSerie(exo.series[serieIdx-1])" placeholder="intensité" class="mini-input" />
+                              <input v-if="groupe.exercices.length === 1" v-model="exo.series[serieIdx-1].temps_repos" @change="mettreAJourSerie(exo.series[serieIdx-1])" placeholder="repos" class="mini-input repos-input" />
+                            </template>
+                            <template v-else-if="seance.type_seance === 'pliometrie'">
+                              <input v-model="exo.series[serieIdx-1].bonds" @change="mettreAJourSerie(exo.series[serieIdx-1])" placeholder="bonds" class="mini-input" />
+                              <input v-model="exo.series[serieIdx-1].intensite" @change="mettreAJourSerie(exo.series[serieIdx-1])" placeholder="intensité" class="mini-input" />
+                              <input v-if="groupe.exercices.length === 1" v-model="exo.series[serieIdx-1].temps_repos" @change="mettreAJourSerie(exo.series[serieIdx-1])" placeholder="repos" class="mini-input repos-input" />
+                            </template>
+                          </template>
+                        </div>
+
+                        <!-- Repos commun APRÈS tous les exos si superset -->
+                        <div v-if="groupe.exercices.length > 1" class="repos-commun">
+                          <template v-if="!editMode">
+                            <span class="repos-tag" v-if="groupe.exercices[0].series[serieIdx-1]?.temps_repos">
+                              <i class="ti ti-clock"></i> Repos · {{ groupe.exercices[0].series[serieIdx-1].temps_repos }}
+                            </span>
+                          </template>
+                          <template v-else>
+                            <span class="repos-label"><i class="ti ti-clock"></i> Repos :</span>
+                            <input
+                              v-model="groupe.exercices[0].series[serieIdx-1].temps_repos"
+                              @change="syncReposSuperset(groupe, serieIdx-1)"
+                              placeholder="ex: 1min30"
+                              class="mini-input repos-input"
+                            />
+                          </template>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- FORMULAIRE DE GÉNÉRATION (si aucune série et mode édition) -->
+                  <template v-else-if="editMode">
+                    <div class="serie-gen-form">
+                      <!-- Champs par exercice -->
+                      <div v-for="(exo, eidx) in groupe.exercices" :key="exo.id" class="serie-gen-exo">
+                        <span class="exo-letter-mini" v-if="groupe.exercices.length > 1">{{ letterFor(eidx) }}</span>
+                        <strong style="font-size:12px;min-width:80px">{{ exo.nom }}</strong>
+
+                        <template v-if="seance.type_seance === 'musculation' || !seance.type_seance">
+                          <input v-model="getGroupeForm(groupe, exo).params[exo.id].nb_reps" placeholder="reps" class="mini-input" />
+                          <input v-model="getGroupeForm(groupe, exo).params[exo.id].poids_cible" placeholder="charge" class="mini-input" />
+                          <input v-model="getGroupeForm(groupe, exo).params[exo.id].rm" placeholder="%RM" class="mini-input" />
+                          <input v-model="getGroupeForm(groupe, exo).params[exo.id].tempo" placeholder="tempo" class="mini-input" />
+                          <!-- Repos sur l'exo si solo -->
+                          <input v-if="groupe.exercices.length === 1" v-model="getGroupeForm(groupe, exo).temps_repos" placeholder="repos" class="mini-input repos-input" />
+                        </template>
+                        <template v-else-if="seance.type_seance === 'natation' || seance.type_seance === 'athletisme'">
+                          <input v-model="getGroupeForm(groupe, exo).params[exo.id].metres" placeholder="mètres" class="mini-input" />
+                          <input v-model="getGroupeForm(groupe, exo).params[exo.id].intensite" placeholder="intensité" class="mini-input" />
+                          <input v-if="groupe.exercices.length === 1" v-model="getGroupeForm(groupe, exo).temps_repos" placeholder="repos" class="mini-input repos-input" />
+                        </template>
+                        <template v-else-if="seance.type_seance === 'pliometrie'">
+                          <input v-model="getGroupeForm(groupe, exo).params[exo.id].bonds" placeholder="bonds" class="mini-input" />
+                          <input v-model="getGroupeForm(groupe, exo).params[exo.id].intensite" placeholder="intensité" class="mini-input" />
+                          <input v-if="groupe.exercices.length === 1" v-model="getGroupeForm(groupe, exo).temps_repos" placeholder="repos" class="mini-input repos-input" />
+                        </template>
                       </div>
 
-                      <div v-else class="series-table">
-                        <div class="series-header">
-                          <span>#</span>
-                          <span>Reps</span>
-                          <span>Charge</span>
-                          <span>% RM</span>
-                          <span>Tempo</span>
-                          <span>Repos</span>
-                          <span></span>
+                      <!-- Repos commun si superset -->
+                      <div v-if="groupe.exercices.length > 1" class="serie-gen-repos-superset">
+                        <span class="repos-label"><i class="ti ti-clock"></i> Repos après le superset :</span>
+                        <input v-model="getGroupeForm(groupe, groupe.exercices[0]).temps_repos" placeholder="ex: 1min30" class="mini-input" style="width:110px" />
+                      </div>
+
+                      <!-- Nb séries + bouton générer -->
+                      <div class="serie-gen-footer">
+                        <div class="field-inline">
+                          <label>Nb séries</label>
+                          <input v-model.number="getGroupeForm(groupe, groupe.exercices[0]).nb_series" type="number" min="1" placeholder="4" class="mini-input" style="width:70px" />
                         </div>
-                        <div v-for="(serie, i) in exo.series" :key="serie.id" class="serie-row-edit">
-                          <span class="serie-num">{{ i + 1 }}</span>
-                          <input v-model="serie.nb_reps" @change="mettreAJourSerie(serie)" placeholder="–" />
-                          <input v-model="serie.poids_cible" @change="mettreAJourSerie(serie)" placeholder="–" />
-                          <input v-model="serie.rm" @change="mettreAJourSerie(serie)" placeholder="–" />
-                          <input v-model="serie.tempo" @change="mettreAJourSerie(serie)" placeholder="–" />
-                          <input v-model="serie.temps_repos" @change="mettreAJourSerie(serie)" placeholder="–" />
-                          <button class="btn-icon btn-danger" @click="supprimerSerie(exo, serie)">
-                            <i class="ti ti-trash"></i>
-                          </button>
-                        </div>
-                        <button class="btn btn-sm btn-dashed" @click="ajouterSerieRapide(exo)" style="margin-top:4px">
-                          <i class="ti ti-plus"></i> Ajouter une série
+                        <button class="btn btn-sm btn-primary" @click="genererSeriesGroupeEdit(groupe, seance)">
+                          Générer {{ getGroupeForm(groupe, groupe.exercices[0]).nb_series || '?' }} séries
                         </button>
                       </div>
                     </div>
                   </template>
-                </template>
 
+                  <div v-else class="empty-series">Aucune série définie</div>
+                </div>
+
+                <!-- Formulaire ajout exercice en mode édition -->
                 <div v-if="editMode" class="add-exercice-form">
-                  <input v-model.number="seance._nouvelExercice.ordre" type="number" placeholder="Ordre" class="input-sm" />
                   <input v-model="seance._nouvelExercice.nom" placeholder="Nom de l'exercice" class="input-flex" />
-                  <input v-model.number="seance._nouvelExercice.groupe" type="number" placeholder="Groupe" class="input-sm" />
-                  <button
-                    class="btn btn-sm"
-                    @click="ajouterExercice(seance)"
-                    :disabled="!seance._nouvelExercice.nom || !seance._nouvelExercice.ordre"
-                  >
+                  <button class="btn btn-sm" @click="ajouterExercice(seance)" :disabled="!seance._nouvelExercice.nom">
                     + Exercice
                   </button>
                 </div>
               </div>
             </div>
 
+            <!-- Formulaire ajout séance en mode édition -->
             <div v-if="editMode" class="add-seance-form">
               <input v-model="nouvelleSeance.nom" placeholder="Nom de la séance" class="input-flex" />
+              <select v-model="nouvelleSeance.type_seance">
+                <option value="musculation">Musculation</option>
+                <option value="natation">Natation</option>
+                <option value="athletisme">Athlétisme</option>
+                <option value="pliometrie">Pliométrie</option>
+              </select>
               <select v-model="nouvelleSeance.jour">
-                <option value="">Jour (optionnel)</option>
+                <option value="">Jour</option>
                 <option v-for="j in jours" :key="j" :value="j">{{ j }}</option>
               </select>
               <button class="btn btn-sm" @click="ajouterSeance" :disabled="!nouvelleSeance.nom">+ Séance</button>
             </div>
           </template>
 
-          <!-- TAB LOGS ATHLETES -->
+          <!-- TAB LOGS -->
           <template v-if="tabDetail === 'logs'">
             <div v-if="programmeActif.athletes.length === 0" class="empty">
               Aucun athlète assigné à ce programme.
             </div>
 
             <div v-if="!athleteLogs" class="logs-athletes-list">
-              <div
-                v-for="a in programmeActif.athletes"
-                :key="a.id"
-                class="athlete-card"
-                @click="voirLogsAthlete(a)"
-              >
+              <div v-for="a in programmeActif.athletes" :key="a.id" class="athlete-card" @click="voirLogsAthlete(a)">
                 <div class="mini-av-lg">{{ initiales(a.nom) }}</div>
                 <div class="athlete-info">
                   <div class="athlete-nom">{{ a.nom }}</div>
@@ -277,9 +404,7 @@
               </div>
 
               <div v-if="loadingLogs" class="empty">Chargement...</div>
-              <div v-else-if="logsGroupes.length === 0" class="empty">
-                Aucun log enregistré pour cet athlète.
-              </div>
+              <div v-else-if="logsGroupes.length === 0" class="empty">Aucun log enregistré pour cet athlète.</div>
 
               <div v-else>
                 <div v-for="session in logsGroupes" :key="session.key" class="session-block">
@@ -288,33 +413,22 @@
                     <span class="session-nom">{{ session.seanceNom }}</span>
                     <span class="session-date">{{ formatDate(session.date) }}</span>
                   </div>
-
                   <div class="session-body">
                     <div v-for="exo in session.exercices" :key="exo.id" class="exo-bloc">
                       <div class="exo-header">
                         <div class="exo-num">{{ exo.ordre }}</div>
                         <span class="exo-name">{{ exo.nom }}</span>
                       </div>
-
                       <div class="comparatif-grid">
                         <div class="comparatif-header">
-                          <span>#</span>
-                          <span>Prescrit</span>
-                          <span>Réalisé</span>
-                          <span></span>
+                          <span>#</span><span>Prescrit</span><span>Réalisé</span><span></span>
                         </div>
-                        <div
-                          v-for="(log, i) in exo.logs"
-                          :key="log.id"
-                          class="comparatif-row"
-                          :class="getStatutClasse(log)"
-                        >
+                        <div v-for="(log, i) in exo.logs" :key="log.id" class="comparatif-row" :class="getStatutClasse(log)">
                           <span class="serie-num">{{ i + 1 }}</span>
                           <div class="prescrit-cell">
                             <span v-if="log.serie.nb_reps">{{ log.serie.nb_reps }} reps</span>
                             <span v-if="log.serie.poids_cible"> · {{ log.serie.poids_cible }}</span>
                             <span v-if="log.serie.rm"> · {{ log.serie.rm }}</span>
-                            <span v-if="log.serie.tempo"> · {{ log.serie.tempo }}</span>
                           </div>
                           <div class="realise-cell">
                             <template v-if="log.fait">
@@ -324,9 +438,7 @@
                             </template>
                             <span v-else class="non-fait">non réalisé</span>
                           </div>
-                          <span class="statut-icon">
-                            <i :class="getStatutIcon(log)"></i>
-                          </span>
+                          <span class="statut-icon"><i :class="getStatutIcon(log)"></i></span>
                         </div>
                       </div>
                     </div>
@@ -341,6 +453,7 @@
       </div>
     </template>
 
+    <!-- ONGLET ATHLETES -->
     <div v-if="onglet === 'athletes'" class="athletes-page">
       <div class="section-title" style="margin-bottom:12px">Mon cercle d'athlètes</div>
       <div v-if="monCercle.length === 0" class="empty">Aucun athlète dans votre cercle.</div>
@@ -352,7 +465,6 @@
         </div>
         <button class="btn btn-sm btn-danger" @click="retirerDuCercle(a)">Retirer</button>
       </div>
-
       <div class="add-athlete-row">
         <input v-model="searchEmail" placeholder="Email de l'athlète" type="email" style="flex:1" />
         <button class="btn" @click="rechercherAthlète" :disabled="!searchEmail">Rechercher</button>
@@ -400,8 +512,9 @@ export default {
     const athleteLogs = ref(null)
     const logs = ref([])
     const loadingLogs = ref(false)
-    const nouvelleSeance = ref({ nom: '', jour: '' })
+    const nouvelleSeance = ref({ nom: '', jour: '', type_seance: 'musculation' })
     const semaineActive = ref(1)
+    const groupeForms = ref({})
     const router = useRouter()
     const authStore = useAuthStore()
     const api = useApi()
@@ -409,13 +522,129 @@ export default {
     const jours = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche']
     const vueLabel = computed(() => onglet.value === 'athletes' ? 'Mes athlètes' : 'Programmes')
 
-    // Liste triée des numéros de semaines existant
+    const labelType = (t) => {
+      const map = { musculation: 'Musculation', natation: 'Natation', athletisme: 'Athlétisme', pliometrie: 'Pliométrie' }
+      return map[t] || 'Musculation'
+    }
+
+    const letterFor = (idx) => String.fromCharCode(65 + idx)
+
+    const grouperExercices = (exercices) => {
+      if (!exercices || exercices.length === 0) return []
+      const groupes = []
+      const map = {}
+      const sorted = [...exercices].sort((a, b) => a.ordre - b.ordre)
+      sorted.forEach(exo => {
+        if (exo.groupe) {
+          if (!map[exo.groupe]) {
+            map[exo.groupe] = { key: `g${exo.groupe}`, exercices: [] }
+            groupes.push(map[exo.groupe])
+          }
+          map[exo.groupe].exercices.push(exo)
+        } else {
+          groupes.push({ key: `e${exo.id}`, exercices: [exo] })
+        }
+      })
+      return groupes
+    }
+
+    const getGroupeForm = (groupe, exo) => {
+      const key = groupe.key
+      if (!groupeForms.value[key]) {
+        groupeForms.value[key] = {
+          nb_series: 4,
+          temps_repos: '',
+          params: {},
+          _formSupersetOuvert: false,
+          _nouvelExoNom: ''
+        }
+      }
+      const form = groupeForms.value[key]
+      groupe.exercices.forEach(e => {
+        if (!form.params[e.id]) {
+          form.params[e.id] = { nb_reps: '', poids_cible: '', rm: '', tempo: '', metres: '', bonds: '', intensite: '' }
+        }
+      })
+      if (exo && !form.params[exo.id]) {
+        form.params[exo.id] = { nb_reps: '', poids_cible: '', rm: '', tempo: '', metres: '', bonds: '', intensite: '' }
+      }
+      return form
+    }
+
+    const genererSeriesGroupeEdit = async (groupe, seance) => {
+      const form = groupeForms.value[groupe.key]
+      if (!form) return
+      const type = seance.type_seance || 'musculation'
+
+      const buildPayload = (params) => {
+        if (type === 'musculation') {
+          return { nb_reps: params.nb_reps || null, poids_cible: params.poids_cible || null, rm: params.rm || null, tempo: params.tempo || null, temps_repos: form.temps_repos || null }
+        }
+        if (type === 'natation' || type === 'athletisme') {
+          return { nb_series: '1', metres: params.metres || null, intensite: params.intensite || null, temps_repos: form.temps_repos || null }
+        }
+        if (type === 'pliometrie') {
+          return { nb_series: '1', bonds: params.bonds || null, intensite: params.intensite || null, temps_repos: form.temps_repos || null }
+        }
+        return {}
+      }
+
+      for (const exo of groupe.exercices) {
+        const params = form.params[exo.id] || {}
+        for (let i = 0; i < form.nb_series; i++) {
+          await api.post(`/exercices/${exo.id}/series/`, buildPayload(params))
+        }
+      }
+      await fetchSeances(programmeActif.value.id)
+    }
+
+    // Synchronise le repos sur toutes les séries du superset (même série_idx)
+    const syncReposSuperset = async (groupe, serieIdx) => {
+      const repos = groupe.exercices[0].series[serieIdx]?.temps_repos
+      for (const exo of groupe.exercices) {
+        const serie = exo.series[serieIdx]
+        if (serie) {
+          serie.temps_repos = repos
+          await mettreAJourSerie(serie)
+        }
+      }
+    }
+
+    // Ajoute un exo à un superset depuis le mode édition
+    const ajouterAuSupersetEdit = async (seance, groupe) => {
+      const form = groupeForms.value[groupe.key]
+      if (!form?._nouvelExoNom) return
+
+      let numGroupe = groupe.exercices[0].groupe
+      if (!numGroupe) {
+        const maxGroupe = Math.max(0, ...seance.exercices.map(e => e.groupe || 0))
+        numGroupe = maxGroupe + 1
+        const premierExo = groupe.exercices[0]
+        await api.patch(`/exercices/${premierExo.id}`, {
+          nom: premierExo.nom,
+          ordre: premierExo.ordre,
+          groupe: numGroupe
+        })
+        premierExo.groupe = numGroupe
+      }
+
+      const data = await api.post(`/seances/${seance.id}/exercices/`, {
+        nom: form._nouvelExoNom,
+        ordre: seance.exercices.length + 1,
+        groupe: numGroupe
+      })
+      seance.exercices.push({ ...data, series: [] })
+      form._nouvelExoNom = ''
+      form._formSupersetOuvert = false
+      // Recharge pour avoir la nouvelle structure
+      await fetchSeances(programmeActif.value.id)
+    }
+
     const semainesDisponibles = computed(() => {
       const set = new Set(seances.value.map(s => s.semaine || 1))
       return Array.from(set).sort((a, b) => a - b)
     })
 
-    // Séances de la semaine active uniquement
     const seancesFiltrees = computed(() => {
       return seances.value
         .filter(s => (s.semaine || 1) === semaineActive.value)
@@ -450,15 +679,9 @@ export default {
     const fetchSeances = async (programmeId) => {
       loadingSeances.value = true
       const data = await api.get(`/programmes/${programmeId}/seances/`)
-      seances.value = data.map(s => ({
-        ...s,
-        _nouvelExercice: { nom: '', ordre: (s.exercices?.length || 0) + 1, groupe: null }
-      }))
-      // Recalibre la semaine active si besoin
+      seances.value = data.map(s => ({ ...s, _nouvelExercice: { nom: '' } }))
       const semaines = [...new Set(seances.value.map(s => s.semaine || 1))]
-      if (!semaines.includes(semaineActive.value)) {
-        semaineActive.value = semaines[0] || 1
-      }
+      if (!semaines.includes(semaineActive.value)) semaineActive.value = semaines[0] || 1
       loadingSeances.value = false
     }
 
@@ -474,6 +697,7 @@ export default {
       }
       programmeActif.value = p
       semaineActive.value = 1
+      groupeForms.value = {}
     }
 
     watch(programmeActif, (p) => {
@@ -486,6 +710,7 @@ export default {
       editNom.value = programmeActif.value.nom
       editDesc.value = programmeActif.value.description || ''
       editMode.value = true
+      groupeForms.value = {}
     }
 
     const sauvegarderEditMode = async () => {
@@ -500,40 +725,33 @@ export default {
 
     const annulerEditMode = () => {
       editMode.value = false
+      groupeForms.value = {}
       fetchSeances(programmeActif.value.id)
     }
 
     const ajouterSeance = async () => {
-      // Compte les séances existantes dans la semaine active pour l'ordre
       const seancesSemaine = seances.value.filter(s => (s.semaine || 1) === semaineActive.value)
       const data = await api.post(`/programmes/${programmeActif.value.id}/seances/`, {
         nom: nouvelleSeance.value.nom,
         ordre: seancesSemaine.length + 1,
         jour: nouvelleSeance.value.jour || null,
-        semaine: semaineActive.value
+        semaine: semaineActive.value,
+        type_seance: nouvelleSeance.value.type_seance
       })
-      seances.value.push({
-        ...data,
-        exercices: [],
-        _nouvelExercice: { nom: '', ordre: 1, groupe: null }
-      })
-      nouvelleSeance.value = { nom: '', jour: '' }
+      seances.value.push({ ...data, exercices: [], _nouvelExercice: { nom: '' } })
+      nouvelleSeance.value = { nom: '', jour: '', type_seance: 'musculation' }
     }
 
     const dupliquerSemaine = async () => {
       const nouvellesSeances = await api.post(
         `/programmes/${programmeActif.value.id}/seances/dupliquer-semaine/${semaineActive.value}`
       )
-      // Recharge tout pour avoir la structure complète à jour
       await fetchSeances(programmeActif.value.id)
-      // Bascule sur la nouvelle semaine
-      if (nouvellesSeances.length > 0) {
-        semaineActive.value = nouvellesSeances[0].semaine
-      }
+      if (nouvellesSeances.length > 0) semaineActive.value = nouvellesSeances[0].semaine
     }
 
     const supprimerSemaine = async (numero) => {
-      if (!confirm(`Supprimer toute la semaine ${numero} (toutes les séances et exercices) ?`)) return
+      if (!confirm(`Supprimer toute la semaine ${numero} ?`)) return
       await api.del(`/programmes/${programmeActif.value.id}/seances/semaine/${numero}`)
       await fetchSeances(programmeActif.value.id)
     }
@@ -541,18 +759,11 @@ export default {
     const ajouterExercice = async (seance) => {
       const data = await api.post(`/seances/${seance.id}/exercices/`, {
         nom: seance._nouvelExercice.nom,
-        ordre: seance._nouvelExercice.ordre,
-        groupe: seance._nouvelExercice.groupe || null
+        ordre: seance.exercices.length + 1,
+        groupe: null
       })
       seance.exercices.push({ ...data, series: [] })
-      seance._nouvelExercice = { nom: '', ordre: seance.exercices.length + 1, groupe: null }
-    }
-
-    const ajouterSerieRapide = async (exercice) => {
-      const data = await api.post(`/exercices/${exercice.id}/series/`, {
-        nb_reps: null, poids_cible: null, rm: null, tempo: null, temps_repos: null
-      })
-      exercice.series.push(data)
+      seance._nouvelExercice = { nom: '' }
     }
 
     const mettreAJourSerie = async (serie) => {
@@ -561,6 +772,10 @@ export default {
         poids_cible: serie.poids_cible || null,
         rm: serie.rm || null,
         tempo: serie.tempo || null,
+        metres: serie.metres || null,
+        bonds: serie.bonds || null,
+        nb_series: serie.nb_series || null,
+        intensite: serie.intensite || null,
         temps_repos: serie.temps_repos || null
       })
     }
@@ -585,11 +800,6 @@ export default {
       if (!confirm(`Supprimer l'exercice "${exo.nom}" ?`)) return
       await api.del(`/exercices/${exo.id}`)
       seance.exercices = seance.exercices.filter(e => e.id !== exo.id)
-    }
-
-    const supprimerSerie = async (exo, serie) => {
-      await api.del(`/series/${serie.id}`)
-      exo.series = exo.series.filter(s => s.id !== serie.id)
     }
 
     const onClickTabLogs = () => { tabDetail.value = 'logs'; athleteLogs.value = null }
@@ -617,9 +827,7 @@ export default {
 
     const getStatutIcon = (log) => {
       if (!log.fait) return 'ti ti-x'
-      const classe = getStatutClasse(log)
-      if (classe === 'statut-warn') return 'ti ti-alert-triangle'
-      return 'ti ti-check'
+      return getStatutClasse(log) === 'statut-warn' ? 'ti ti-alert-triangle' : 'ti ti-check'
     }
 
     const onTermine = () => { vue.value = 'liste'; fetchProgrammes() }
@@ -668,13 +876,15 @@ export default {
       loadingSeances, modalAssigner, vue, onglet, vueLabel,
       tabDetail, athleteLogs, logs, loadingLogs, logsGroupes,
       editMode, editNom, editDesc,
-      nouvelleSeance, jours,
+      nouvelleSeance, jours, labelType, letterFor, grouperExercices,
       semaineActive, semainesDisponibles, seancesFiltrees,
+      groupeForms, getGroupeForm, genererSeriesGroupeEdit,
+      syncReposSuperset, ajouterAuSupersetEdit,
       searchEmail, athleteTrouve, searchError,
       selectProgramme, startEditMode, sauvegarderEditMode, annulerEditMode,
-      ajouterSeance, ajouterExercice, ajouterSerieRapide, mettreAJourSerie,
+      ajouterSeance, ajouterExercice, mettreAJourSerie,
       dupliquerSemaine, supprimerSemaine,
-      supprimerProgramme, supprimerSeance, supprimerExercice, supprimerSerie,
+      supprimerProgramme, supprimerSeance, supprimerExercice,
       onTermine, onModifie, logout, initiales,
       onClickTabLogs, voirLogsAthlete, formatDate,
       getStatutClasse, getStatutIcon,
@@ -698,6 +908,8 @@ export default {
 .btn-icon-tiny:hover { opacity: 1; }
 .btn-danger { background: #fee2e2; color: #dc2626; border: 1px solid #fca5a5 !important; }
 .btn-danger:hover { background: #fecaca; }
+.btn-secondary { background: #f3f4f6; color: #374151; border: 1px solid #e5e7eb; }
+.btn-secondary:hover { background: #e5e7eb; }
 .nav-item { display: flex; align-items: center; gap: 10px; padding: 8px 16px; font-size: 13px; cursor: pointer; color: #6b7280; }
 .nav-item:hover { background: white; color: #111; }
 .nav-item.active { background: white; color: #111; font-weight: 500; border-right: 2px solid #7F77DD; }
@@ -739,30 +951,65 @@ export default {
 .semaine-tab.active { background: #EEEDFE; border-color: #7F77DD; color: #3C3489; font-weight: 500; }
 .semaine-tab.semaine-add { background: transparent; border-style: dashed; color: #534AB7; }
 .semaine-tab.semaine-add:hover { background: #f9fafb; }
-.seance-block { border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; flex-shrink: 0; }
+.seance-block { border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; flex-shrink: 0; border-left-width: 4px; }
+.seance-block.type-musculation { border-left-color: #FCA5A5; }
+.seance-block.type-natation { border-left-color: #93C5FD; }
+.seance-block.type-athletisme { border-left-color: #86EFAC; }
+.seance-block.type-pliometrie { border-left-color: #FDBA74; }
+.type-badge { display: inline-flex; align-items: center; font-size: 10px; font-weight: 500; padding: 2px 8px; border-radius: 20px; }
+.type-badge-musculation { background: #FEE2E2; color: #B91C1C; }
+.type-badge-natation { background: #DBEAFE; color: #1E40AF; }
+.type-badge-athletisme { background: #DCFCE7; color: #166534; }
+.type-badge-pliometrie { background: #FED7AA; color: #9A3412; }
 .seance-head { padding: 10px 14px; background: #f9fafb; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #e5e7eb; font-size: 13px; font-weight: 500; }
 .seance-body { padding: 10px 14px; display: flex; flex-direction: column; gap: 10px; }
-.exo-block { display: flex; flex-direction: column; gap: 6px; padding: 8px 0; border-bottom: 1px solid #f3f4f6; }
-.exo-block:last-child { border-bottom: none; }
-.exo-header { display: flex; align-items: center; gap: 8px; }
-.exo-num { width: 20px; height: 20px; border-radius: 4px; background: #EEEDFE; color: #534AB7; font-size: 11px; font-weight: 500; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+
+/* Groupes d'exercices */
+.exo-group { display: flex; flex-direction: column; gap: 8px; padding: 10px; background: #f9fafb; border-radius: 8px; border: 1px solid #e5e7eb; }
+.exo-group.is-superset { background: #F5F4FD; border: 1px solid #AFA9EC; border-left: 3px solid #7F77DD; }
+.superset-banner { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #534AB7; font-weight: 500; }
+.exo-list { display: flex; flex-direction: column; gap: 6px; }
+.exo-block { display: flex; flex-direction: column; gap: 6px; background: white; border-radius: 6px; padding: 8px 10px; border: 1px solid #e5e7eb; }
+.exo-head { display: flex; align-items: center; gap: 8px; }
+.exo-num, .exo-letter { width: 22px; height: 22px; border-radius: 4px; background: #EEEDFE; color: #534AB7; font-size: 11px; font-weight: 600; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.exo-letter { background: #7F77DD; color: white; }
 .exo-name { font-size: 13px; font-weight: 500; }
-.serie-chips { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 2px; padding-left: 28px; }
-.chip { font-size: 11px; background: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 4px; padding: 2px 6px; color: #6b7280; }
-.series-table { display: flex; flex-direction: column; gap: 4px; padding-left: 28px; }
-.series-header { display: grid; grid-template-columns: 24px repeat(5, 1fr) 28px; gap: 6px; font-size: 11px; color: #6b7280; font-weight: 500; padding: 0 2px; }
-.serie-row-edit { display: grid; grid-template-columns: 24px repeat(5, 1fr) 28px; gap: 6px; align-items: center; }
-.serie-row-edit input { padding: 5px 8px; font-size: 12px; border: 1px solid #e5e7eb; border-radius: 6px; width: 100%; }
-.serie-row-edit input:focus { outline: none; border-color: #7F77DD; }
-.serie-num { font-size: 12px; color: #9ca3af; text-align: center; }
-.add-exercice-form { display: flex; gap: 8px; align-items: center; padding-top: 8px; border-top: 1px dashed #e5e7eb; margin-top: 6px; }
-.add-seance-form { display: flex; gap: 8px; align-items: center; padding: 12px 16px; background: #f9fafb; border: 1px dashed #e5e7eb; border-radius: 8px; flex-shrink: 0; }
-.input-sm { width: 70px; flex-shrink: 0; padding: 6px 10px; border: 1px solid #e5e7eb; border-radius: 6px; font-size: 13px; }
-.input-flex { flex: 1; min-width: 0; padding: 6px 10px; border: 1px solid #e5e7eb; border-radius: 6px; font-size: 13px; }
+
+/* Formulaire ajout superset */
+.add-exo-superset-form { display: flex; gap: 8px; align-items: center; padding: 8px; background: white; border-radius: 6px; border: 1px dashed #AFA9EC; }
+
+/* Affichage séries */
+.series-display { display: flex; flex-direction: column; gap: 6px; }
+.series-summary { font-size: 12px; color: #534AB7; font-weight: 600; padding-bottom: 4px; border-bottom: 1px solid #e5e7eb; }
+.serie-group-row { display: flex; gap: 10px; align-items: flex-start; padding: 8px; background: white; border-radius: 6px; border: 1px solid #e5e7eb; }
+.serie-label { font-size: 11px; font-weight: 600; color: #534AB7; padding: 4px 8px; background: #EEEDFE; border-radius: 4px; white-space: nowrap; flex-shrink: 0; align-self: flex-start; }
+.serie-exos { display: flex; flex-direction: column; gap: 6px; flex: 1; }
+.serie-exo { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.exo-letter-mini { font-size: 10px; font-weight: 700; color: white; background: #7F77DD; padding: 2px 6px; border-radius: 4px; flex-shrink: 0; }
+.serie-exo strong { font-size: 12px; min-width: 80px; }
+.serie-values { font-size: 12px; color: #6b7280; }
+
+/* Repos */
+.repos-tag { font-size: 11px; color: #9ca3af; font-style: italic; }
+.repos-input { border-color: #C8D6E5 !important; background: #f8fafc; }
+.repos-commun { display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: #f3f4f6; border-radius: 6px; border: 1px dashed #d1d5db; margin-top: 4px; }
+.repos-label { font-size: 11px; color: #6b7280; white-space: nowrap; display: flex; align-items: center; gap: 4px; }
+
+/* Formulaire de génération de séries */
+.serie-gen-form { display: flex; flex-direction: column; gap: 8px; padding: 10px; background: white; border-radius: 6px; border: 1px dashed #7F77DD; }
+.serie-gen-exo { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.serie-gen-repos-superset { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: #f3f4f6; border-radius: 6px; border: 1px dashed #d1d5db; }
+.serie-gen-footer { display: flex; align-items: center; gap: 8px; padding-top: 8px; border-top: 1px solid #f3f4f6; }
+.field-inline { display: flex; flex-direction: column; gap: 3px; }
+.field-inline label { font-size: 10px; color: #9ca3af; font-weight: 500; }
+.mini-input { padding: 4px 8px; font-size: 12px; width: 80px; border: 1px solid #e5e7eb; border-radius: 4px; }
+.mini-input:focus { outline: none; border-color: #7F77DD; }
+
+.empty-series { font-size: 12px; color: #9ca3af; font-style: italic; padding: 4px 0; }
+.add-exercice-form { display: flex; gap: 8px; align-items: center; padding-top: 8px; border-top: 1px dashed #e5e7eb; }
+.add-seance-form { display: flex; gap: 8px; align-items: center; padding: 12px 16px; background: #f9fafb; border: 1px dashed #e5e7eb; border-radius: 8px; flex-shrink: 0; flex-wrap: wrap; }
 .add-seance-form select { padding: 6px 10px; border: 1px solid #e5e7eb; border-radius: 6px; font-size: 13px; }
-.superset-label-row { display: flex; align-items: center; gap: 6px; margin: 4px 0 2px; }
-.superset-label { font-size: 10px; color: #534AB7; background: #EEEDFE; padding: 1px 6px; border-radius: 10px; font-weight: 500; }
-.superset-indent { padding-left: 12px; border-left: 2px solid #AFA9EC; margin-left: 10px; }
+.input-flex { flex: 1; min-width: 0; padding: 6px 10px; border: 1px solid #e5e7eb; border-radius: 6px; font-size: 13px; }
 .empty { color: #9ca3af; text-align: center; padding: 20px; font-size: 13px; }
 .empty-seance { color: #9ca3af; font-size: 12px; padding: 8px 0; }
 .athletes-page { flex: 1; padding: 20px 24px; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; }
@@ -787,6 +1034,7 @@ export default {
 .session-date { font-size: 11px; color: #6b7280; text-transform: capitalize; }
 .session-body { padding: 12px 14px; display: flex; flex-direction: column; gap: 14px; }
 .exo-bloc { display: flex; flex-direction: column; gap: 6px; }
+.exo-header { display: flex; align-items: center; gap: 8px; }
 .comparatif-grid { display: flex; flex-direction: column; gap: 2px; }
 .comparatif-header { display: grid; grid-template-columns: 32px 1.4fr 1.4fr 24px; gap: 8px; font-size: 11px; color: #6b7280; font-weight: 500; padding: 0 4px 4px; }
 .comparatif-row { display: grid; grid-template-columns: 32px 1.4fr 1.4fr 24px; gap: 8px; align-items: center; padding: 6px 4px; border-radius: 6px; font-size: 12px; }
@@ -800,4 +1048,5 @@ export default {
 .realise-cell { font-weight: 500; }
 .non-fait { color: #dc2626; font-style: italic; }
 .statut-icon { display: flex; justify-content: center; }
+.serie-num { font-size: 12px; color: #9ca3af; text-align: center; }
 </style>
