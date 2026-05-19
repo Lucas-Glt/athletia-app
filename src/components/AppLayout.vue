@@ -2,34 +2,25 @@
   <div class="app">
     <header class="app-header">
       <div class="brand">
-        <h1>Athletia</h1>
-        <span>{{ roleLabel }}</span>
+        <div class="brand-icon">A</div>
+        <div class="brand-text">
+          <h1>Athletia</h1>
+          <span>{{ roleLabel }}</span>
+        </div>
       </div>
+
+      <nav class="header-nav">
+        <slot name="nav" />
+      </nav>
+
       <div class="header-right">
+        <slot name="actions" />
         <div class="avatar">{{ initiales }}</div>
       </div>
     </header>
 
-    <div class="app-body">
-      <div class="overlay" :class="{ show: sidebarOpen }" @click="sidebarOpen = false"></div>
-
-      <nav class="sidebar" :class="{ open: sidebarOpen }">
-        <slot name="nav" />
-        <div class="sidebar-bottom">{{ userName }}</div>
-      </nav>
-
-      <div class="main">
-        <div class="topbar">
-          <button class="btn-icon" @click="sidebarOpen = !sidebarOpen">
-            <i class="ti ti-menu-2"></i>
-          </button>
-          <h2>{{ title }}</h2>
-          <slot name="actions" />
-        </div>
-        <main class="main-content">
-          <slot />
-        </main>
-      </div>
+    <div class="main-content">
+      <slot />
     </div>
   </div>
 </template>
@@ -43,7 +34,6 @@ export default {
     title: { type: String, required: true }
   },
   setup() {
-    const sidebarOpen = ref(false)
     const authStore = useAuthStore()
 
     const roleLabel = computed(() => {
@@ -57,64 +47,105 @@ export default {
       return nom.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
     })
 
-    return { sidebarOpen, roleLabel, userName, initiales }
+    return { roleLabel, userName, initiales }
   }
 }
 </script>
 
 <style scoped>
 * { box-sizing: border-box; }
-html, body, #app { height: 100%; margin: 0; padding: 0; }
-.app { display: flex; flex-direction: column; height: 100vh; overflow: hidden; background: var(--bg); }
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  background: #F8F7FF;
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
 .app-header {
-  padding: 14px 20px;
-  border-bottom: 1px solid #e5e7eb;
+  height: 56px;
+  padding: 0 24px;
+  border-bottom: 1px solid #EEEDF8;
   display: flex;
   align-items: center;
   justify-content: space-between;
   flex-shrink: 0;
   background: white;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  z-index: 20;
+  gap: 24px;
 }
-.brand h1 { font-size: 18px; font-weight: 600; letter-spacing: -0.4px; color: #111; }
-.brand span { font-size: 12px; color: #6b7280; }
-.avatar {
-  width: 32px; height: 32px; border-radius: 50%;
-  background: #CECBF6; color: #3C3489;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 11px; font-weight: 600;
-}
-.app-body { display: flex; flex: 1 1 0; overflow: hidden; position: relative; min-height: 0; }
-.overlay {
-  display: none; position: absolute; inset: 0;
-  background: rgba(0,0,0,0.2); z-index: 9;
-}
-.overlay.show { display: block; }
-.sidebar {
-  position: absolute; left: 0; top: 0; bottom: 0; width: 220px;
-  border-right: 1px solid #e5e7eb; background: #f9fafb;
-  display: flex; flex-direction: column; padding: 12px 0;
-  z-index: 10; transform: translateX(-100%);
-  transition: transform 0.2s ease;
-}
-.sidebar.open { transform: translateX(0); }
-.sidebar-bottom {
-  margin-top: auto; padding: 12px 16px;
-  border-top: 1px solid #e5e7eb;
-  font-size: 12px; color: #6b7280;
-}
-.main { flex: 1 1 0; display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
-.topbar {
-  padding: 10px 16px; border-bottom: 1px solid #e5e7eb;
-  display: flex; align-items: center; gap: 10px; flex-shrink: 0;
-}
-.topbar h2 { font-size: 14px; font-weight: 500; flex: 1; }
-.btn-icon {
-  width: 32px; height: 32px; padding: 0;
-  display: inline-flex; align-items: center; justify-content: center;
-  border-radius: 6px; border: 1px solid #e5e7eb;
-  cursor: pointer; background: transparent; color: #374151;
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   flex-shrink: 0;
 }
-.btn-icon:hover { background: #f3f4f6; }
-.main-content { flex: 1 1 0; overflow: hidden; display: flex; min-height: 0; min-width: 0; }
+
+.brand-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #7F77DD, #534AB7);
+  color: white;
+  font-size: 16px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.brand-text h1 {
+  font-size: 15px;
+  font-weight: 700;
+  color: #111;
+  letter-spacing: -0.3px;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.brand-text span {
+  font-size: 10px;
+  color: #9ca3af;
+}
+
+/* Nav dans le header */
+.header-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #CECBF6, #AFA9EC);
+  color: #3C3489;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.main-content {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
 </style>

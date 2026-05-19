@@ -428,9 +428,9 @@ export default {
 .btn-primary:hover { background: #534AB7; }
 .btn-sm { padding: 5px 10px; font-size: 12px; }
 .btn-large { padding: 10px 20px; font-size: 14px; width: 100%; justify-content: center; }
-.nav-item { display: flex; align-items: center; gap: 10px; padding: 8px 16px; font-size: 13px; cursor: pointer; color: #6b7280; }
-.nav-item:hover { background: white; color: #111; }
-.nav-item.active { background: white; color: #111; font-weight: 500; border-right: 2px solid #7F77DD; }
+.nav-item { display: flex; align-items: center; gap: 6px; padding: 6px 12px; font-size: 13px; cursor: pointer; color: #6b7280; border-radius: 6px; font-weight: 500; border: none; background: transparent; }
+.nav-item:hover { background: #F8F7FF; color: #374151; }
+.nav-item.active { background: #EEEDFE; color: #534AB7; }
 .empty-state { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: #6b7280; }
 .empty-state p { font-size: 15px; font-weight: 500; }
 .empty-state span { font-size: 13px; color: #9ca3af; }

@@ -1,6 +1,17 @@
 import { useAuthStore } from '../stores/auth'
+import router from '../router'
 
 const BASE_URL = 'http://localhost:8000'
+
+async function handleResponse(response) {
+  if (response.status === 401) {
+    const authStore = useAuthStore()
+    authStore.logout()
+    router.push('/')
+    throw new Error('Session expirée')
+  }
+  return response.json()
+}
 
 export function useApi() {
   const authStore = useAuthStore()
@@ -11,27 +22,27 @@ export function useApi() {
   })
 
   const get = (path) =>
-    fetch(`${BASE_URL}${path}`, { headers: headers() }).then(r => r.json())
+    fetch(`${BASE_URL}${path}`, { headers: headers() }).then(handleResponse)
 
   const post = (path, body) =>
     fetch(`${BASE_URL}${path}`, {
       method: 'POST',
       headers: headers(),
       body: JSON.stringify(body)
-    }).then(r => r.json())
+    }).then(handleResponse)
 
   const patch = (path, body) =>
     fetch(`${BASE_URL}${path}`, {
       method: 'PATCH',
       headers: headers(),
       body: JSON.stringify(body)
-    }).then(r => r.json())
+    }).then(handleResponse)
 
   const del = (path) =>
     fetch(`${BASE_URL}${path}`, {
       method: 'DELETE',
       headers: headers()
-    }).then(r => r.json())
+    }).then(handleResponse)
 
   return { get, post, patch, del }
 }
