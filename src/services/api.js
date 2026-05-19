@@ -1,7 +1,7 @@
 import { useAuthStore } from '../stores/auth'
 import router from '../router'
 
-const BASE_URL = 'http://localhost:8000'
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 async function handleResponse(response) {
   if (response.status === 401) {
