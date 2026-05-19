@@ -7,8 +7,9 @@
     </template>
 
     <template #actions>
-      <button class="btn btn-primary" @click="ouvrirCreation"><i class="ti ti-plus"></i> Nouvel utilisateur</button>
-      <button class="btn" @click="logout"><i class="ti ti-logout"></i> Déconnexion</button>
+      <button class="btn btn-primary" @click="ouvrirCreation">
+        <i class="ti ti-plus"></i> Nouvel utilisateur
+      </button>
     </template>
 
     <!-- Modal création -->
@@ -45,6 +46,37 @@
           <button class="btn" @click="modalCreation = false">Annuler</button>
           <button class="btn btn-primary" @click="creerUtilisateur" :disabled="!newUser.nom || !newUser.email || !newUser.password">
             Créer
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal reset password -->
+    <div v-if="modalResetPassword" class="modal-overlay" @click.self="modalResetPassword = false">
+      <div class="modal">
+        <div class="modal-header">
+          <h3>Réinitialiser le mot de passe</h3>
+          <button class="btn-icon" @click="modalResetPassword = false"><i class="ti ti-x"></i></button>
+        </div>
+        <div class="modal-body">
+          <div class="user-cible-info">
+            <div class="avatar">{{ initiales(userCible?.nom || '') }}</div>
+            <div>
+              <div class="user-nom">{{ userCible?.nom }}</div>
+              <div class="user-email">{{ userCible?.email }}</div>
+            </div>
+          </div>
+          <div class="field">
+            <label>Nouveau mot de passe</label>
+            <input v-model="newPassword" type="password" placeholder="8 caractères minimum" />
+          </div>
+          <div v-if="resetError" class="error">{{ resetError }}</div>
+          <div v-if="resetSuccess" class="success">{{ resetSuccess }}</div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn" @click="modalResetPassword = false">Annuler</button>
+          <button class="btn btn-primary" @click="resetPassword" :disabled="!newPassword || loadingReset">
+            {{ loadingReset ? 'Enregistrement...' : 'Enregistrer' }}
           </button>
         </div>
       </div>
@@ -95,6 +127,13 @@
           </div>
           <div class="actions-cell">
             <button
+              class="btn btn-sm btn-warning"
+              @click="ouvrirResetPassword(user)"
+              title="Réinitialiser le mot de passe"
+            >
+              <i class="ti ti-lock"></i>
+            </button>
+            <button
               class="btn btn-sm btn-danger"
               @click="supprimerUtilisateur(user)"
               :disabled="user.id === moi?.id"
@@ -113,7 +152,6 @@
 
 <script>
 import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useApi } from '../services/api'
 import AppLayout from '../components/AppLayout.vue'
@@ -125,19 +163,31 @@ export default {
     const moi = ref(null)
     const loading = ref(false)
     const filtreRole = ref('tous')
-    const modalCreation = ref(false)
-    const createError = ref('')
     const onglet = ref('users')
-    const newUser = ref({ nom: '', email: '', password: '', role: 'athlete' })
-    const router = useRouter()
     const authStore = useAuthStore()
     const api = useApi()
 
+    // Création
+    const modalCreation = ref(false)
+    const createError = ref('')
+    const newUser = ref({ nom: '', email: '', password: '', role: 'athlete' })
+
+    // Reset password
+    const modalResetPassword = ref(false)
+    const userCible = ref(null)
+    const newPassword = ref('')
+    const resetError = ref('')
+    const resetSuccess = ref('')
+    const loadingReset = ref(false)
+
     const fetchUsers = async () => {
       loading.value = true
-      users.value = await api.get('/users/')
-      moi.value = await api.get('/users/me')
-      loading.value = false
+      try {
+        users.value = await api.get('/users/')
+        moi.value = await api.get('/users/me')
+      } finally {
+        loading.value = false
+      }
     }
 
     const usersFiltres = computed(() => {
@@ -160,10 +210,11 @@ export default {
       createError.value = ''
       try {
         const data = await api.post('/users/', newUser.value)
-        if (data.detail) { createError.value = data.detail; return }
         users.value.push(data)
         modalCreation.value = false
-      } catch { createError.value = 'Erreur lors de la création' }
+      } catch (e) {
+        createError.value = e.message || 'Erreur lors de la création'
+      }
     }
 
     const changerRole = async (user, newRole) => {
@@ -179,16 +230,45 @@ export default {
       users.value = users.value.filter(u => u.id !== user.id)
     }
 
+    const ouvrirResetPassword = (user) => {
+      userCible.value = user
+      newPassword.value = ''
+      resetError.value = ''
+      resetSuccess.value = ''
+      modalResetPassword.value = true
+    }
+
+    const resetPassword = async () => {
+      resetError.value = ''
+      resetSuccess.value = ''
+      if (newPassword.value.length < 8) {
+        resetError.value = 'Le mot de passe doit faire au moins 8 caractères'
+        return
+      }
+      loadingReset.value = true
+      try {
+        await api.patch(`/users/${userCible.value.id}/password`, { nouveau_mdp: newPassword.value })
+        resetSuccess.value = 'Mot de passe modifié avec succès !'
+        setTimeout(() => { modalResetPassword.value = false }, 1500)
+      } catch (e) {
+        resetError.value = e.message || 'Erreur lors de la réinitialisation'
+      } finally {
+        loadingReset.value = false
+      }
+    }
+
     const initiales = (nom) => nom.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
-    const logout = () => { authStore.logout(); router.push('/') }
 
     onMounted(fetchUsers)
 
     return {
-      users, moi, loading, filtreRole, modalCreation, createError, onglet, newUser,
+      users, moi, loading, filtreRole, onglet,
+      modalCreation, createError, newUser,
+      modalResetPassword, userCible, newPassword, resetError, resetSuccess, loadingReset,
       usersFiltres, compteRole,
       ouvrirCreation, creerUtilisateur, changerRole, supprimerUtilisateur,
-      initiales, logout
+      ouvrirResetPassword, resetPassword,
+      initiales
     }
   }
 }
@@ -196,26 +276,36 @@ export default {
 
 <style scoped>
 * { box-sizing: border-box; }
+
 .btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 6px; border: 1px solid #e5e7eb; font-size: 13px; cursor: pointer; background: transparent; color: #374151; }
 .btn:hover { background: #f9fafb; }
-.btn-primary { background: #7F77DD; color: #EEEDFE; border-color: #534AB7; }
-.btn-primary:hover { background: #534AB7; }
-.btn-sm { padding: 5px 10px; font-size: 12px; }
+.btn-primary { background: #7F77DD; color: white; border-color: #534AB7; }
+.btn-primary:hover:not(:disabled) { background: #534AB7; }
+.btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+.btn-sm { padding: 5px 8px; font-size: 12px; }
 .btn-icon { width: 28px; height: 28px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px; border: none; cursor: pointer; background: transparent; color: #6b7280; }
 .btn-danger { background: #fee2e2; color: #dc2626; border-color: #fca5a5; }
-.btn-danger:hover { background: #fecaca; }
+.btn-danger:hover:not(:disabled) { background: #fecaca; }
 .btn-danger:disabled { opacity: 0.3; cursor: not-allowed; }
-.nav-item { display: flex; align-items: center; gap: 10px; padding: 8px 16px; font-size: 13px; cursor: pointer; color: #6b7280; }
-.nav-item:hover { background: white; color: #111; }
-.nav-item.active { background: white; color: #111; font-weight: 500; border-right: 2px solid #7F77DD; }
+.btn-warning { background: #fef3c7; color: #b45309; border-color: #fcd34d; }
+.btn-warning:hover { background: #fde68a; }
+
+.nav-item { display: flex; align-items: center; gap: 10px; padding: 8px 16px; font-size: 13px; cursor: pointer; color: #6b7280; border-radius: 6px; }
+.nav-item:hover { background: #f3f4f6; color: #111; }
+.nav-item.active { background: #EEEDFE; color: #3C3489; font-weight: 500; }
 
 /* Modal */
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; z-index: 100; }
 .modal { background: white; border-radius: 12px; width: 420px; box-shadow: 0 20px 60px rgba(0,0,0,0.15); overflow: hidden; }
 .modal-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid #e5e7eb; }
-.modal-header h3 { font-size: 15px; font-weight: 500; }
+.modal-header h3 { font-size: 15px; font-weight: 600; margin: 0; }
 .modal-body { padding: 20px; display: flex; flex-direction: column; gap: 14px; }
 .modal-footer { display: flex; justify-content: flex-end; gap: 8px; padding: 16px 20px; border-top: 1px solid #e5e7eb; }
+
+.user-cible-info { display: flex; align-items: center; gap: 12px; padding: 12px; background: #f9fafb; border-radius: 8px; }
+.user-cible-info .user-nom { font-size: 13px; font-weight: 600; }
+.user-cible-info .user-email { font-size: 12px; color: #6b7280; }
+
 .field { display: flex; flex-direction: column; gap: 5px; }
 .field label { font-size: 12px; font-weight: 500; color: #374151; }
 .field input, .field select { padding: 8px 12px; border: 1px solid #e5e7eb; border-radius: 6px; font-size: 13px; }
@@ -223,6 +313,7 @@ export default {
 
 /* Page admin */
 .admin-page { flex: 1; padding: 20px 24px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; }
+
 .filters { display: flex; gap: 8px; flex-wrap: wrap; }
 .filter-btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border: 1px solid #e5e7eb; border-radius: 6px; font-size: 13px; cursor: pointer; background: white; color: #6b7280; }
 .filter-btn:hover { border-color: #7F77DD; }
@@ -232,21 +323,26 @@ export default {
 
 /* Table */
 .users-table { display: flex; flex-direction: column; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; }
-.table-header { display: grid; grid-template-columns: 1.5fr 2fr 1fr 80px; gap: 12px; padding: 10px 16px; background: #f9fafb; border-bottom: 1px solid #e5e7eb; font-size: 11px; font-weight: 500; color: #6b7280; text-transform: uppercase; letter-spacing: 0.4px; }
-.table-row { display: grid; grid-template-columns: 1.5fr 2fr 1fr 80px; gap: 12px; padding: 12px 16px; border-bottom: 1px solid #f3f4f6; align-items: center; }
+.table-header { display: grid; grid-template-columns: 1.5fr 2fr 1fr 100px; gap: 12px; padding: 10px 16px; background: #f9fafb; border-bottom: 1px solid #e5e7eb; font-size: 11px; font-weight: 500; color: #6b7280; text-transform: uppercase; letter-spacing: 0.4px; }
+.table-row { display: grid; grid-template-columns: 1.5fr 2fr 1fr 100px; gap: 12px; padding: 12px 16px; border-bottom: 1px solid #f3f4f6; align-items: center; }
 .table-row:last-child { border-bottom: none; }
 .table-row:hover { background: #fafafa; }
+
 .user-info { display: flex; align-items: center; gap: 10px; }
 .avatar { width: 32px; height: 32px; border-radius: 50%; background: #CECBF6; color: #3C3489; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; flex-shrink: 0; }
 .user-nom { font-size: 13px; font-weight: 500; }
 .user-email { font-size: 12px; color: #6b7280; }
+
 .role-cell { display: flex; }
 .role-select { padding: 4px 8px; border-radius: 20px; font-size: 11px; font-weight: 500; cursor: pointer; border: 1px solid transparent; }
 .role-select:focus { outline: none; }
 .role-select.role-admin { background: #FEE2E2; color: #B91C1C; }
 .role-select.role-prepa { background: #EEEDFE; color: #3C3489; }
 .role-select.role-athlete { background: #EAF3DE; color: #3B6D11; }
-.actions-cell { display: flex; justify-content: flex-end; }
+
+.actions-cell { display: flex; justify-content: flex-end; gap: 6px; }
+
 .empty { color: #9ca3af; text-align: center; padding: 40px; font-size: 13px; }
 .error { font-size: 12px; color: #dc2626; background: #fee2e2; padding: 8px 12px; border-radius: 6px; }
+.success { font-size: 12px; color: #16a34a; background: #dcfce7; padding: 8px 12px; border-radius: 6px; }
 </style>

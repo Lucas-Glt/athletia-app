@@ -10,7 +10,11 @@ async function handleResponse(response) {
     router.push('/')
     throw new Error('Session expirée')
   }
-  return response.json()
+  const data = await response.json()
+  if (!response.ok) {
+    throw new Error(data.detail || 'Erreur serveur')
+  }
+  return data
 }
 
 export function useApi() {
