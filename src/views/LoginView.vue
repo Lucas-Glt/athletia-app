@@ -60,7 +60,7 @@ export default {
         formData.append('username', email.value)
         formData.append('password', password.value)
 
-        const response = await fetch('http://localhost:8000/auth/login', {
+        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/auth/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
           body: formData
@@ -79,7 +79,7 @@ export default {
         const data = await response.json()
         const payload = JSON.parse(atob(data.access_token.split('.')[1]))
 
-        const userResponse = await fetch('http://localhost:8000/users/me', {
+        const userResponse = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/users/me`, {
           headers: { Authorization: `Bearer ${data.access_token}` }
         })
         const user = await userResponse.json()
