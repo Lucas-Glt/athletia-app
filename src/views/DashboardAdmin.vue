@@ -345,4 +345,34 @@ export default {
 .empty { color: #9ca3af; text-align: center; padding: 40px; font-size: 13px; }
 .error { font-size: 12px; color: #dc2626; background: #fee2e2; padding: 8px 12px; border-radius: 6px; }
 .success { font-size: 12px; color: #16a34a; background: #dcfce7; padding: 8px 12px; border-radius: 6px; }
+
+@media (max-width: 768px) {
+  .admin-page { padding: 12px 16px; }
+
+  .table-header { display: none; }
+
+  .users-table { border: none; gap: 8px; background: transparent; }
+
+  .table-row {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    background: white;
+  }
+
+  .user-info { justify-content: flex-start; }
+  .user-email { font-size: 12px; color: #6b7280; }
+
+  .role-cell { justify-content: flex-start; }
+
+  .actions-cell { justify-content: flex-start; }
+
+  .modal { width: calc(100vw - 32px); max-width: 420px; }
+
+  .filters { gap: 6px; }
+  .filter-btn { padding: 5px 10px; font-size: 12px; }
+}
 </style>

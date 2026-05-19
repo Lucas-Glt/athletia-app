@@ -546,4 +546,55 @@ export default {
 .chip { font-size: 11px; background: white; border: 1px solid #e5e7eb; border-radius: 4px; padding: 2px 6px; color: #6b7280; }
 .chip-done { background: #dcfce7; color: #16a34a; border-color: #86efac; }
 .chip-skip { background: #f3f4f6; color: #9ca3af; }
+
+@media (max-width: 768px) {
+  .content-body { flex-direction: column; }
+
+  .panel-list {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid #e5e7eb;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 8px 12px;
+    gap: 6px;
+    flex-shrink: 0;
+    max-height: none;
+    height: auto;
+  }
+
+  .panel-list .section-title { display: none; }
+
+  .prog-card {
+    flex-shrink: 0;
+    min-width: 140px;
+    padding: 8px 10px;
+  }
+
+  .panel-detail {
+    padding: 12px 14px;
+  }
+
+  .series-cols {
+    gap: 8px;
+  }
+
+  .serie-col {
+    min-width: calc(50% - 4px);
+    max-width: calc(50% - 4px);
+    flex: none;
+    padding: 10px;
+  }
+
+  .semaines-tabs { gap: 4px; }
+  .semaine-tab { padding: 5px 10px; font-size: 12px; }
+
+  .seance-head { font-size: 13px; flex-wrap: wrap; }
+
+  .logs-page { padding: 12px 14px; }
+
+  .btn-large { font-size: 13px; }
+}
 </style>

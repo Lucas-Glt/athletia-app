@@ -988,4 +988,67 @@ export default {
 .non-fait { color: #dc2626; font-style: italic; }
 .statut-icon { display: flex; justify-content: center; }
 .serie-num { font-size: 12px; color: #9ca3af; text-align: center; }
+
+@media (max-width: 768px) {
+  .content-body { flex-direction: column; }
+
+  .panel-list {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid #e5e7eb;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 8px 12px;
+    gap: 6px;
+    flex-shrink: 0;
+    height: auto;
+    max-height: none;
+  }
+
+  .panel-list .section-title { display: none; }
+
+  .prog-card {
+    flex-shrink: 0;
+    min-width: 140px;
+    padding: 8px 10px;
+  }
+
+  .panel-detail { padding: 12px 14px; }
+
+  .detail-top {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .detail-actions {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .info-grid { grid-template-columns: 1fr; }
+
+  .semaines-tabs { gap: 4px; overflow-x: auto; flex-wrap: nowrap; }
+  .semaine-tab { flex-shrink: 0; font-size: 12px; padding: 5px 10px; }
+
+  .seance-head { font-size: 13px; flex-wrap: wrap; gap: 6px; }
+
+  .serie-exo { flex-wrap: wrap; }
+
+  .add-seance-form { flex-direction: column; align-items: stretch; }
+  .add-seance-form select, .add-seance-form input { width: 100%; }
+
+  .athletes-page { padding: 12px 14px; }
+
+  .comparatif-header,
+  .comparatif-row {
+    grid-template-columns: 24px 1fr 1fr 20px;
+    font-size: 11px;
+  }
+
+  .mini-input { width: 70px; }
+
+  .serie-gen-exo { flex-wrap: wrap; }
+}
 </style>

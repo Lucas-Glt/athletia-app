@@ -39,6 +39,11 @@
       <slot />
     </div>
 
+    <!-- Bottom nav mobile — EN DEHORS du header -->
+    <nav class="bottom-nav">
+      <slot name="nav" />
+    </nav>
+    
     <!-- Modale changement de mot de passe -->
     <div v-if="modalePassword" class="modal-overlay" @click.self="fermerModalePassword">
       <div class="modal">
@@ -327,4 +332,38 @@ export default {
   cursor: pointer;
 }
 .btn-secondary:hover { background: #e5e7eb; }
+
+.bottom-nav {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .app-header {
+    padding: 0 12px;
+    gap: 8px;
+    height: 52px;
+  }
+  .brand-text span { display: none; }
+  .brand-text h1 { font-size: 15px; }
+  .brand-icon { width: 32px; height: 32px; font-size: 15px; border-radius: 8px; }
+  .header-nav { display: none; }
+
+  .bottom-nav {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    height: 56px;
+    background: white;
+    border-top: 1px solid #EEEDF8;
+    box-shadow: 0 -1px 3px rgba(0,0,0,0.04);
+    flex-shrink: 0;
+    padding: 0 8px;
+    z-index: 20;
+  }
+
+  .main-content {
+    /* Retire la hauteur perdue par la bottom nav */
+  }
+}
 </style>
