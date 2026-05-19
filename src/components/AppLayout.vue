@@ -2,7 +2,7 @@
   <div class="app">
     <header class="app-header">
       <div class="brand">
-        <div class="brand-icon">A</div>
+        <div class="brand-icon" :style="{ background: brandColor }">{{ brandLetter }}</div>
         <div class="brand-text">
           <h1>Athletia</h1>
           <span>{{ roleLabel }}</span>
@@ -26,7 +26,7 @@
 </template>
 
 <script>
-import { ref, computed } from 'vue'
+import { computed } from 'vue'
 import { useAuthStore } from '../stores/auth'
 
 export default {
@@ -41,13 +41,24 @@ export default {
       return labels[authStore.role] || ''
     })
 
-    const userName = computed(() => authStore.user?.nom || '')
+    const brandLetter = computed(() => {
+      if (authStore.role === 'prepa') return 'P'
+      if (authStore.role === 'admin') return 'A'
+      return 'A'
+    })
+
+    const brandColor = computed(() => {
+      if (authStore.role === 'prepa') return 'linear-gradient(135deg, #7F77DD, #534AB7)'
+      if (authStore.role === 'admin') return 'linear-gradient(135deg, #dc2626, #b91c1c)'
+      return 'linear-gradient(135deg, #16a34a, #15803d)'
+    })
+
     const initiales = computed(() => {
       const nom = authStore.user?.nom || ''
       return nom.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
     })
 
-    return { roleLabel, userName, initiales }
+    return { roleLabel, brandLetter, brandColor, initiales }
   }
 }
 </script>
@@ -65,7 +76,7 @@ export default {
 }
 
 .app-header {
-  height: 56px;
+  height: 60px;
   padding: 0 24px;
   border-bottom: 1px solid #EEEDF8;
   display: flex;
@@ -81,25 +92,25 @@ export default {
 .brand {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   flex-shrink: 0;
 }
 
 .brand-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  background: linear-gradient(135deg, #7F77DD, #534AB7);
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
   color: white;
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
 
 .brand-text h1 {
-  font-size: 15px;
+  font-size: 18px;
   font-weight: 700;
   color: #111;
   letter-spacing: -0.3px;
@@ -108,11 +119,10 @@ export default {
 }
 
 .brand-text span {
-  font-size: 10px;
+  font-size: 11px;
   color: #9ca3af;
 }
 
-/* Nav dans le header */
 .header-nav {
   display: flex;
   align-items: center;
@@ -128,15 +138,15 @@ export default {
 }
 
 .avatar {
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
   background: linear-gradient(135deg, #CECBF6, #AFA9EC);
   color: #3C3489;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   flex-shrink: 0;
 }
