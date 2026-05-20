@@ -2,6 +2,9 @@
   <div class="app">
     <header class="app-header">
       <div class="brand">
+        <button class="hamburger" @click="drawerOuvert = !drawerOuvert">
+          <i class="ti ti-menu-2"></i>
+        </button>
         <div class="brand-icon" :style="{ background: brandColor }">{{ brandLetter }}</div>
         <div class="brand-text">
           <h1>Athletia</h1>
@@ -35,14 +38,25 @@
       </div>
     </header>
 
+    <!-- Drawer mobile -->
+    <div class="drawer-overlay" v-if="drawerOuvert" @click="drawerOuvert = false"></div>
+    <div class="drawer" :class="{ open: drawerOuvert }">
+      <div class="drawer-header">
+        <div class="brand-icon" :style="{ background: brandColor }">{{ brandLetter }}</div>
+        <span class="drawer-title">{{ roleLabel }}</span>
+        <button class="drawer-close" @click="drawerOuvert = false"><i class="ti ti-x"></i></button>
+      </div>
+      <div class="drawer-nav" @click="drawerOuvert = false">
+        <slot name="nav" />
+      </div>
+      <div class="drawer-actions">
+        <slot name="actions" />
+      </div>
+    </div>
+
     <div class="main-content">
       <slot />
     </div>
-
-    <!-- Bottom nav mobile — EN DEHORS du header -->
-    <nav class="bottom-nav">
-      <slot name="nav" />
-    </nav>
     
     <!-- Modale changement de mot de passe -->
     <div v-if="modalePassword" class="modal-overlay" @click.self="fermerModalePassword">
@@ -187,11 +201,13 @@ export default {
       }
     }
 
+    const drawerOuvert = ref(false)
+
     return {
       authStore, roleLabel, brandLetter, brandColor, initiales,
       menuOuvert, toggleMenu, avatarRef, deconnexion,
       modalePassword, ouvrirModalePassword, fermerModalePassword,
-      form, changerPassword, loadingPassword, passwordError, passwordSuccess
+      form, changerPassword, loadingPassword, passwordError, passwordSuccess, drawerOuvert
     }
   }
 }
@@ -337,6 +353,68 @@ export default {
   display: none;
 }
 
+.hamburger {
+  display: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #374151;
+  font-size: 20px;
+  padding: 4px;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+.hamburger:hover { background: #f3f4f6; }
+
+.drawer-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.3);
+  z-index: 50;
+}
+.drawer {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; bottom: 0;
+  width: 260px;
+  background: white;
+  z-index: 60;
+  flex-direction: column;
+  transform: translateX(-100%);
+  transition: transform 0.25s ease;
+  box-shadow: 4px 0 24px rgba(0,0,0,0.12);
+}
+.drawer.open { transform: translateX(0); }
+
+.drawer-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px;
+  border-bottom: 1px solid #f3f4f6;
+}
+.drawer-title { font-size: 13px; font-weight: 500; color: #374151; flex: 1; }
+.drawer-close {
+  background: none; border: none; cursor: pointer;
+  color: #9ca3af; font-size: 18px; padding: 4px;
+}
+.drawer-nav {
+  flex: 1;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-y: auto;
+}
+.drawer-actions {
+  padding: 12px 16px;
+  border-top: 1px solid #f3f4f6;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 @media (max-width: 768px) {
   .app-header {
     padding: 0 12px;
@@ -347,23 +425,13 @@ export default {
   .brand-text h1 { font-size: 15px; }
   .brand-icon { width: 32px; height: 32px; font-size: 15px; border-radius: 8px; }
   .header-nav { display: none; }
+  .hamburger { display: flex; align-items: center; justify-content: center; }
+  .drawer-overlay { display: block; }
+  .drawer { display: flex; }
 
-  .bottom-nav {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 4px;
-    height: 56px;
-    background: white;
-    border-top: 1px solid #EEEDF8;
-    box-shadow: 0 -1px 3px rgba(0,0,0,0.04);
-    flex-shrink: 0;
-    padding: 0 8px;
-    z-index: 20;
-  }
+  /* Masquer les actions du header sur mobile — elles sont dans le drawer */
+  .header-right :deep(.btn) { display: none; }
 
-  .main-content {
-    /* Retire la hauteur perdue par la bottom nav */
-  }
+  .modal { width: calc(100vw - 32px); }
 }
 </style>

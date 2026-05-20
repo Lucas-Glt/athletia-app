@@ -25,33 +25,40 @@
         @modifie="onModifie"
       />
 
-      <!-- ONGLET PROGRAMMES -->
-      <div v-if="onglet === 'programmes'" class="onglet-wrapper">
-        <ProgrammeForm v-if="vue === 'form'" @termine="onTermine" />
+    <!-- ONGLET PROGRAMMES -->
+    <div v-if="onglet === 'programmes'" class="onglet-wrapper">
+      <ProgrammeForm v-if="vue === 'form'" @termine="onTermine" />
 
-        <div v-if="vue === 'liste'" class="content-body">
-          <div class="panel-list">
-            <div class="section-title">Mes programmes</div>
-            <div v-if="programmes.length === 0" class="empty">Aucun programme.</div>
-            <div
-              v-for="p in programmes"
-              :key="p.id"
-              class="prog-card"
-              :class="{ active: programmeActif?.id === p.id }"
-              @click="selectProgramme(p)"
-            >
-              <div class="prog-card-top">
-                <div class="prog-name">{{ p.nom }}</div>
-              </div>
-              <div class="prog-meta">
-                <span class="badge" :class="p.statut === 'actif' ? 'badge-green' : 'badge-gray'">{{ p.statut }}</span>
-                <span>{{ p.athletes.length }} athlète{{ p.athletes.length > 1 ? 's' : '' }}</span>
-              </div>
+      <div v-if="vue === 'liste'" class="content-body">
+        <button class="toggle-programmes-btn" @click="panelListVisible = !panelListVisible">
+          <i class="ti ti-layout-list"></i>
+          {{ panelListVisible ? 'Masquer' : 'Mes programmes' }}
+        </button>
+
+        <div class="panel-list" :class="{ 'mobile-visible': panelListVisible }">
+          <div class="section-title">Mes programmes</div>
+          <div v-if="programmes.length === 0" class="empty">Aucun programme.</div>
+          <div
+            v-for="p in programmes"
+            :key="p.id"
+            class="prog-card"
+            :class="{ active: programmeActif?.id === p.id }"
+            @click="selectProgramme(p)"
+          >
+            <div class="prog-card-top">
+              <div class="prog-name">{{ p.nom }}</div>
             </div>
-            <button class="btn btn-dashed" @click="vue = 'form'">
-              <i class="ti ti-plus"></i> Nouveau
-            </button>
+            <div class="prog-meta">
+              <span class="badge" :class="p.statut === 'actif' ? 'badge-green' : 'badge-gray'">{{ p.statut }}</span>
+              <span>{{ p.athletes.length }} athlète{{ p.athletes.length > 1 ? 's' : '' }}</span>
+            </div>
           </div>
+          <button class="btn btn-dashed" @click="vue = 'form'">
+            <i class="ti ti-plus"></i> Nouveau
+          </button>
+        </div>
+
+        <!-- panel-detail suit ici -->
 
           <div class="panel-detail" v-if="programmeActif">
             <div v-if="editMode" class="edit-banner">
@@ -796,7 +803,7 @@ export default {
 
     const logout = () => { authStore.logout(); router.push('/') }
     const initiales = (nom) => nom.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
-
+    const panelListVisible = ref(false)
     onMounted(async () => {
       await fetchProgrammes()
       await fetchMonCercle()
@@ -821,7 +828,7 @@ export default {
       onTermine, onModifie, logout, initiales,
       onClickTabLogs, voirLogsAthlete, formatDate,
       getStatutClasse, getStatutIcon,
-      retirerDuCercle, rechercherAthlète, ajouterAuCercle
+      retirerDuCercle, rechercherAthlète, ajouterAuCercle, panelListVisible
     }
   }
 }
@@ -990,65 +997,51 @@ export default {
 .serie-num { font-size: 12px; color: #9ca3af; text-align: center; }
 
 @media (max-width: 768px) {
-  .content-body { flex-direction: column; }
+  .content-body { flex-direction: column; position: relative; }
 
   .panel-list {
+    display: none;
     width: 100%;
     border-right: none;
     border-bottom: 1px solid #e5e7eb;
+    padding: 8px 12px;
     flex-direction: row;
     flex-wrap: nowrap;
     overflow-x: auto;
-    overflow-y: hidden;
-    padding: 8px 12px;
     gap: 6px;
     flex-shrink: 0;
-    height: auto;
-    max-height: none;
+  }
+
+  .panel-list.mobile-visible {
+    display: flex;
   }
 
   .panel-list .section-title { display: none; }
 
   .prog-card {
     flex-shrink: 0;
-    min-width: 140px;
-    padding: 8px 10px;
+    min-width: 130px;
   }
 
-  .panel-detail { padding: 12px 14px; }
+  .panel-detail { padding: 10px 12px; }
 
-  .detail-top {
-    flex-direction: column;
-    align-items: flex-start;
+  .toggle-programmes-btn {
+    display: flex;
   }
+}
 
-  .detail-actions {
-    flex-wrap: wrap;
-    gap: 6px;
-  }
-
-  .info-grid { grid-template-columns: 1fr; }
-
-  .semaines-tabs { gap: 4px; overflow-x: auto; flex-wrap: nowrap; }
-  .semaine-tab { flex-shrink: 0; font-size: 12px; padding: 5px 10px; }
-
-  .seance-head { font-size: 13px; flex-wrap: wrap; gap: 6px; }
-
-  .serie-exo { flex-wrap: wrap; }
-
-  .add-seance-form { flex-direction: column; align-items: stretch; }
-  .add-seance-form select, .add-seance-form input { width: 100%; }
-
-  .athletes-page { padding: 12px 14px; }
-
-  .comparatif-header,
-  .comparatif-row {
-    grid-template-columns: 24px 1fr 1fr 20px;
-    font-size: 11px;
-  }
-
-  .mini-input { width: 70px; }
-
-  .serie-gen-exo { flex-wrap: wrap; }
+.toggle-programmes-btn {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  font-size: 13px;
+  background: #EEEDFE;
+  color: #534AB7;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  margin: 10px 12px 0;
+  font-weight: 500;
 }
 </style>

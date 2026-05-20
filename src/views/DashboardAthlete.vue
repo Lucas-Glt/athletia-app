@@ -22,7 +22,13 @@
 
       <!-- ONGLET PROGRAMME -->
       <div v-if="onglet === 'programme' && programmes.length > 0" class="content-body">
-        <div class="panel-list">
+
+        <button class="toggle-programmes-btn" @click="panelListVisible = !panelListVisible">
+          <i class="ti ti-layout-list"></i>
+          {{ panelListVisible ? 'Masquer' : 'Mes programmes' }}
+        </button>
+
+        <div class="panel-list" :class="{ 'mobile-visible': panelListVisible }">
           <div class="section-title">Mes programmes</div>
           <div
             v-for="p in programmes"
@@ -423,6 +429,7 @@ export default {
 
     const formatDate = (d) => new Date(d).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
     const logout = () => { authStore.logout(); router.push('/') }
+    const panelListVisible = ref(false)
 
     onMounted(fetchProgrammes)
 
@@ -434,7 +441,7 @@ export default {
       labelType, letterFor, grouperExercices,
       getLogs, isGroupeDone, toggleGroupeDone,
       selectProgramme, demarrerSeance, validerSeance,
-      formatDate, logout
+      formatDate, logout, panelListVisible
     }
   }
 }
@@ -548,53 +555,51 @@ export default {
 .chip-skip { background: #f3f4f6; color: #9ca3af; }
 
 @media (max-width: 768px) {
-  .content-body { flex-direction: column; }
+  .content-body { flex-direction: column; position: relative; }
 
   .panel-list {
+    display: none;
     width: 100%;
     border-right: none;
     border-bottom: 1px solid #e5e7eb;
+    padding: 8px 12px;
     flex-direction: row;
     flex-wrap: nowrap;
     overflow-x: auto;
-    overflow-y: hidden;
-    padding: 8px 12px;
     gap: 6px;
     flex-shrink: 0;
-    max-height: none;
-    height: auto;
+  }
+
+  .panel-list.mobile-visible {
+    display: flex;
   }
 
   .panel-list .section-title { display: none; }
 
   .prog-card {
     flex-shrink: 0;
-    min-width: 140px;
-    padding: 8px 10px;
+    min-width: 130px;
   }
 
-  .panel-detail {
-    padding: 12px 14px;
+  .panel-detail { padding: 10px 12px; }
+
+  .toggle-programmes-btn {
+    display: flex;
   }
+}
 
-  .series-cols {
-    gap: 8px;
-  }
-
-  .serie-col {
-    min-width: calc(50% - 4px);
-    max-width: calc(50% - 4px);
-    flex: none;
-    padding: 10px;
-  }
-
-  .semaines-tabs { gap: 4px; }
-  .semaine-tab { padding: 5px 10px; font-size: 12px; }
-
-  .seance-head { font-size: 13px; flex-wrap: wrap; }
-
-  .logs-page { padding: 12px 14px; }
-
-  .btn-large { font-size: 13px; }
+.toggle-programmes-btn {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  font-size: 13px;
+  background: #EEEDFE;
+  color: #534AB7;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  margin: 10px 12px 0;
+  font-weight: 500;
 }
 </style>
