@@ -145,85 +145,87 @@
                   >
                     <div class="serie-col-label">Série {{ serieIdx }}</div>
 
-                    <!-- Données de chaque exo du groupe -->
-                    <div v-for="(exo, eidx) in groupe.exercices" :key="exo.id" class="serie-col-exo">
-                      <span class="exo-letter-mini" v-if="groupe.exercices.length > 1">{{ letterFor(eidx) }}</span>
+                    <!-- Wrapper exos côte à côte sur mobile -->
+                    <div class="exos-row">
+                      <div v-for="(exo, eidx) in groupe.exercices" :key="exo.id" class="serie-col-exo">
+                        <span class="exo-letter-mini" v-if="groupe.exercices.length > 1">{{ letterFor(eidx) }}</span>
 
-                      <!-- Prescrit -->
-                      <div class="prescrit-bloc">
-                        <template v-if="seanceActive.type_seance === 'musculation' || !seanceActive.type_seance">
-                          <span class="prescrit-item" v-if="exo.series[serieIdx-1]?.nb_reps">
-                            <span class="prescrit-label">Reps</span>
-                            <span class="prescrit-val">{{ exo.series[serieIdx-1].nb_reps }}</span>
-                          </span>
-                          <span class="prescrit-item" v-if="exo.series[serieIdx-1]?.poids_cible">
-                            <span class="prescrit-label">Charge</span>
-                            <span class="prescrit-val">{{ exo.series[serieIdx-1].poids_cible }}</span>
-                          </span>
-                          <span class="prescrit-item" v-if="exo.series[serieIdx-1]?.rm">
-                            <span class="prescrit-label">%RM</span>
-                            <span class="prescrit-val">{{ exo.series[serieIdx-1].rm }}</span>
-                          </span>
-                          <span class="prescrit-item" v-if="exo.series[serieIdx-1]?.tempo">
-                            <span class="prescrit-label">Tempo</span>
-                            <span class="prescrit-val">{{ exo.series[serieIdx-1].tempo }}</span>
-                          </span>
-                          <span class="prescrit-item prescrit-repos" v-if="groupe.exercices.length === 1 && exo.series[serieIdx-1]?.temps_repos">
-                            <span class="prescrit-label">Repos</span>
-                            <span class="prescrit-val">{{ exo.series[serieIdx-1].temps_repos }}</span>
-                          </span>
-                        </template>
-                        <template v-else-if="seanceActive.type_seance === 'natation' || seanceActive.type_seance === 'athletisme'">
-                          <span class="prescrit-item" v-if="exo.series[serieIdx-1]?.metres">
-                            <span class="prescrit-label">Mètres</span>
-                            <span class="prescrit-val">{{ exo.series[serieIdx-1].metres }}</span>
-                          </span>
-                          <span class="prescrit-item" v-if="exo.series[serieIdx-1]?.intensite">
-                            <span class="prescrit-label">Intensité</span>
-                            <span class="prescrit-val">{{ exo.series[serieIdx-1].intensite }}</span>
-                          </span>
-                          <span class="prescrit-item prescrit-repos" v-if="groupe.exercices.length === 1 && exo.series[serieIdx-1]?.temps_repos">
-                            <span class="prescrit-label">Repos</span>
-                            <span class="prescrit-val">{{ exo.series[serieIdx-1].temps_repos }}</span>
-                          </span>
-                        </template>
-                        <template v-else-if="seanceActive.type_seance === 'pliometrie'">
-                          <span class="prescrit-item" v-if="exo.series[serieIdx-1]?.bonds">
-                            <span class="prescrit-label">Bonds</span>
-                            <span class="prescrit-val">{{ exo.series[serieIdx-1].bonds }}</span>
-                          </span>
-                          <span class="prescrit-item" v-if="exo.series[serieIdx-1]?.intensite">
-                            <span class="prescrit-label">Intensité</span>
-                            <span class="prescrit-val">{{ exo.series[serieIdx-1].intensite }}</span>
-                          </span>
-                          <span class="prescrit-item prescrit-repos" v-if="groupe.exercices.length === 1 && exo.series[serieIdx-1]?.temps_repos">
-                            <span class="prescrit-label">Repos</span>
-                            <span class="prescrit-val">{{ exo.series[serieIdx-1].temps_repos }}</span>
-                          </span>
-                        </template>
+                        <!-- Prescrit -->
+                        <div class="prescrit-bloc">
+                          <template v-if="seanceActive.type_seance === 'musculation' || !seanceActive.type_seance">
+                            <span class="prescrit-item" v-if="exo.series[serieIdx-1]?.nb_reps">
+                              <span class="prescrit-label">Reps</span>
+                              <span class="prescrit-val">{{ exo.series[serieIdx-1].nb_reps }}</span>
+                            </span>
+                            <span class="prescrit-item" v-if="exo.series[serieIdx-1]?.poids_cible">
+                              <span class="prescrit-label">Charge</span>
+                              <span class="prescrit-val">{{ exo.series[serieIdx-1].poids_cible }}</span>
+                            </span>
+                            <span class="prescrit-item" v-if="exo.series[serieIdx-1]?.rm">
+                              <span class="prescrit-label">%RM</span>
+                              <span class="prescrit-val">{{ exo.series[serieIdx-1].rm }}</span>
+                            </span>
+                            <span class="prescrit-item" v-if="exo.series[serieIdx-1]?.tempo">
+                              <span class="prescrit-label">Tempo</span>
+                              <span class="prescrit-val">{{ exo.series[serieIdx-1].tempo }}</span>
+                            </span>
+                            <span class="prescrit-item prescrit-repos" v-if="groupe.exercices.length === 1 && exo.series[serieIdx-1]?.temps_repos">
+                              <span class="prescrit-label">Repos</span>
+                              <span class="prescrit-val">{{ exo.series[serieIdx-1].temps_repos }}</span>
+                            </span>
+                          </template>
+                          <template v-else-if="seanceActive.type_seance === 'natation' || seanceActive.type_seance === 'athletisme'">
+                            <span class="prescrit-item" v-if="exo.series[serieIdx-1]?.metres">
+                              <span class="prescrit-label">Mètres</span>
+                              <span class="prescrit-val">{{ exo.series[serieIdx-1].metres }}</span>
+                            </span>
+                            <span class="prescrit-item" v-if="exo.series[serieIdx-1]?.intensite">
+                              <span class="prescrit-label">Intensité</span>
+                              <span class="prescrit-val">{{ exo.series[serieIdx-1].intensite }}</span>
+                            </span>
+                            <span class="prescrit-item prescrit-repos" v-if="groupe.exercices.length === 1 && exo.series[serieIdx-1]?.temps_repos">
+                              <span class="prescrit-label">Repos</span>
+                              <span class="prescrit-val">{{ exo.series[serieIdx-1].temps_repos }}</span>
+                            </span>
+                          </template>
+                          <template v-else-if="seanceActive.type_seance === 'pliometrie'">
+                            <span class="prescrit-item" v-if="exo.series[serieIdx-1]?.bonds">
+                              <span class="prescrit-label">Bonds</span>
+                              <span class="prescrit-val">{{ exo.series[serieIdx-1].bonds }}</span>
+                            </span>
+                            <span class="prescrit-item" v-if="exo.series[serieIdx-1]?.intensite">
+                              <span class="prescrit-label">Intensité</span>
+                              <span class="prescrit-val">{{ exo.series[serieIdx-1].intensite }}</span>
+                            </span>
+                            <span class="prescrit-item prescrit-repos" v-if="groupe.exercices.length === 1 && exo.series[serieIdx-1]?.temps_repos">
+                              <span class="prescrit-label">Repos</span>
+                              <span class="prescrit-val">{{ exo.series[serieIdx-1].temps_repos }}</span>
+                            </span>
+                          </template>
+                        </div>
+
+                        <!-- Inputs réalisé -->
+                        <div class="realise-inputs">
+                          <template v-if="seanceActive.type_seance === 'musculation' || !seanceActive.type_seance">
+                            <input v-model="getLogs(exo.id, serieIdx-1).reps_realisees" :placeholder="exo.series[serieIdx-1]?.nb_reps || 'reps'" class="mini-input" />
+                            <input v-model="getLogs(exo.id, serieIdx-1).poids_realise" :placeholder="exo.series[serieIdx-1]?.poids_cible || 'charge'" class="mini-input" />
+                          </template>
+                          <template v-else-if="seanceActive.type_seance === 'natation' || seanceActive.type_seance === 'athletisme'">
+                            <input v-model="getLogs(exo.id, serieIdx-1).reps_realisees" :placeholder="exo.series[serieIdx-1]?.metres ? `${exo.series[serieIdx-1].metres}m` : 'mètres'" class="mini-input" />
+                            <input v-model="getLogs(exo.id, serieIdx-1).poids_realise" :placeholder="exo.series[serieIdx-1]?.intensite || 'intensité'" class="mini-input" />
+                          </template>
+                          <template v-else-if="seanceActive.type_seance === 'pliometrie'">
+                            <input v-model="getLogs(exo.id, serieIdx-1).reps_realisees" :placeholder="exo.series[serieIdx-1]?.bonds ? `${exo.series[serieIdx-1].bonds} bonds` : 'bonds'" class="mini-input" />
+                            <input v-model="getLogs(exo.id, serieIdx-1).poids_realise" :placeholder="exo.series[serieIdx-1]?.intensite || 'intensité'" class="mini-input" />
+                          </template>
+                        </div>
                       </div>
 
-                      <!-- Inputs réalisé -->
-                      <div class="realise-inputs">
-                        <template v-if="seanceActive.type_seance === 'musculation' || !seanceActive.type_seance">
-                          <input v-model="getLogs(exo.id, serieIdx-1).reps_realisees" :placeholder="exo.series[serieIdx-1]?.nb_reps || 'reps'" class="mini-input" />
-                          <input v-model="getLogs(exo.id, serieIdx-1).poids_realise" :placeholder="exo.series[serieIdx-1]?.poids_cible || 'charge'" class="mini-input" />
-                        </template>
-                        <template v-else-if="seanceActive.type_seance === 'natation' || seanceActive.type_seance === 'athletisme'">
-                          <input v-model="getLogs(exo.id, serieIdx-1).reps_realisees" :placeholder="exo.series[serieIdx-1]?.metres ? `${exo.series[serieIdx-1].metres}m` : 'mètres'" class="mini-input" />
-                          <input v-model="getLogs(exo.id, serieIdx-1).poids_realise" :placeholder="exo.series[serieIdx-1]?.intensite || 'intensité'" class="mini-input" />
-                        </template>
-                        <template v-else-if="seanceActive.type_seance === 'pliometrie'">
-                          <input v-model="getLogs(exo.id, serieIdx-1).reps_realisees" :placeholder="exo.series[serieIdx-1]?.bonds ? `${exo.series[serieIdx-1].bonds} bonds` : 'bonds'" class="mini-input" />
-                          <input v-model="getLogs(exo.id, serieIdx-1).poids_realise" :placeholder="exo.series[serieIdx-1]?.intensite || 'intensité'" class="mini-input" />
-                        </template>
+                      <!-- Repos superset -->
+                      <div v-if="groupe.exercices.length > 1 && groupe.exercices[0].series[serieIdx-1]?.temps_repos" class="repos-superset-col">
+                        <span class="prescrit-label">Repos</span>
+                        <span class="prescrit-val">{{ groupe.exercices[0].series[serieIdx-1].temps_repos }}</span>
                       </div>
-                    </div>
-
-                    <!-- Repos superset -->
-                    <div v-if="groupe.exercices.length > 1 && groupe.exercices[0].series[serieIdx-1]?.temps_repos" class="repos-superset-col">
-                      <span class="prescrit-label">Repos</span>
-                      <span class="prescrit-val">{{ groupe.exercices[0].series[serieIdx-1].temps_repos }}</span>
                     </div>
 
                     <!-- Bouton valider -->
@@ -601,5 +603,67 @@ export default {
   cursor: pointer;
   margin: 10px 12px 0;
   font-weight: 500;
+}
+
+.exos-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+@media (max-width: 768px) {
+  .series-cols {
+    flex-direction: column !important;
+    gap: 10px;
+  }
+
+  .serie-col {
+    min-width: 100% !important;
+    max-width: 100% !important;
+    flex: none !important;
+  }
+
+  .exos-row {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .serie-col-exo {
+    flex: 1;
+    min-width: 0;
+    background: #f3f4f6;
+    border-radius: 6px;
+    padding: 8px;
+  }
+
+  .repos-superset-col {
+    flex-shrink: 0;
+    align-self: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 8px;
+    background: #EEEDFE;
+    border-radius: 6px;
+  }
+
+  .mini-input {
+    width: 100% !important;
+    box-sizing: border-box;
+  }
+
+  .btn-serie {
+    margin-top: 6px;
+  }
+
+  /* Repos solo aligné inline */
+  .prescrit-repos {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 4px;
+  }
 }
 </style>
