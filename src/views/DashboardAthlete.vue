@@ -69,9 +69,9 @@
             <div
               v-for="seance in seancesFiltrees"
               :key="seance.id"
-              class="seance-block clickable"
-              :class="`type-${seance.type_seance || 'musculation'}`"
-              @click="demarrerSeance(seance)"
+              class="seance-block"
+              :class="[`type-${seance.type_seance || 'musculation'}`, { 'clickable': !seancesCompletees.has(seance.id), 'seance-complete': seancesCompletees.has(seance.id) }]"
+              @click="!seancesCompletees.has(seance.id) && demarrerSeance(seance)"
             >
               <div class="seance-head">
                 <span class="type-badge" :class="`type-badge-${seance.type_seance || 'musculation'}`">
@@ -79,8 +79,11 @@
                 </span>
                 <span class="badge badge-purple" v-if="seance.jour">{{ seance.jour }}</span>
                 <span style="flex:1">{{ seance.nom }}</span>
+                <span v-if="seancesCompletees.has(seance.id)" class="badge-complete">
+                  <i class="ti ti-check"></i> Complétée
+                </span>
                 <span class="exo-count">{{ seance.exercices?.length || 0 }} exercices</span>
-                <i class="ti ti-chevron-right"></i>
+                <i class="ti ti-chevron-right" v-if="!seancesCompletees.has(seance.id)"></i>
               </div>
             </div>
           </template>
@@ -355,6 +358,14 @@ export default {
       }
     }
 
+    const seancesCompletees = ref(new Set())
+
+    const isSeanceComplete = (seance) => {
+      if (!seance.exercices || seance.exercices.length === 0) return false
+      const groupes = grouperExercices(seance.exercices)
+      return groupes.every(groupe => isGroupeComplete(groupe))
+    }
+
     const semainesDisponibles = computed(() => {
       const set = new Set(seances.value.map(s => s.semaine || 1))
       return Array.from(set).sort((a, b) => a - b)
@@ -410,8 +421,8 @@ export default {
           })
         }
       }
+      seancesCompletees.value.add(seanceActive.value.id)
       seanceActive.value = null
-      alert('Séance enregistrée !')
     }
 
     const fetchHistorique = async () => {
@@ -464,7 +475,8 @@ export default {
       labelType, letterFor, grouperExercices,
       getLogs, isGroupeDone, toggleGroupeDone,
       selectProgramme, demarrerSeance, validerSeance,
-      formatDate, logout, panelListVisible, isGroupeComplete
+      formatDate, logout, panelListVisible, isGroupeComplete,
+      seancesCompletees, isSeanceComplete
     }
   }
 }
@@ -632,6 +644,28 @@ export default {
   gap: 8px;
 }
 
+.seance-block.seance-complete {
+  border-color: #86efac;
+  border-left-color: #16a34a;
+  opacity: 0.85;
+}
+
+.seance-block.seance-complete .seance-head {
+  background: #f0fdf4;
+}
+
+.badge-complete {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #16a34a;
+  background: #dcfce7;
+  padding: 2px 8px;
+  border-radius: 20px;
+}
+
 @media (max-width: 768px) {
   .series-cols {
     flex-direction: column !important;
@@ -712,4 +746,6 @@ export default {
   background: #f0fdf4;
 }
 }
+
+
 </style>
