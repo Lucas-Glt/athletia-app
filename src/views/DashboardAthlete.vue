@@ -139,119 +139,165 @@
                   Aucune série définie.
                 </div>
 
-                <!-- Séries en colonnes -->
-                <div class="series-cols">
-                  <div
-                    v-for="serieIdx in groupe.exercices[0].series.length"
-                    :key="serieIdx"
-                    class="serie-col"
-                    :class="{ done: isGroupeDone(groupe, serieIdx - 1) }"
-                  >
-                    <div class="serie-col-label">Série {{ serieIdx }}</div>
+            <!-- Séries en colonnes -->
+            <div class="series-cols">
+              <div
+                v-for="serieIdx in groupe.exercices[0].series.length"
+                :key="serieIdx"
+                class="serie-col"
+                :class="{ done: isGroupeDone(groupe, serieIdx - 1) }"
+              >
+                <div class="serie-col-label">Série {{ serieIdx }}</div>
 
-                    <!-- Wrapper exos côte à côte sur mobile -->
-                    <div class="exos-row">
-                      <div v-for="(exo, eidx) in groupe.exercices" :key="exo.id" class="serie-col-exo">
-                        <span class="exo-letter-mini" v-if="groupe.exercices.length > 1">{{ letterFor(eidx) }}</span>
+                <!-- Wrapper exos côte à côte sur mobile -->
+                <div class="exos-row">
+                  <div v-for="(exo, eidx) in groupe.exercices" :key="exo.id" class="serie-col-exo">
+                    <span class="exo-letter-mini" v-if="groupe.exercices.length > 1">{{ letterFor(eidx) }}</span>
 
-                        <!-- Prescrit -->
-                        <div class="prescrit-bloc">
-                          <template v-if="seanceActive.type_seance === 'musculation' || !seanceActive.type_seance">
-                            <span class="prescrit-item" v-if="exo.series[serieIdx-1]?.nb_reps">
-                              <span class="prescrit-label">Reps</span>
-                              <span class="prescrit-val">{{ exo.series[serieIdx-1].nb_reps }}</span>
-                            </span>
-                            <span class="prescrit-item" v-if="exo.series[serieIdx-1]?.poids_cible">
-                              <span class="prescrit-label">Charge</span>
-                              <span class="prescrit-val">{{ exo.series[serieIdx-1].poids_cible }}</span>
-                            </span>
-                            <span class="prescrit-item" v-if="exo.series[serieIdx-1]?.rm">
-                              <span class="prescrit-label">%RM</span>
-                              <span class="prescrit-val">{{ exo.series[serieIdx-1].rm }}</span>
-                            </span>
-                            <span class="prescrit-item" v-if="exo.series[serieIdx-1]?.tempo">
-                              <span class="prescrit-label">Tempo</span>
-                              <span class="prescrit-val">{{ exo.series[serieIdx-1].tempo }}</span>
-                            </span>
-                            <span class="prescrit-item prescrit-repos" v-if="groupe.exercices.length === 1 && exo.series[serieIdx-1]?.temps_repos">
-                              <span class="prescrit-label">Repos</span>
-                              <span class="prescrit-val">{{ exo.series[serieIdx-1].temps_repos }}</span>
-                            </span>
-                          </template>
-                          <template v-else-if="seanceActive.type_seance === 'natation' || seanceActive.type_seance === 'athletisme'">
-                            <span class="prescrit-item" v-if="exo.series[serieIdx-1]?.metres">
-                              <span class="prescrit-label">Mètres</span>
-                              <span class="prescrit-val">{{ exo.series[serieIdx-1].metres }}</span>
-                            </span>
-                            <span class="prescrit-item" v-if="exo.series[serieIdx-1]?.intensite">
-                              <span class="prescrit-label">Intensité</span>
-                              <span class="prescrit-val">{{ exo.series[serieIdx-1].intensite }}</span>
-                            </span>
-                            <span class="prescrit-item prescrit-repos" v-if="groupe.exercices.length === 1 && exo.series[serieIdx-1]?.temps_repos">
-                              <span class="prescrit-label">Repos</span>
-                              <span class="prescrit-val">{{ exo.series[serieIdx-1].temps_repos }}</span>
-                            </span>
-                          </template>
-                          <template v-else-if="seanceActive.type_seance === 'pliometrie'">
-                            <span class="prescrit-item" v-if="exo.series[serieIdx-1]?.bonds">
-                              <span class="prescrit-label">Bonds</span>
-                              <span class="prescrit-val">{{ exo.series[serieIdx-1].bonds }}</span>
-                            </span>
-                            <span class="prescrit-item" v-if="exo.series[serieIdx-1]?.intensite">
-                              <span class="prescrit-label">Intensité</span>
-                              <span class="prescrit-val">{{ exo.series[serieIdx-1].intensite }}</span>
-                            </span>
-                            <span class="prescrit-item prescrit-repos" v-if="groupe.exercices.length === 1 && exo.series[serieIdx-1]?.temps_repos">
-                              <span class="prescrit-label">Repos</span>
-                              <span class="prescrit-val">{{ exo.series[serieIdx-1].temps_repos }}</span>
-                            </span>
-                          </template>
-                        </div>
-
-                        <!-- Inputs réalisé -->
-                        <div class="realise-inputs">
-                          <template v-if="seanceActive.type_seance === 'musculation' || !seanceActive.type_seance">
-                            <input v-model="getLogs(exo.id, serieIdx-1).reps_realisees" :placeholder="exo.series[serieIdx-1]?.nb_reps || 'reps'" class="mini-input" />
-                            <input v-model="getLogs(exo.id, serieIdx-1).poids_realise" :placeholder="exo.series[serieIdx-1]?.poids_cible || 'charge'" class="mini-input" />
-                          </template>
-                          <template v-else-if="seanceActive.type_seance === 'natation' || seanceActive.type_seance === 'athletisme'">
-                            <input v-model="getLogs(exo.id, serieIdx-1).reps_realisees" :placeholder="exo.series[serieIdx-1]?.metres ? `${exo.series[serieIdx-1].metres}m` : 'mètres'" class="mini-input" />
-                            <input v-model="getLogs(exo.id, serieIdx-1).poids_realise" :placeholder="exo.series[serieIdx-1]?.intensite || 'intensité'" class="mini-input" />
-                          </template>
-                          <template v-else-if="seanceActive.type_seance === 'pliometrie'">
-                            <input v-model="getLogs(exo.id, serieIdx-1).reps_realisees" :placeholder="exo.series[serieIdx-1]?.bonds ? `${exo.series[serieIdx-1].bonds} bonds` : 'bonds'" class="mini-input" />
-                            <input v-model="getLogs(exo.id, serieIdx-1).poids_realise" :placeholder="exo.series[serieIdx-1]?.intensite || 'intensité'" class="mini-input" />
-                          </template>
-                        </div>
-                      </div>
-
-                      <!-- Repos superset -->
-                      <div v-if="groupe.exercices.length > 1 && groupe.exercices[0].series[serieIdx-1]?.temps_repos" class="repos-superset-col">
-                        <span class="prescrit-label">Repos</span>
-                        <span class="prescrit-val">{{ groupe.exercices[0].series[serieIdx-1].temps_repos }}</span>
-                      </div>
+                    <!-- Prescrit -->
+                    <div class="prescrit-bloc">
+                      <template v-if="seanceActive.type_seance === 'musculation' || !seanceActive.type_seance">
+                        <span class="prescrit-item" v-if="exo.series[serieIdx-1]?.nb_reps">
+                          <span class="prescrit-label">Reps</span>
+                          <span class="prescrit-val">{{ exo.series[serieIdx-1].nb_reps }}</span>
+                        </span>
+                        <span class="prescrit-item" v-if="exo.series[serieIdx-1]?.poids_cible">
+                          <span class="prescrit-label">Charge</span>
+                          <span class="prescrit-val">{{ exo.series[serieIdx-1].poids_cible }}</span>
+                        </span>
+                        <span class="prescrit-item" v-if="exo.series[serieIdx-1]?.rm">
+                          <span class="prescrit-label">%RM</span>
+                          <span class="prescrit-val">{{ exo.series[serieIdx-1].rm }}</span>
+                        </span>
+                        <span class="prescrit-item" v-if="exo.series[serieIdx-1]?.tempo">
+                          <span class="prescrit-label">Tempo</span>
+                          <span class="prescrit-val">{{ exo.series[serieIdx-1].tempo }}</span>
+                        </span>
+                        <span class="prescrit-item prescrit-repos" v-if="groupe.exercices.length === 1 && exo.series[serieIdx-1]?.temps_repos">
+                          <span class="prescrit-label">Repos</span>
+                          <span class="prescrit-val">{{ exo.series[serieIdx-1].temps_repos }}</span>
+                        </span>
+                      </template>
+                      <template v-else-if="seanceActive.type_seance === 'natation' || seanceActive.type_seance === 'athletisme'">
+                        <span class="prescrit-item" v-if="exo.series[serieIdx-1]?.metres">
+                          <span class="prescrit-label">Mètres</span>
+                          <span class="prescrit-val">{{ exo.series[serieIdx-1].metres }}</span>
+                        </span>
+                        <span class="prescrit-item" v-if="exo.series[serieIdx-1]?.intensite">
+                          <span class="prescrit-label">Intensité</span>
+                          <span class="prescrit-val">{{ exo.series[serieIdx-1].intensite }}</span>
+                        </span>
+                        <span class="prescrit-item prescrit-repos" v-if="groupe.exercices.length === 1 && exo.series[serieIdx-1]?.temps_repos">
+                          <span class="prescrit-label">Repos</span>
+                          <span class="prescrit-val">{{ exo.series[serieIdx-1].temps_repos }}</span>
+                        </span>
+                      </template>
+                      <template v-else-if="seanceActive.type_seance === 'pliometrie'">
+                        <span class="prescrit-item" v-if="exo.series[serieIdx-1]?.bonds">
+                          <span class="prescrit-label">Bonds</span>
+                          <span class="prescrit-val">{{ exo.series[serieIdx-1].bonds }}</span>
+                        </span>
+                        <span class="prescrit-item" v-if="exo.series[serieIdx-1]?.intensite">
+                          <span class="prescrit-label">Intensité</span>
+                          <span class="prescrit-val">{{ exo.series[serieIdx-1].intensite }}</span>
+                        </span>
+                        <span class="prescrit-item prescrit-repos" v-if="groupe.exercices.length === 1 && exo.series[serieIdx-1]?.temps_repos">
+                          <span class="prescrit-label">Repos</span>
+                          <span class="prescrit-val">{{ exo.series[serieIdx-1].temps_repos }}</span>
+                        </span>
+                      </template>
                     </div>
 
-                    <!-- Bouton valider -->
-                    <button
-                      class="btn-serie"
-                      :class="isGroupeDone(groupe, serieIdx - 1) ? 'btn-done' : 'btn-todo'"
-                      @click="toggleGroupeDone(groupe, serieIdx - 1)"
-                    >
-                      <i :class="isGroupeDone(groupe, serieIdx - 1) ? 'ti ti-check' : 'ti ti-circle'"></i>
-                      {{ isGroupeDone(groupe, serieIdx - 1) ? 'Fait' : 'Valider' }}
-                    </button>
+                    <!-- Inputs réalisé -->
+                    <div class="realise-inputs">
+                      <template v-if="seanceActive.type_seance === 'musculation' || !seanceActive.type_seance">
+                        <input
+                          v-model="getLogs(exo.id, serieIdx-1).reps_realisees"
+                          :placeholder="exo.series[serieIdx-1]?.nb_reps || 'reps'"
+                          class="mini-input"
+                          :readonly="seancesCompletees.has(seanceActive.id)"
+                          :class="{ 'input-readonly': seancesCompletees.has(seanceActive.id) }"
+                        />
+                        <input
+                          v-model="getLogs(exo.id, serieIdx-1).poids_realise"
+                          :placeholder="exo.series[serieIdx-1]?.poids_cible || 'charge'"
+                          class="mini-input"
+                          :readonly="seancesCompletees.has(seanceActive.id)"
+                          :class="{ 'input-readonly': seancesCompletees.has(seanceActive.id) }"
+                        />
+                      </template>
+                      <template v-else-if="seanceActive.type_seance === 'natation' || seanceActive.type_seance === 'athletisme'">
+                        <input
+                          v-model="getLogs(exo.id, serieIdx-1).reps_realisees"
+                          :placeholder="exo.series[serieIdx-1]?.metres ? `${exo.series[serieIdx-1].metres}m` : 'mètres'"
+                          class="mini-input"
+                          :readonly="seancesCompletees.has(seanceActive.id)"
+                          :class="{ 'input-readonly': seancesCompletees.has(seanceActive.id) }"
+                        />
+                        <input
+                          v-model="getLogs(exo.id, serieIdx-1).poids_realise"
+                          :placeholder="exo.series[serieIdx-1]?.intensite || 'intensité'"
+                          class="mini-input"
+                          :readonly="seancesCompletees.has(seanceActive.id)"
+                          :class="{ 'input-readonly': seancesCompletees.has(seanceActive.id) }"
+                        />
+                      </template>
+                      <template v-else-if="seanceActive.type_seance === 'pliometrie'">
+                        <input
+                          v-model="getLogs(exo.id, serieIdx-1).reps_realisees"
+                          :placeholder="exo.series[serieIdx-1]?.bonds ? `${exo.series[serieIdx-1].bonds} bonds` : 'bonds'"
+                          class="mini-input"
+                          :readonly="seancesCompletees.has(seanceActive.id)"
+                          :class="{ 'input-readonly': seancesCompletees.has(seanceActive.id) }"
+                        />
+                        <input
+                          v-model="getLogs(exo.id, serieIdx-1).poids_realise"
+                          :placeholder="exo.series[serieIdx-1]?.intensite || 'intensité'"
+                          class="mini-input"
+                          :readonly="seancesCompletees.has(seanceActive.id)"
+                          :class="{ 'input-readonly': seancesCompletees.has(seanceActive.id) }"
+                        />
+                      </template>
+                    </div>
                   </div>
+
+                  <!-- Repos superset -->
+                  <div v-if="groupe.exercices.length > 1 && groupe.exercices[0].series[serieIdx-1]?.temps_repos" class="repos-superset-col">
+                    <span class="prescrit-label">Repos</span>
+                    <span class="prescrit-val">{{ groupe.exercices[0].series[serieIdx-1].temps_repos }}</span>
+                  </div>
+                </div>
+
+                <!-- Bouton valider -->
+                <button
+                  v-if="!seancesCompletees.has(seanceActive.id)"
+                  class="btn-serie"
+                  :class="isGroupeDone(groupe, serieIdx - 1) ? 'btn-done' : 'btn-todo'"
+                  @click="toggleGroupeDone(groupe, serieIdx - 1)"
+                >
+                  <i :class="isGroupeDone(groupe, serieIdx - 1) ? 'ti ti-check' : 'ti ti-circle'"></i>
+                  {{ isGroupeDone(groupe, serieIdx - 1) ? 'Fait' : 'Valider' }}
+                </button>
+                <div v-else class="serie-statut-badge" :class="getLogs(exo.id, serieIdx-1).fait ? 'badge-fait' : 'badge-non-fait'">
+                  <i :class="getLogs(exo.id, serieIdx-1).fait ? 'ti ti-check' : 'ti ti-x'"></i>
+                  {{ getLogs(exo.id, serieIdx-1).fait ? 'Fait' : 'Non réalisé' }}
                 </div>
               </div>
             </div>
-
-            <button class="btn btn-primary btn-large" @click="validerSeance">
+            <button
+              v-if="!seancesCompletees.has(seanceActive.id)"
+              class="btn btn-primary btn-large"
+              @click="validerSeance"
+            >
               <i class="ti ti-check"></i> Valider la séance
             </button>
-          </template>
-        </div>
-      </div>
+            <div v-else class="seance-complete-banner">
+              <i class="ti ti-check"></i> Séance complétée — consultation uniquement
+            </div>
+
+          </template> <!-- fin vue séance en cours -->
+        </div> <!-- fin panel-detail -->
+      </div> <!-- fin content-body / onglet programme -->
 
       <!-- ONGLET LOGS -->
       <div v-if="onglet === 'logs'" class="logs-page">
@@ -342,6 +388,23 @@ export default {
       return logs.value[exoId][serieIdx]
     }
 
+    const getLogsAvecHistorique = (exo, serieIdx) => {
+      const serie = exo.series[serieIdx]
+      if (!serie) return getLogs(exo.id, serieIdx)
+      
+      // Si on a des logs existants pour cette série et qu'on est en consultation
+      if (logsParSerie.value[serie.id] && !getLogs(exo.id, serieIdx).fait) {
+        const logExistant = logsParSerie.value[serie.id]
+        logs.value[exo.id] = logs.value[exo.id] || {}
+        logs.value[exo.id][serieIdx] = {
+          reps_realisees: logExistant.reps_realisees || '',
+          poids_realise: logExistant.poids_realise || '',
+          fait: logExistant.fait
+        }
+      }
+      return getLogs(exo.id, serieIdx)
+    }
+
     const isGroupeDone = (groupe, serieIdx) => {
       return groupe.exercices.every(exo => getLogs(exo.id, serieIdx).fait)
     }
@@ -366,6 +429,38 @@ export default {
     }
 
     const seancesCompletees = ref(new Set())
+    const logsParSerie = ref({}) // { serie_id: { reps_realisees, poids_realise, fait } }
+
+    const chargerLogsExistants = async (programmeId) => {
+      try {
+        const logs = await api.get(`/logs/programme/${programmeId}/moi`)
+        const completees = new Set()
+        
+        // Groupe les logs par serie_id (garde le plus récent)
+        logs.forEach(log => {
+          logsParSerie.value[log.serie.id] = {
+            reps_realisees: log.reps_realisees || '',
+            poids_realise: log.poids_realise || '',
+            fait: log.fait
+          }
+        })
+
+        // Détermine quelles séances sont complètes
+        // Une séance est complète si toutes ses séries ont un log avec fait: true
+        if (seances.value.length > 0) {
+          seances.value.forEach(seance => {
+            const toutesLesSeries = seance.exercices?.flatMap(e => e.series) || []
+            if (toutesLesSeries.length === 0) return
+            const toutesFaites = toutesLesSeries.every(s => logsParSerie.value[s.id]?.fait)
+            if (toutesFaites) completees.add(seance.id)
+          })
+        }
+        
+        seancesCompletees.value = completees
+      } catch (e) {
+        console.error('Erreur chargement logs:', e)
+      }
+    }
 
     const isSeanceComplete = (seance) => {
       if (!seance.exercices || seance.exercices.length === 0) return false
@@ -404,15 +499,34 @@ export default {
       const semaines = [...new Set(seances.value.map(s => s.semaine || 1))]
       semaineActive.value = semaines[0] || 1
       loadingSeances.value = false
+      
+      // Charge les logs existants après les séances
+      await chargerLogsExistants(p.id)
     }
 
     const demarrerSeance = (seance) => {
       seanceActive.value = seance
       logs.value = {}
       groupesOuverts.value = {}
+
+      // Pré-remplir les logs depuis l'historique
+      seance.exercices?.forEach(exo => {
+        exo.series?.forEach((serie, idx) => {
+          if (logsParSerie.value[serie.id]) {
+            logs.value[exo.id] = logs.value[exo.id] || {}
+            logs.value[exo.id][idx] = {
+              reps_realisees: logsParSerie.value[serie.id].reps_realisees || '',
+              poids_realise: logsParSerie.value[serie.id].poids_realise || '',
+              fait: logsParSerie.value[serie.id].fait
+            }
+          }
+        })
+      })
+
       // Ferme tous les groupes par défaut
       grouperExercices(seance.exercices).forEach(g => {
         groupesOuverts.value[g.key] = false
+        // Si groupe déjà complet, le marquer
       })
     }
 
@@ -508,7 +622,8 @@ const validerSeance = async () => {
       getLogs, isGroupeDone, toggleGroupeDone,
       selectProgramme, demarrerSeance, validerSeance,
       formatDate, logout, panelListVisible, isGroupeComplete,
-      seancesCompletees, isSeanceComplete, isSemaineComplete
+      seancesCompletees, isSeanceComplete, isSemaineComplete,
+      logsParSerie, chargerLogsExistants
     }
   }
 }
@@ -631,6 +746,50 @@ const validerSeance = async () => {
 .semaine-tab.semaine-complete.active {
   background: #bbf7d0;
   border-color: #4ade80;
+}
+
+.input-readonly {
+  background: #f3f4f6;
+  color: #6b7280;
+  cursor: not-allowed;
+  border-color: #e5e7eb;
+}
+
+.serie-statut-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  width: 100%;
+  justify-content: center;
+  margin-top: 4px;
+}
+
+.badge-fait {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.badge-non-fait {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.seance-complete-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+  background: #dcfce7;
+  color: #16a34a;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  margin-top: 8px;
 }
 
 @media (max-width: 768px) {
