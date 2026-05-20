@@ -57,9 +57,10 @@
                 v-for="sem in semainesDisponibles"
                 :key="sem"
                 class="semaine-tab"
-                :class="{ active: semaineActive === sem }"
+                :class="{ active: semaineActive === sem, 'semaine-complete': isSemaineComplete(sem) }"
                 @click="semaineActive = sem"
               >
+                <i v-if="isSemaineComplete(sem)" class="ti ti-check"></i>
                 Semaine {{ sem }}
               </div>
             </div>
@@ -321,6 +322,12 @@ export default {
       return groupes
     }
 
+    const isSemaineComplete = (numSemaine) => {
+      const seancesDeLaSemaine = seances.value.filter(s => (s.semaine || 1) === numSemaine)
+      if (seancesDeLaSemaine.length === 0) return false
+      return seancesDeLaSemaine.every(s => seancesCompletees.value.has(s.id))
+    }
+
     const toggleGroupe = (key) => {
       groupesOuverts.value[key] = !groupesOuverts.value[key]
     }
@@ -476,7 +483,7 @@ export default {
       getLogs, isGroupeDone, toggleGroupeDone,
       selectProgramme, demarrerSeance, validerSeance,
       formatDate, logout, panelListVisible, isGroupeComplete,
-      seancesCompletees, isSeanceComplete
+      seancesCompletees, isSeanceComplete, isSemaineComplete
     }
   }
 }
@@ -588,6 +595,18 @@ export default {
 .chip { font-size: 11px; background: white; border: 1px solid #e5e7eb; border-radius: 4px; padding: 2px 6px; color: #6b7280; }
 .chip-done { background: #dcfce7; color: #16a34a; border-color: #86efac; }
 .chip-skip { background: #f3f4f6; color: #9ca3af; }
+
+.semaine-tab.semaine-complete {
+  background: #dcfce7;
+  border-color: #86efac;
+  color: #16a34a;
+  font-weight: 500;
+}
+
+.semaine-tab.semaine-complete.active {
+  background: #bbf7d0;
+  border-color: #4ade80;
+}
 
 @media (max-width: 768px) {
   .content-body { flex-direction: column; position: relative; }
