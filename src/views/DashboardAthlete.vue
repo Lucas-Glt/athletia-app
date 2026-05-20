@@ -341,6 +341,18 @@ export default {
       groupe.exercices.forEach(exo => {
         getLogs(exo.id, serieIdx).fait = !isDone
       })
+
+      // Après validation, vérifie si toutes les séries du groupe sont complètes
+      if (!isDone) {
+        const nbSeries = groupe.exercices[0].series.length
+        const toutesValidees = Array.from({ length: nbSeries }, (_, i) => i)
+          .every(i => isGroupeDone(groupe, i))
+
+        if (toutesValidees) {
+          // Ferme automatiquement l'accordéon
+          groupesOuverts.value[groupe.key] = false
+        }
+      }
     }
 
     const semainesDisponibles = computed(() => {
