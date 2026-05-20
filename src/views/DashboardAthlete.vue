@@ -416,21 +416,46 @@ export default {
       })
     }
 
-    const validerSeance = async () => {
-      for (const exo of seanceActive.value.exercices) {
-        for (let i = 0; i < exo.series.length; i++) {
-          const serie = exo.series[i]
-          const log = getLogs(exo.id, i)
-          await api.post(`/series/${serie.id}/logs/`, {
-            reps_realisees: log.reps_realisees || null,
-            poids_realise: log.poids_realise || null,
-            fait: log.fait
-          })
-        }
-      }
-      seancesCompletees.value.add(seanceActive.value.id)
-      seanceActive.value = null
+const validerSeance = async () => {
+  for (const exo of seanceActive.value.exercices) {
+    for (let i = 0; i < exo.series.length; i++) {
+      const serie = exo.series[i]
+      const log = getLogs(exo.id, i)
+      await api.post(`/series/${serie.id}/logs/`, {
+        reps_realisees: log.reps_realisees || null,
+        poids_realise: log.poids_realise || null,
+        fait: log.fait
+      })
     }
+  }
+
+  seancesCompletees.value.add(seanceActive.value.id)
+  const seanceValidee = seanceActive.value
+  seanceActive.value = null
+
+  // Vérifie si la semaine est complète
+  const semaine = seanceValidee.semaine || 1
+  const seancesDeLaSemaine = seances.value.filter(s => (s.semaine || 1) === semaine)
+  const semaineComplete = seancesDeLaSemaine.every(s => seancesCompletees.value.has(s.id))
+
+  if (semaineComplete) {
+    // Vérifie si une semaine suivante existe déjà
+    const semaineSuivante = semaine + 1
+    const semaineSuivanteExiste = semainesDisponibles.value.includes(semaineSuivante)
+
+    if (!semaineSuivanteExiste) {
+      try {
+        await api.post(`/programmes/${programmeActif.value.id}/seances/auto-semaine-suivante`)
+        // Recharge les séances
+        const data = await api.get(`/programmes/${programmeActif.value.id}/seances/`)
+        seances.value = data
+        semaineActive.value = semaineSuivante
+      } catch (e) {
+        console.error('Erreur auto-semaine:', e)
+      }
+    }
+  }
+}
 
     const fetchHistorique = async () => {
       historique.value = []
