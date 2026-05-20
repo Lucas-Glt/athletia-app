@@ -268,7 +268,7 @@
                   </div>
                 </div>
 
-                <!-- Bouton valider -->
+                <!-- Bouton valider série -->
                 <button
                   v-if="!seancesCompletees.has(seanceActive.id)"
                   class="btn-serie"
@@ -278,12 +278,18 @@
                   <i :class="isGroupeDone(groupe, serieIdx - 1) ? 'ti ti-check' : 'ti ti-circle'"></i>
                   {{ isGroupeDone(groupe, serieIdx - 1) ? 'Fait' : 'Valider' }}
                 </button>
-                <div v-else class="serie-statut-badge" :class="getLogs(exo.id, serieIdx-1).fait ? 'badge-fait' : 'badge-non-fait'">
-                  <i :class="getLogs(exo.id, serieIdx-1).fait ? 'ti ti-check' : 'ti ti-x'"></i>
-                  {{ getLogs(exo.id, serieIdx-1).fait ? 'Fait' : 'Non réalisé' }}
+                <div v-else class="serie-statut-badge" :class="getLogs(groupe.exercices[0].id, serieIdx-1).fait ? 'badge-fait' : 'badge-non-fait'">
+                  <i :class="getLogs(groupe.exercices[0].id, serieIdx-1).fait ? 'ti ti-check' : 'ti ti-x'"></i>
+                  {{ getLogs(groupe.exercices[0].id, serieIdx-1).fait ? 'Fait' : 'Non réalisé' }}
                 </div>
-              </div>
-            </div>
+
+              </div> <!-- fin serie-col -->
+            </div> <!-- fin series-cols -->
+
+          </div> <!-- fin exo-group-body -->
+        </div> <!-- fin exo-group v-for -->
+
+            <!-- Bouton valider séance -->
             <button
               v-if="!seancesCompletees.has(seanceActive.id)"
               class="btn btn-primary btn-large"
@@ -923,7 +929,8 @@ const validerSeance = async () => {
     align-items: center;
     gap: 4px;
   }
-
+}
+ 
   .exo-group.is-complete {
   border-color: #86efac;
   background: #f0fdf4;
@@ -948,7 +955,5 @@ const validerSeance = async () => {
   border-left-color: #16a34a;
   background: #f0fdf4;
 }
-}
-
 
 </style>
