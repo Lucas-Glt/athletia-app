@@ -106,7 +106,7 @@
               v-for="groupe in grouperExercices(seanceActive.exercices)"
               :key="groupe.key"
               class="exo-group"
-              :class="{ 'is-superset': groupe.exercices.length > 1 }"
+              :class="{ 'is-superset': groupe.exercices.length > 1, 'is-complete': isGroupeComplete(groupe) }"
             >
               <!-- En-tête accordéon groupe -->
               <div class="exo-group-head" @click="toggleGroupe(groupe.key)">
@@ -380,9 +380,9 @@ export default {
       seanceActive.value = seance
       logs.value = {}
       groupesOuverts.value = {}
-      // Ouvre tous les groupes par défaut
+      // Ferme tous les groupes par défaut
       grouperExercices(seance.exercices).forEach(g => {
-        groupesOuverts.value[g.key] = true
+        groupesOuverts.value[g.key] = false
       })
     }
 
@@ -435,6 +435,15 @@ export default {
 
     onMounted(fetchProgrammes)
 
+    const isGroupeComplete = (groupe) => {
+      const nbSeries = groupe.exercices[0].series.length
+      if (nbSeries === 0) return false
+      for (let i = 0; i < nbSeries; i++) {
+        if (!isGroupeDone(groupe, i)) return false
+      }
+      return true
+    }
+
     return {
       programmes, programmeActif, seances, seanceActive, logs, historique,
       loadingSeances, onglet, historiqueGroupe,
@@ -443,7 +452,7 @@ export default {
       labelType, letterFor, grouperExercices,
       getLogs, isGroupeDone, toggleGroupeDone,
       selectProgramme, demarrerSeance, validerSeance,
-      formatDate, logout, panelListVisible
+      formatDate, logout, panelListVisible, isGroupeComplete
     }
   }
 }
@@ -665,5 +674,30 @@ export default {
     align-items: center;
     gap: 4px;
   }
+
+  .exo-group.is-complete {
+  border-color: #86efac;
+  background: #f0fdf4;
+}
+
+.exo-group.is-complete .exo-group-head {
+  background: #dcfce7;
+}
+
+.exo-group.is-complete .exo-group-noms .exo-nom-inline {
+  color: #16a34a;
+}
+
+.exo-group.is-complete .series-count-badge {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+/* Override superset si complet */
+.exo-group.is-superset.is-complete {
+  border-color: #86efac;
+  border-left-color: #16a34a;
+  background: #f0fdf4;
+}
 }
 </style>
