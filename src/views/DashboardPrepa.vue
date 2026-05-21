@@ -25,42 +25,56 @@
         @modifie="onModifie"
       />
 
-    <!-- ONGLET PROGRAMMES -->
-    <div v-if="onglet === 'programmes'" class="onglet-wrapper">
-      <ProgrammeForm v-if="vue === 'form'" @termine="onTermine" />
+      <!-- ONGLET PROGRAMMES -->
+      <div v-if="onglet === 'programmes'" class="onglet-wrapper">
+        <ProgrammeForm v-if="vue === 'form'" @termine="onTermine" />
 
-      <div v-if="vue === 'liste'" class="content-body">
-        <button class="toggle-programmes-btn" @click="panelListVisible = !panelListVisible">
-          <i class="ti ti-layout-list"></i>
-          {{ panelListVisible ? 'Masquer' : 'Mes programmes' }}
-        </button>
+        <div v-if="vue === 'liste'" class="content-body">
 
-        <div class="panel-list" :class="{ 'mobile-visible': panelListVisible }">
-          <div class="section-title">Mes programmes</div>
-          <div v-if="programmes.length === 0" class="empty">Aucun programme.</div>
-          <div
-            v-for="p in programmes"
-            :key="p.id"
-            class="prog-card"
-            :class="{ active: programmeActif?.id === p.id }"
-            @click="selectProgramme(p)"
-          >
-            <div class="prog-card-top">
-              <div class="prog-name">{{ p.nom }}</div>
+          <!-- Sidebar coulissante -->
+          <div class="sidebar-wrapper" :class="{ open: sidebarOuverte }">
+
+            <!-- Bande verticale toujours visible -->
+            <div class="sidebar-strip" @click="sidebarOuverte = !sidebarOuverte">
+              <i class="ti" :class="sidebarOuverte ? 'ti-chevron-left' : 'ti-chevron-right'"></i>
+              <div class="sidebar-dots">
+                <span
+                  v-for="p in programmes"
+                  :key="p.id"
+                  class="sidebar-dot"
+                  :class="{ active: programmeActif?.id === p.id }"
+                ></span>
+              </div>
             </div>
-            <div class="prog-meta">
-              <span class="badge" :class="p.statut === 'actif' ? 'badge-green' : 'badge-gray'">{{ p.statut }}</span>
-              <span>{{ p.athletes.length }} athlète{{ p.athletes.length > 1 ? 's' : '' }}</span>
+
+            <!-- Panel liste programmes -->
+            <div class="panel-list">
+              <div class="section-title">Mes programmes</div>
+              <div v-if="programmes.length === 0" class="empty">Aucun programme.</div>
+              <div
+                v-for="p in programmes"
+                :key="p.id"
+                class="prog-card"
+                :class="{ active: programmeActif?.id === p.id }"
+                @click="selectProgramme(p); sidebarOuverte = false"
+              >
+                <div class="prog-card-top">
+                  <div class="prog-name">{{ p.nom }}</div>
+                </div>
+                <div class="prog-meta">
+                  <span class="badge" :class="p.statut === 'actif' ? 'badge-green' : 'badge-gray'">{{ p.statut }}</span>
+                  <span>{{ p.athletes.length }} athlète{{ p.athletes.length > 1 ? 's' : '' }}</span>
+                </div>
+              </div>
+              <button class="btn btn-dashed" @click="vue = 'form'">
+                <i class="ti ti-plus"></i> Nouveau
+              </button>
             </div>
           </div>
-          <button class="btn btn-dashed" @click="vue = 'form'">
-            <i class="ti ti-plus"></i> Nouveau
-          </button>
-        </div>
 
-        <!-- panel-detail suit ici -->
-
+          <!-- Panel detail -->
           <div class="panel-detail" v-if="programmeActif">
+
             <div v-if="editMode" class="edit-banner">
               <i class="ti ti-edit"></i>
               <span>Mode édition activé</span>
@@ -143,14 +157,12 @@
 
               <div v-if="loadingSeances" class="empty">Chargement...</div>
 
-              <!-- SÉANCES -->
               <div
                 v-for="seance in seancesFiltrees"
                 :key="seance.id"
                 class="seance-block"
                 :class="`type-${seance.type_seance || 'musculation'}`"
               >
-                <!-- En-tête séance accordéon -->
                 <div class="seance-head" @click="toggleSeance(seance.id)">
                   <span class="type-badge" :class="`type-badge-${seance.type_seance || 'musculation'}`">
                     {{ labelType(seance.type_seance) }}
@@ -164,26 +176,22 @@
                   </button>
                 </div>
 
-                <!-- Corps séance -->
                 <div class="seance-body" v-if="isSeanceOuverte(seance.id)">
                   <div class="empty-seance" v-if="!seance.exercices || seance.exercices.length === 0">
                     Aucun exercice
                   </div>
 
-                  <!-- GROUPES D'EXERCICES -->
                   <div
                     v-for="groupe in grouperExercices(seance.exercices)"
                     :key="groupe.key"
                     class="exo-group"
                     :class="{ 'is-superset': groupe.exercices.length > 1 }"
                   >
-                    <!-- Bandeau superset -->
                     <div v-if="groupe.exercices.length > 1" class="superset-banner">
                       <i class="ti ti-link"></i>
                       <span>Superset/Biset · {{ groupe.exercices.length }} exercices</span>
                     </div>
 
-                    <!-- Liste des exos -->
                     <div class="exo-list">
                       <div v-for="(exo, eidx) in groupe.exercices" :key="exo.id" class="exo-block">
                         <div class="exo-head">
@@ -197,7 +205,6 @@
                       </div>
                     </div>
 
-                    <!-- Bouton ajout superset (edit, sans séries) -->
                     <template v-if="editMode && groupe.exercices[0].series.length === 0">
                       <button
                         v-if="!getGroupeForm(groupe, groupe.exercices[0])._formSupersetOuvert"
@@ -214,7 +221,6 @@
                       </div>
                     </template>
 
-                    <!-- SÉRIES EXISTANTES avec accordéon -->
                     <div v-if="groupe.exercices[0].series.length > 0">
                       <div class="groupe-series-head" @click="toggleGroupeSeries(groupe.key + '_' + seance.id)">
                         <span class="series-count">{{ groupe.exercices[0].series.length }} séries</span>
@@ -228,8 +234,6 @@
                             <div v-for="(exo, eidx) in groupe.exercices" :key="exo.id" class="serie-exo">
                               <span class="exo-letter-mini" v-if="groupe.exercices.length > 1">{{ letterFor(eidx) }}</span>
                               <strong>{{ exo.nom }}</strong>
-
-                              <!-- Lecture seule -->
                               <template v-if="!editMode">
                                 <span class="serie-values">
                                   <template v-if="seance.type_seance === 'musculation' || !seance.type_seance">
@@ -251,8 +255,6 @@
                                   </template>
                                 </span>
                               </template>
-
-                              <!-- Édition inline -->
                               <template v-else>
                                 <template v-if="seance.type_seance === 'musculation' || !seance.type_seance">
                                   <input v-model="exo.series[serieIdx-1].nb_reps" @change="mettreAJourSerie(exo.series[serieIdx-1])" placeholder="reps" class="mini-input" />
@@ -274,7 +276,6 @@
                               </template>
                             </div>
 
-                            <!-- Repos commun superset -->
                             <div v-if="groupe.exercices.length > 1" class="repos-commun">
                               <template v-if="!editMode">
                                 <span class="repos-tag" v-if="groupe.exercices[0].series[serieIdx-1]?.temps_repos">
@@ -291,7 +292,6 @@
                       </div>
                     </div>
 
-                    <!-- FORMULAIRE GÉNÉRATION (edit, sans séries) -->
                     <template v-else-if="editMode">
                       <div class="serie-gen-form">
                         <div v-for="(exo, eidx) in groupe.exercices" :key="exo.id" class="serie-gen-exo">
@@ -334,7 +334,6 @@
                     <div v-else class="empty-series">Aucune série définie</div>
                   </div>
 
-                  <!-- Ajout exercice -->
                   <div v-if="editMode" class="add-exercice-form">
                     <input v-model="seance._nouvelExercice.nom" placeholder="Nom de l'exercice" class="input-flex" />
                     <button class="btn btn-sm" @click="ajouterExercice(seance)" :disabled="!seance._nouvelExercice.nom">+ Exercice</button>
@@ -342,7 +341,6 @@
                 </div>
               </div>
 
-              <!-- Ajout séance -->
               <div v-if="editMode" class="add-seance-form">
                 <input v-model="nouvelleSeance.nom" placeholder="Nom de la séance" class="input-flex" />
                 <select v-model="nouvelleSeance.type_seance">
@@ -432,11 +430,16 @@
                 </div>
               </div>
             </div>
+
           </div>
+          <!-- fin panel-detail -->
 
           <div class="panel-detail empty" v-else>Sélectionnez un programme</div>
+
         </div>
+        <!-- fin content-body -->
       </div>
+      <!-- fin onglet-wrapper programmes -->
 
       <!-- ONGLET ATHLETES -->
       <div v-if="onglet === 'athletes'" class="onglet-wrapper athletes-page">
@@ -464,6 +467,7 @@
         </div>
         <div v-if="searchError" class="error">{{ searchError }}</div>
       </div>
+
     </div>
   </AppLayout>
 </template>
@@ -503,6 +507,7 @@ export default {
     const groupeForms = ref({})
     const seancesOuvertes = ref({})
     const groupesSeriesOuverts = ref({})
+    const sidebarOuverte = ref(false)
     const router = useRouter()
     const authStore = useAuthStore()
     const api = useApi()
@@ -803,7 +808,7 @@ export default {
 
     const logout = () => { authStore.logout(); router.push('/') }
     const initiales = (nom) => nom.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
-    const panelListVisible = ref(false)
+
     onMounted(async () => {
       await fetchProgrammes()
       await fetchMonCercle()
@@ -828,7 +833,8 @@ export default {
       onTermine, onModifie, logout, initiales,
       onClickTabLogs, voirLogsAthlete, formatDate,
       getStatutClasse, getStatutIcon,
-      retirerDuCercle, rechercherAthlète, ajouterAuCercle, panelListVisible
+      retirerDuCercle, rechercherAthlète, ajouterAuCercle,
+      sidebarOuverte
     }
   }
 }
@@ -894,8 +900,6 @@ export default {
 .semaine-tab.active { background: #EEEDFE; border-color: #7F77DD; color: #3C3489; font-weight: 500; }
 .semaine-tab.semaine-add { background: transparent; border-style: dashed; color: #534AB7; }
 .semaine-tab.semaine-add:hover { background: #f9fafb; }
-
-/* Séances */
 .seance-block { border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; flex-shrink: 0; border-left-width: 4px; }
 .seance-block.type-musculation { border-left-color: #FCA5A5; }
 .seance-block.type-natation { border-left-color: #93C5FD; }
@@ -910,8 +914,6 @@ export default {
 .seance-head:hover { background: #f3f4f6; }
 .seance-body { padding: 10px 14px; display: flex; flex-direction: column; gap: 10px; border-top: 1px solid #e5e7eb; }
 .exo-count-badge { font-size: 11px; color: #9ca3af; background: #f3f4f6; padding: 2px 8px; border-radius: 10px; }
-
-/* Groupes */
 .exo-group { display: flex; flex-direction: column; gap: 8px; padding: 10px; background: #f9fafb; border-radius: 8px; border: 1px solid #e5e7eb; }
 .exo-group.is-superset { background: #F5F4FD; border: 1px solid #AFA9EC; border-left: 3px solid #7F77DD; }
 .superset-banner { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #534AB7; font-weight: 500; }
@@ -922,13 +924,9 @@ export default {
 .exo-letter { background: #7F77DD; color: white; }
 .exo-name { font-size: 14px; font-weight: 500; }
 .add-exo-superset-form { display: flex; gap: 8px; align-items: center; padding: 8px; background: white; border-radius: 6px; border: 1px dashed #AFA9EC; }
-
-/* Accordéon séries */
 .groupe-series-head { display: flex; align-items: center; justify-content: space-between; padding: 7px 10px; background: white; border-radius: 6px; border: 1px solid #e5e7eb; cursor: pointer; }
 .groupe-series-head:hover { border-color: #7F77DD; background: #FAFAFE; }
 .series-count { font-size: 13px; font-weight: 600; color: #534AB7; }
-
-/* Séries */
 .series-display { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
 .serie-group-row { display: flex; gap: 10px; align-items: flex-start; padding: 8px; background: white; border-radius: 6px; border: 1px solid #e5e7eb; }
 .serie-label { font-size: 12px; font-weight: 600; color: #534AB7; padding: 4px 8px; background: #EEEDFE; border-radius: 4px; white-space: nowrap; flex-shrink: 0; align-self: flex-start; }
@@ -941,8 +939,6 @@ export default {
 .repos-input { border-color: #C8D6E5 !important; background: #f8fafc; }
 .repos-commun { display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: #f3f4f6; border-radius: 6px; border: 1px dashed #d1d5db; margin-top: 4px; }
 .repos-label { font-size: 11px; color: #6b7280; white-space: nowrap; display: flex; align-items: center; gap: 4px; }
-
-/* Formulaire génération */
 .serie-gen-form { display: flex; flex-direction: column; gap: 8px; padding: 10px; background: white; border-radius: 6px; border: 1px dashed #7F77DD; }
 .serie-gen-exo { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .serie-gen-repos-superset { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: #f3f4f6; border-radius: 6px; border: 1px dashed #d1d5db; }
@@ -996,52 +992,95 @@ export default {
 .statut-icon { display: flex; justify-content: center; }
 .serie-num { font-size: 12px; color: #9ca3af; text-align: center; }
 
-@media (max-width: 768px) {
-  .content-body { flex-direction: column; position: relative; }
-
-  .panel-list {
-    display: none;
-    width: 100%;
-    border-right: none;
-    border-bottom: 1px solid #e5e7eb;
-    padding: 8px 12px;
-    flex-direction: row;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    gap: 6px;
-    flex-shrink: 0;
-  }
-
-  .panel-list.mobile-visible {
-    display: flex;
-  }
-
-  .panel-list .section-title { display: none; }
-
-  .prog-card {
-    flex-shrink: 0;
-    min-width: 130px;
-  }
-
-  .panel-detail { padding: 10px 12px; }
-
-  .toggle-programmes-btn {
-    display: flex;
-  }
+.sidebar-wrapper {
+  display: flex;
+  flex-direction: row;
+  flex-shrink: 0;
 }
 
-.toggle-programmes-btn {
+.sidebar-strip {
   display: none;
-  align-items: center;
+}
+
+.sidebar-dots {
+  display: flex;
+  flex-direction: column;
   gap: 6px;
-  padding: 8px 14px;
-  font-size: 13px;
-  background: #EEEDFE;
-  color: #534AB7;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  margin: 10px 12px 0;
-  font-weight: 500;
+  align-items: center;
+}
+
+.sidebar-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.4);
+  transition: background 0.2s;
+}
+
+.sidebar-dot.active {
+  background: white;
+  width: 8px;
+  height: 8px;
+}
+
+@media (max-width: 768px) {
+  .sidebar-wrapper {
+    position: relative;
+    flex-shrink: 0;
+    z-index: 30;
+  }
+
+  .sidebar-strip {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 16px;
+    padding: 16px 6px;
+    width: 32px;
+    background: #7F77DD;
+    cursor: pointer;
+    flex-shrink: 0;
+    color: white;
+    font-size: 14px;
+  }
+
+  .sidebar-strip:hover {
+    background: #534AB7;
+  }
+
+  .panel-list {
+    position: absolute;
+    left: 32px;
+    top: 0;
+    bottom: 0;
+    width: 220px;
+    transform: translateX(-220px);
+    transition: transform 0.3s ease;
+    border-right: 1px solid #e5e7eb;
+    background: white;
+    overflow-y: auto;
+    z-index: 20;
+    box-shadow: 4px 0 16px rgba(0,0,0,0.1);
+  }
+
+  .sidebar-wrapper.open .panel-list {
+    transform: translateX(0);
+  }
+
+  .panel-detail {
+    flex: 1;
+    min-width: 0;
+    padding: 12px;
+    overflow-y: auto;
+  }
+
+  .detail-top {
+    flex-direction: column;
+  }
+
+  .detail-actions {
+    flex-wrap: wrap;
+  }
 }
 </style>
