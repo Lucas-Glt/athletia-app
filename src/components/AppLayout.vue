@@ -91,6 +91,36 @@
         </div>
       </div>
     </div>
+    <!-- Bannière PWA Android/Chrome -->
+    <div v-if="showInstallBanner && !isInStandaloneMode" class="install-banner">
+      <div class="install-banner-content">
+        <i class="ti ti-device-mobile" style="font-size:24px;color:#7F77DD"></i>
+        <div>
+          <div class="install-title">Installer Athletia</div>
+          <div class="install-sub">Accès rapide depuis ton écran d'accueil</div>
+        </div>
+      </div>
+      <div class="install-actions">
+        <button class="install-btn" @click="installerApp">Installer</button>
+        <button class="install-dismiss" @click="showInstallBanner = false">Plus tard</button>
+      </div>
+    </div>
+
+    <!-- Bannière PWA iOS -->
+    <div v-if="isIos && !isInStandaloneMode && showIosBanner" class="install-banner">
+      <div class="install-banner-content">
+        <i class="ti ti-device-mobile" style="font-size:24px;color:#7F77DD"></i>
+        <div>
+          <div class="install-title">Installer Athletia</div>
+          <div class="install-sub">
+            Appuie sur <i class="ti ti-share"></i> puis "Sur l'écran d'accueil"
+          </div>
+        </div>
+      </div>
+      <div class="install-actions">
+        <button class="install-dismiss" @click="showIosBanner = false">OK</button>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -148,7 +178,14 @@ export default {
       }
     }
 
-    onMounted(() => document.addEventListener('click', fermerMenu))
+    onMounted(() => {
+      document.addEventListener('click', fermerMenu)
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault()
+        installPrompt.value = e
+        if (!isInStandaloneMode) showInstallBanner.value = true
+      })
+    })
     onUnmounted(() => document.removeEventListener('click', fermerMenu))
 
     const deconnexion = () => {
@@ -202,12 +239,26 @@ export default {
     }
 
     const drawerOuvert = ref(false)
+    const installPrompt = ref(null)
+    const showInstallBanner = ref(false)
+    const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent)
+    const isInStandaloneMode = window.matchMedia('(display-mode: standalone)').matches
+    const showIosBanner = ref(isIos && !isInStandaloneMode)
+
+    const installerApp = async () => {
+      if (!installPrompt.value) return
+      installPrompt.value.prompt()
+      const result = await installPrompt.value.userChoice
+      if (result.outcome === 'accepted') showInstallBanner.value = false
+      installPrompt.value = null
+    }
 
     return {
       authStore, roleLabel, brandLetter, brandColor, initiales,
       menuOuvert, toggleMenu, avatarRef, deconnexion,
       modalePassword, ouvrirModalePassword, fermerModalePassword,
-      form, changerPassword, loadingPassword, passwordError, passwordSuccess, drawerOuvert
+      form, changerPassword, loadingPassword, passwordError, passwordSuccess, drawerOuvert,
+      installPrompt, showInstallBanner, isIos, isInStandaloneMode, showIosBanner, installerApp
     }
   }
 }
@@ -434,4 +485,69 @@ export default {
 
   .modal { width: calc(100vw - 32px); }
 }
+
+.install-banner {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: white;
+  border-top: 1px solid #EEEDF8;
+  box-shadow: 0 -4px 16px rgba(0,0,0,0.08);
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  z-index: 300;
+}
+
+.install-banner-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.install-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #111;
+}
+
+.install-sub {
+  font-size: 12px;
+  color: #6b7280;
+  margin-top: 2px;
+}
+
+.install-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.install-btn {
+  padding: 7px 14px;
+  background: #7F77DD;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.install-btn:hover { background: #534AB7; }
+
+.install-dismiss {
+  padding: 7px 14px;
+  background: #f3f4f6;
+  color: #374151;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.install-dismiss:hover { background: #e5e7eb; }
 </style>
