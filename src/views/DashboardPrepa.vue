@@ -823,7 +823,7 @@ export default {
       await fetchProgrammes()
       await fetchMonCercle()
     })
-^
+
     const mettreAJourSeance = async (seance) => {
       await api.patch(`/seances/${seance.id}`, {
         nom: seance.nom,
