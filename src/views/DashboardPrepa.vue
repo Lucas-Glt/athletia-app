@@ -167,7 +167,17 @@
                   <span class="type-badge" :class="`type-badge-${seance.type_seance || 'musculation'}`">
                     {{ labelType(seance.type_seance) }}
                   </span>
-                  <span class="badge badge-purple" v-if="seance.jour">{{ seance.jour }}</span>
+                  <span class="badge badge-purple" v-if="seance.jour && !editMode">{{ seance.jour }}</span>
+                  <select
+                    v-if="editMode"
+                    v-model="seance.jour"
+                    @change="mettreAJourSeance(seance)"
+                    @click.stop
+                    class="select-jour"
+                  >
+                    <option value="">Jour</option>
+                    <option v-for="j in jours" :key="j" :value="j">{{ j }}</option>
+                  </select>
                   <span style="flex:1">{{ seance.nom }}</span>
                   <span class="exo-count-badge">{{ seance.exercices?.length || 0 }} exo{{ seance.exercices?.length > 1 ? 's' : '' }}</span>
                   <i class="ti" :class="isSeanceOuverte(seance.id) ? 'ti-chevron-up' : 'ti-chevron-down'" style="color:#9ca3af;font-size:14px"></i>
@@ -813,7 +823,16 @@ export default {
       await fetchProgrammes()
       await fetchMonCercle()
     })
-
+^
+    const mettreAJourSeance = async (seance) => {
+      await api.patch(`/seances/${seance.id}`, {
+        nom: seance.nom,
+        ordre: seance.ordre,
+        jour: seance.jour || null,
+        semaine: seance.semaine,
+        type_seance: seance.type_seance
+      })
+    }
     return {
       programmes, programmeActif, seances, monCercle,
       loadingSeances, modalAssigner, vue, onglet, vueLabel,
@@ -834,7 +853,7 @@ export default {
       onClickTabLogs, voirLogsAthlete, formatDate,
       getStatutClasse, getStatutIcon,
       retirerDuCercle, rechercherAthlète, ajouterAuCercle,
-      sidebarOuverte
+      sidebarOuverte,mettreAJourSeance
     }
   }
 }
@@ -1091,5 +1110,14 @@ export default {
   .detail-actions {
     flex-wrap: wrap;
   }
+}
+.select-jour {
+  padding: 3px 6px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #374151;
+  background: white;
+  cursor: pointer;
 }
 </style>
