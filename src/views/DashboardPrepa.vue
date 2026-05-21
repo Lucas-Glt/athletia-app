@@ -1049,7 +1049,7 @@ export default {
     font-size: 14px;
     position: fixed;
     left: 0;
-    top: 56px;
+    top: 52px;
     bottom: 0;
     z-index: 101;
   }
@@ -1061,7 +1061,7 @@ export default {
   .panel-list {
     position: fixed;
     left: 32px;
-    top: 56px;
+    top: 52px;
     bottom: 0;
     width: 220px;
     transform: translateX(-252px);
