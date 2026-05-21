@@ -1024,8 +1024,12 @@ export default {
 }
 
 @media (max-width: 768px) {
+  .content-body {
+    overflow: visible !important;
+  }
+
   .sidebar-wrapper {
-    position: relative;
+    position: static;
     flex-shrink: 0;
     z-index: 30;
   }
@@ -1043,6 +1047,11 @@ export default {
     flex-shrink: 0;
     color: white;
     font-size: 14px;
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    z-index: 101;
   }
 
   .sidebar-strip:hover {
@@ -1050,17 +1059,17 @@ export default {
   }
 
   .panel-list {
-    position: absolute;
+    position: fixed;
     left: 32px;
     top: 0;
     bottom: 0;
     width: 220px;
-    transform: translateX(-220px);
+    transform: translateX(-252px);
     transition: transform 0.3s ease;
     border-right: 1px solid #e5e7eb;
     background: white;
     overflow-y: auto;
-    z-index: 20;
+    z-index: 100;
     box-shadow: 4px 0 16px rgba(0,0,0,0.1);
   }
 
@@ -1071,7 +1080,7 @@ export default {
   .panel-detail {
     flex: 1;
     min-width: 0;
-    padding: 12px;
+    padding: 12px 12px 12px 44px;
     overflow-y: auto;
   }
 
