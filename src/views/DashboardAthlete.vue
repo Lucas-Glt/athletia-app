@@ -956,4 +956,12 @@ const validerSeance = async () => {
   background: #f0fdf4;
 }
 
+.seance-block.seance-complete {
+  cursor: pointer;
+}
+
+.seance-block.seance-complete:hover {
+  border-color: #4ade80;
+  opacity: 1;
+}
 </style>
