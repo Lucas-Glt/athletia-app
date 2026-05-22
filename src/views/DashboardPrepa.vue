@@ -178,7 +178,15 @@
                     <option value="">Jour</option>
                     <option v-for="j in jours" :key="j" :value="j">{{ j }}</option>
                   </select>
-                  <span style="flex:1">{{ seance.nom }}</span>
+                  <input
+                    v-if="editMode"
+                    v-model="seance.nom"
+                    @change="mettreAJourSeance(seance)"
+                    @click.stop
+                    class="input-inline"
+                    placeholder="Nom de la séance"
+                  />
+                  <span v-else style="flex:1">{{ seance.nom }}</span>
                   <span class="exo-count-badge">{{ seance.exercices?.length || 0 }} exo{{ seance.exercices?.length > 1 ? 's' : '' }}</span>
                   <i class="ti" :class="isSeanceOuverte(seance.id) ? 'ti-chevron-up' : 'ti-chevron-down'" style="color:#9ca3af;font-size:14px"></i>
                   <button v-if="editMode" class="btn btn-sm btn-danger" @click.stop="supprimerSeance(seance)">
@@ -207,7 +215,15 @@
                         <div class="exo-head">
                           <span class="exo-letter" v-if="groupe.exercices.length > 1">{{ letterFor(eidx) }}</span>
                           <span class="exo-num" v-else>{{ exo.ordre }}</span>
-                          <span class="exo-name" style="flex:1">{{ exo.nom }}</span>
+                          <input
+                            v-if="editMode"
+                            v-model="exo.nom"
+                            @change="mettreAJourExercice(exo)"
+                            @click.stop
+                            class="input-inline"
+                            placeholder="Nom de l'exercice"
+                          />
+                          <span v-else class="exo-name" style="flex:1">{{ exo.nom }}</span>
                           <button v-if="editMode" class="btn-icon btn-danger" @click="supprimerExercice(seance, exo)">
                             <i class="ti ti-trash"></i>
                           </button>
@@ -652,7 +668,11 @@ export default {
       loadingSeances.value = true
       const data = await api.get(`/programmes/${programmeId}/seances/`)
       seances.value = data.map(s => ({ ...s, _nouvelExercice: { nom: '' } }))
-      seances.value.forEach(s => { seancesOuvertes.value[s.id] = false })
+      seances.value.forEach(s => {
+        if (seancesOuvertes.value[s.id] === undefined) {
+          seancesOuvertes.value[s.id] = false
+        }
+      })
       groupesSeriesOuverts.value = {}
       const semaines = [...new Set(seances.value.map(s => s.semaine || 1))]
       if (!semaines.includes(semaineActive.value)) semaineActive.value = semaines[0] || 1
@@ -824,6 +844,14 @@ export default {
       await fetchMonCercle()
     })
 
+    const mettreAJourExercice = async (exo) => {
+      await api.patch(`/exercices/${exo.id}`, {
+        nom: exo.nom,
+        ordre: exo.ordre,
+        groupe: exo.groupe || null
+      })
+    }
+
     const mettreAJourSeance = async (seance) => {
       await api.patch(`/seances/${seance.id}`, {
         nom: seance.nom,
@@ -853,7 +881,7 @@ export default {
       onClickTabLogs, voirLogsAthlete, formatDate,
       getStatutClasse, getStatutIcon,
       retirerDuCercle, rechercherAthlète, ajouterAuCercle,
-      sidebarOuverte,mettreAJourSeance
+      sidebarOuverte,mettreAJourSeance, mettreAJourExercice
     }
   }
 }
@@ -1119,5 +1147,21 @@ export default {
   color: #374151;
   background: white;
   cursor: pointer;
+}
+
+.input-inline {
+  flex: 1;
+  padding: 3px 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  background: white;
+  min-width: 0;
+}
+
+.input-inline:focus {
+  outline: none;
+  border-color: #7F77DD;
 }
 </style>
