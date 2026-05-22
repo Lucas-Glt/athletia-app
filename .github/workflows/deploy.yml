@@ -14,7 +14,7 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: 2222
+          port: ${{ secrets.VPS_PORT }}
           script: |
             cd /srv/athletia/frontend
             git pull
