@@ -71,8 +71,8 @@
               v-for="seance in seancesFiltrees"
               :key="seance.id"
               class="seance-block"
-              :class="[`type-${seance.type_seance || 'musculation'}`, { 'clickable': !seancesCompletees.has(seance.id), 'seance-complete': seancesCompletees.has(seance.id) }]"
-              @click="!seancesCompletees.has(seance.id) && demarrerSeance(seance)"
+              :class="[`type-${seance.type_seance || 'musculation'}`, { 'seance-complete': seancesCompletees.has(seance.id) }]"
+              @click="demarrerSeance(seance)"
             >
               <div class="seance-head">
                 <span class="type-badge" :class="`type-badge-${seance.type_seance || 'musculation'}`">
