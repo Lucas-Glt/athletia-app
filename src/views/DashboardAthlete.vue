@@ -4,6 +4,21 @@
       <div class="nav-item" :class="{ active: onglet === 'programme' }" @click="onglet = 'programme'">
         <i class="ti ti-calendar"></i> Mon programme
       </div>
+
+      <div class="nav-programmes" v-if="programmes.length > 0">
+        <div class="nav-programmes-title">Mes programmes</div>
+        <div
+          v-for="p in programmes"
+          :key="p.id"
+          class="nav-prog"
+          :class="{ active: programmeActif?.id === p.id }"
+          @click="onglet = 'programme'; selectProgramme(p)"
+        >
+          <i class="ti ti-point-filled"></i>
+          <span>{{ p.nom }}</span>
+        </div>
+      </div>
+
       <div class="nav-item" :class="{ active: onglet === 'logs' }" @click="onglet = 'logs'">
         <i class="ti ti-chart-bar"></i> Mes logs
       </div>
@@ -934,5 +949,48 @@ const validerSeance = async () => {
 .seance-block.seance-complete:hover {
   border-color: #4ade80;
   opacity: 1;
+}
+
+.nav-programmes {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .nav-programmes {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 4px 0 4px 12px;
+    margin: 2px 0;
+    border-left: 2px solid #EEEDFE;
+  }
+
+  .nav-programmes-title {
+    font-size: 10px;
+    font-weight: 500;
+    color: #9ca3af;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 4px 8px;
+  }
+
+  .nav-prog {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 7px 8px;
+    font-size: 13px;
+    color: #6b7280;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+
+  .nav-prog:hover { background: #F8F7FF; color: #374151; }
+
+  .nav-prog.active {
+    background: #EEEDFE;
+    color: #534AB7;
+    font-weight: 500;
+  }
 }
 </style>
