@@ -23,12 +23,7 @@
       <!-- ONGLET PROGRAMME -->
       <div v-if="onglet === 'programme' && programmes.length > 0" class="content-body">
 
-        <button class="toggle-programmes-btn" @click="panelListVisible = !panelListVisible">
-          <i class="ti ti-layout-list"></i>
-          {{ panelListVisible ? 'Masquer' : 'Mes programmes' }}
-        </button>
-
-        <div class="panel-list" :class="{ 'mobile-visible': panelListVisible }">
+        <div class="panel-list">
           <div class="section-title">Mes programmes</div>
           <div
             v-for="p in programmes"
@@ -801,8 +796,8 @@ const validerSeance = async () => {
 @media (max-width: 768px) {
   .content-body { flex-direction: column; position: relative; }
 
-  .panel-list {
-    display: none;
+.panel-list {
+    display: flex;
     width: 100%;
     border-right: none;
     border-bottom: 1px solid #e5e7eb;
@@ -814,38 +809,14 @@ const validerSeance = async () => {
     flex-shrink: 0;
   }
 
-  .panel-list.mobile-visible {
-    display: flex;
-  }
-
-  .panel-list .section-title { display: none; }
-
   .prog-card {
     flex-shrink: 0;
     min-width: 130px;
   }
 
   .panel-detail { padding: 10px 12px; }
-
-  .toggle-programmes-btn {
-    display: flex;
-  }
 }
 
-.toggle-programmes-btn {
-  display: none;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 14px;
-  font-size: 13px;
-  background: #EEEDFE;
-  color: #534AB7;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  margin: 10px 12px 0;
-  font-weight: 500;
-}
 
 .exos-row {
   display: flex;
