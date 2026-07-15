@@ -22,6 +22,7 @@
 
   /* --- Couleurs de surface --- */
   --color-bg: #ffffff;
+  --color-bg-app: #F8F7FF;
   --color-bg-secondary: #f9fafb;
   --color-bg-tertiary: #f3f4f6;
 
@@ -31,6 +32,7 @@
 
   /* --- Texte --- */
   --color-text: #111827;
+  --color-text-body: #374151;
   --color-text-secondary: #6b7280;
   --color-text-muted: #9ca3af;
 
@@ -41,6 +43,12 @@
   --color-danger-text: #dc2626;
   --color-warning-bg: #fef9c3;
   --color-warning-text: #854d0e;
+
+  /* --- Validation (séries/séances faites) --- */
+  --color-valid-bg: #dcfce7;
+  --color-valid-bg-soft: #f0fdf4;
+  --color-valid-text: #16a34a;
+  --color-valid-border: #86efac;
 
   /* --- Superset / groupe --- */
   --color-superset-border: #AFA9EC;
@@ -53,14 +61,33 @@
   --color-avatar-athlete-bg: #C0DD97;
   --color-avatar-athlete-text: #27500A;
 
+  /* --- Types de séance --- */
+  --color-type-musculation-border: #FCA5A5;
+  --color-type-musculation-bg: #FEE2E2;
+  --color-type-musculation-text: #B91C1C;
+  --color-type-natation-border: #93C5FD;
+  --color-type-natation-bg: #DBEAFE;
+  --color-type-natation-text: #1E40AF;
+  --color-type-athletisme-border: #86EFAC;
+  --color-type-athletisme-bg: #DCFCE7;
+  --color-type-athletisme-text: #166534;
+  --color-type-pliometrie-border: #FDBA74;
+  --color-type-pliometrie-bg: #FED7AA;
+  --color-type-pliometrie-text: #9A3412;
+
   /* --- Typographie --- */
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-size-2xs: 10px;
   --font-size-xs: 11px;
   --font-size-sm: 12px;
   --font-size-md: 13px;
   --font-size-base: 14px;
+  --font-size-15: 15px;
   --font-size-lg: 16px;
+  --font-size-17: 17px;
   --font-size-xl: 18px;
+  --font-size-20: 20px;
+  --font-size-24: 24px;
 
   /* --- Espacements --- */
   --spacing-xs: 4px;
@@ -74,11 +101,27 @@
   --radius-sm: 4px;
   --radius-md: 6px;
   --radius-lg: 8px;
+  --radius-xl: 12px;
   --radius-full: 9999px;
 
   /* --- Ombres --- */
   --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
   --shadow-md: 0 4px 6px rgba(0,0,0,0.07);
+  --shadow-header: 0 1px 3px rgba(0,0,0,0.04);
+  --shadow-dropdown: 0 8px 24px rgba(0,0,0,0.10);
+  --shadow-modal: 0 20px 60px rgba(0,0,0,0.15);
+  --shadow-drawer: 4px 0 24px rgba(0,0,0,0.12);
+  --shadow-banner: 0 -4px 16px rgba(0,0,0,0.08);
+  --shadow-card: 0 4px 24px rgba(0,0,0,0.08);
+
+  /* --- Dimensions layout --- */
+  --header-height-desktop: 60px;
+  --header-height-mobile: 52px;
+
+  /* --- Avatars --- */
+  --avatar-xs: 18px;
+  --avatar-md: 32px;
+  --avatar-lg: 34px;
 }
 
 /* ===========================
@@ -92,6 +135,7 @@
   --color-primary-text: #C4C0F5;
 
   --color-bg: #111827;
+  --color-bg-app: #0b0f1a;
   --color-bg-secondary: #1f2937;
   --color-bg-tertiary: #374151;
 
@@ -99,6 +143,7 @@
   --color-border-strong: #4b5563;
 
   --color-text: #f9fafb;
+  --color-text-body: #e5e7eb;
   --color-text-secondary: #9ca3af;
   --color-text-muted: #6b7280;
 
@@ -106,6 +151,11 @@
   --color-success-text: #86efac;
   --color-danger-bg: #7f1d1d;
   --color-danger-text: #fca5a5;
+
+  --color-valid-bg: #14532d;
+  --color-valid-bg-soft: #0d2818;
+  --color-valid-text: #4ade80;
+  --color-valid-border: #16a34a;
 
   --color-superset-border: #534AB7;
   --color-superset-bg: #2D2B4A;
@@ -115,4 +165,17 @@
   --color-avatar-prepa-text: #C4C0F5;
   --color-avatar-athlete-bg: #14532d;
   --color-avatar-athlete-text: #86efac;
+
+  --color-type-musculation-border: #B91C1C;
+  --color-type-musculation-bg: #450a0a;
+  --color-type-musculation-text: #FCA5A5;
+  --color-type-natation-border: #1E40AF;
+  --color-type-natation-bg: #172554;
+  --color-type-natation-text: #93C5FD;
+  --color-type-athletisme-border: #166534;
+  --color-type-athletisme-bg: #052e16;
+  --color-type-athletisme-text: #86EFAC;
+  --color-type-pliometrie-border: #9A3412;
+  --color-type-pliometrie-bg: #431407;
+  --color-type-pliometrie-text: #FDBA74;
 }

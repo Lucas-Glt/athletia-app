@@ -109,47 +109,47 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #f3f4f6;
-  padding: 20px;
+  background: var(--color-bg-tertiary);
+  padding: var(--spacing-xl);
 }
 .login-card {
-  background: white;
-  border-radius: 12px;
+  background: var(--color-bg);
+  border-radius: var(--radius-xl);
   padding: 36px 32px;
   width: 100%;
   max-width: 400px;
-  box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+  box-shadow: var(--shadow-card);
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: var(--spacing-2xl);
 }
 .login-brand { text-align: center; }
-.login-brand h1 { font-size: 24px; font-weight: 700; color: #7F77DD; letter-spacing: -0.5px; margin: 0 0 4px; }
-.login-brand span { font-size: 13px; color: #9ca3af; }
+.login-brand h1 { font-size: var(--font-size-24); font-weight: 700; color: var(--color-primary); letter-spacing: -0.5px; margin: 0 0 4px; }
+.login-brand span { font-size: var(--font-size-md); color: var(--color-text-muted); }
 .login-form { display: flex; flex-direction: column; gap: 14px; }
 .field { display: flex; flex-direction: column; gap: 5px; }
-.field label { font-size: 12px; font-weight: 500; color: #374151; }
+.field label { font-size: var(--font-size-sm); font-weight: 500; color: var(--color-text-body); }
 .field input {
   padding: 10px 14px;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  font-size: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-base);
   transition: border-color 0.15s;
 }
-.field input:focus { outline: none; border-color: #7F77DD; }
+.field input:focus { outline: none; border-color: var(--color-primary); }
 button {
   padding: 11px;
-  background: #7F77DD;
-  color: white;
+  background: var(--color-primary);
+  color: var(--color-bg);
   border: none;
-  border-radius: 8px;
-  font-size: 14px;
+  border-radius: var(--radius-lg);
+  font-size: var(--font-size-base);
   font-weight: 500;
   cursor: pointer;
   margin-top: 4px;
   transition: background 0.15s;
 }
-button:hover:not(:disabled) { background: #534AB7; }
+button:hover:not(:disabled) { background: var(--color-primary-dark); }
 button:disabled { opacity: 0.6; cursor: not-allowed; }
-.error { font-size: 12px; color: #dc2626; background: #fee2e2; padding: 8px 12px; border-radius: 6px; margin: 0; }
+.error { font-size: var(--font-size-sm); color: var(--color-danger-text); background: var(--color-danger-bg); padding: var(--spacing-sm) var(--spacing-md); border-radius: var(--radius-md); margin: 0; }
 </style>
