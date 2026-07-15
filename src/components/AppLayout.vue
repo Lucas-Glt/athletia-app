@@ -29,6 +29,10 @@
             <button class="dropdown-item" @click="ouvrirModalePassword">
               <i class="ti ti-lock"></i> Changer le mot de passe
             </button>
+            <button class="dropdown-item" @click="themeStore.toggleTheme()">
+              <i class="ti" :class="themeStore.theme === 'dark' ? 'ti-sun' : 'ti-moon'"></i>
+              {{ themeStore.theme === 'dark' ? 'Mode clair' : 'Mode sombre' }}
+            </button>
             <div class="dropdown-divider"></div>
             <button class="dropdown-item danger" @click="deconnexion">
               <i class="ti ti-logout"></i> Se déconnecter
@@ -127,6 +131,7 @@
 <script>
 import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
+import { useThemeStore } from '../stores/theme'
 import { useRouter } from 'vue-router'
 import { useApi } from '../services/api'
 
@@ -136,6 +141,7 @@ export default {
   },
   setup() {
     const authStore = useAuthStore()
+    const themeStore = useThemeStore()
     const router = useRouter()
     const { patch } = useApi()
 
@@ -254,7 +260,7 @@ export default {
     }
 
     return {
-      authStore, roleLabel, brandLetter, brandColor, initiales,
+      authStore, themeStore, roleLabel, brandLetter, brandColor, initiales,
       menuOuvert, toggleMenu, avatarRef, deconnexion,
       modalePassword, ouvrirModalePassword, fermerModalePassword,
       form, changerPassword, loadingPassword, passwordError, passwordSuccess, drawerOuvert,
