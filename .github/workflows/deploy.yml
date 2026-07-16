@@ -16,7 +16,10 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.VPS_PORT }}
           script: |
+            set -e
             cd /srv/athletia/frontend
             git pull
-            source $HOME/.nvm/nvm.sh && npm run build
+            source $HOME/.nvm/nvm.sh
+            npm install
+            npm run build
             sudo systemctl reload nginx
