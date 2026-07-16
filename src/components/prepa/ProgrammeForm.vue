@@ -2,13 +2,19 @@
   <div class="form-wrapper">
 
     <!-- Étape 1 : Programme -->
-    <div v-if="etape === 1" class="etape">
+    <div v-if="etape === 1" class="etape etape-creation">
       <h2>Nouveau programme</h2>
-      <input v-model="programme.nom" placeholder="Nom du programme" />
-      <input v-model="programme.description" placeholder="Description (optionnelle)" />
+      <div class="field">
+        <label>Nom du programme</label>
+        <input v-model="programme.nom" placeholder="ex: Préparation été 2026" />
+      </div>
+      <div class="field">
+        <label>Description (optionnelle)</label>
+        <input v-model="programme.description" placeholder="ex: Cycle force 6 semaines" />
+      </div>
       <div class="actions">
-        <button class="btn-secondary" @click="$emit('termine')">Annuler</button>
-        <button @click="creerProgramme" :disabled="!programme.nom">Créer et continuer →</button>
+        <button class="btn btn-secondary" @click="$emit('termine')">Annuler</button>
+        <button class="btn btn-primary" @click="creerProgramme" :disabled="!programme.nom">Créer et continuer →</button>
       </div>
     </div>
 
@@ -16,14 +22,13 @@
     <div v-if="etape === 2" class="etape">
       <div class="etape-header">
         <h2>{{ programme.nom }}</h2>
-        <button @click="terminer">✓ Terminer</button>
+        <button class="btn btn-primary" @click="terminer">✓ Terminer</button>
       </div>
 
       <div
         v-for="seance in seances"
         :key="seance.id"
         class="seance-block"
-        :class="`type-${seance.type_seance || 'musculation'}`"
       >
         <div class="seance-head">
           <span class="type-badge" :class="`type-badge-${seance.type_seance || 'musculation'}`">
@@ -31,7 +36,7 @@
           </span>
           <span class="badge badge-purple" v-if="seance.jour">{{ seance.jour }}</span>
           <span class="seance-nom">{{ seance.nom }}</span>
-          <button class="btn-icon btn-danger" @click="supprimerSeance(seance)" title="Supprimer">
+          <button class="btn btn-sm btn-danger" @click="supprimerSeance(seance)" title="Supprimer">
             <i class="ti ti-trash"></i>
           </button>
         </div>
@@ -58,7 +63,7 @@
                   <input type="checkbox" v-model="exo.optionnel" @change="toggleOptionnel(exo)" />
                   Optionnelle
                 </label>
-                <button class="btn-icon btn-danger" @click="supprimerExercice(seance, groupe, exo)">
+                <button class="btn btn-sm btn-danger" @click="supprimerExercice(seance, groupe, exo)">
                   <i class="ti ti-trash"></i>
                 </button>
               </div>
@@ -74,14 +79,14 @@
               </template>
 
               <template v-else-if="seance.type_seance === 'natation' || seance.type_seance === 'athletisme'">
-                <div class="exo-fields grid-nat-edit">
+                <div class="exo-fields grid-duo">
                   <div class="field"><label>Mètres</label><input v-model="exo._params.metres" placeholder="ex: 100" /></div>
                   <div class="field"><label>Intensité</label><input v-model="exo._params.intensite" placeholder="ex: rapide" /></div>
                 </div>
               </template>
 
               <template v-else-if="seance.type_seance === 'pliometrie'">
-                <div class="exo-fields grid-plio-edit">
+                <div class="exo-fields grid-duo">
                   <div class="field"><label>Bonds</label><input v-model="exo._params.bonds" placeholder="ex: 10" /></div>
                   <div class="field"><label>Intensité</label><input v-model="exo._params.intensite" placeholder="ex: max" /></div>
                 </div>
@@ -91,7 +96,7 @@
             <!-- Bouton + Superset -->
             <button
               v-if="!groupe._formOpen"
-              class="btn-secondary btn-sm btn-superset"
+              class="btn btn-sm btn-secondary btn-superset"
               @click="groupe._formOpen = true"
             >
               <i class="ti ti-link"></i> Ajouter un superset à ce groupe
@@ -99,21 +104,21 @@
 
             <div v-if="groupe._formOpen" class="add-exo-form">
               <input v-model="groupe._nouvelExoNom" placeholder="Nom de l'exercice à enchaîner" class="input-flex" />
-              <button @click="ajouterAuSuperset(seance, groupe)" :disabled="!groupe._nouvelExoNom">+ Ajouter</button>
-              <button class="btn-secondary" @click="groupe._formOpen = false">Annuler</button>
+              <button class="btn btn-sm btn-primary" @click="ajouterAuSuperset(seance, groupe)" :disabled="!groupe._nouvelExoNom">+ Ajouter</button>
+              <button class="btn btn-sm btn-secondary" @click="groupe._formOpen = false">Annuler</button>
             </div>
 
             <!-- Paramètres communs au groupe : nb_series + repos -->
             <div class="groupe-commun">
-              <div class="field" style="width:90px">
+              <div class="field field-nb">
                 <label>Nb séries</label>
                 <input v-model.number="groupe._nb_series" type="number" min="1" placeholder="4" />
               </div>
-              <div class="field" style="flex:1">
+              <div class="field field-repos">
                 <label>Repos (commun)</label>
                 <input v-model="groupe._temps_repos" placeholder="ex: 1min30" />
               </div>
-              <button @click="genererSeriesGroupe(groupe, seance)" :disabled="groupe._nb_series < 1">
+              <button class="btn btn-primary" @click="genererSeriesGroupe(groupe, seance)" :disabled="groupe._nb_series < 1">
                 Générer {{ groupe._nb_series || '?' }} séries
               </button>
             </div>
@@ -152,13 +157,13 @@
               </div>
             </div>
 
-            <button class="btn-secondary btn-sm" @click="resetSeriesGroupe(seance, groupe)">↺ Réinitialiser</button>
+            <button class="btn btn-sm btn-secondary btn-reset" @click="resetSeriesGroupe(seance, groupe)">↺ Réinitialiser</button>
           </div>
         </div>
 
         <div class="add-exercice-form">
           <input v-model="seance._nouvelExercice.nom" placeholder="Nom du nouvel exercice" class="input-flex" />
-          <button class="btn-secondary" @click="ajouterExercice(seance)" :disabled="!seance._nouvelExercice.nom">
+          <button class="btn btn-secondary" @click="ajouterExercice(seance)" :disabled="!seance._nouvelExercice.nom">
             + Exercice
           </button>
         </div>
@@ -176,12 +181,12 @@
           <option value="">Jour</option>
           <option v-for="j in jours" :key="j" :value="j">{{ j }}</option>
         </select>
-        <button @click="ajouterSeance" :disabled="!nouvelleSeance.nom">+ Séance</button>
+        <button class="btn btn-primary" @click="ajouterSeance" :disabled="!nouvelleSeance.nom">+ Séance</button>
       </div>
 
       <div class="actions">
-        <button class="btn-secondary" @click="$emit('termine')">← Retour au dashboard</button>
-        <button @click="terminer">✓ Terminer</button>
+        <button class="btn btn-secondary" @click="$emit('termine')">← Retour au dashboard</button>
+        <button class="btn btn-primary" @click="terminer">✓ Terminer</button>
       </div>
     </div>
 
@@ -402,72 +407,206 @@ export default {
 </script>
 
 <style scoped>
-.form-wrapper { width: 100%; height: 100%; padding: var(--spacing-xl) var(--spacing-2xl); display: flex; flex-direction: column; gap: var(--spacing-lg); overflow-y: auto; box-sizing: border-box; }
+.form-wrapper {
+  width: 100%;
+  height: 100%;
+  padding: var(--spacing-xl) var(--spacing-2xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+  overflow-y: auto;
+}
 .etape { display: flex; flex-direction: column; gap: var(--spacing-lg); }
-.etape-header { display: flex; justify-content: space-between; align-items: center; }
-h2 { font-size: var(--font-size-lg); font-weight: 500; margin: 0; }
-input, select { padding: 7px 10px; border: 1px solid var(--color-border); border-radius: var(--radius-md); font-size: var(--font-size-md); background: var(--color-bg); box-sizing: border-box; }
-input:focus { outline: none; border-color: var(--color-primary); }
-button { padding: 7px 14px; background: var(--color-primary); color: var(--color-bg); border: none; border-radius: var(--radius-md); cursor: pointer; font-size: var(--font-size-md); white-space: nowrap; }
-button:disabled { opacity: 0.4; cursor: not-allowed; }
-button:hover:not(:disabled) { background: var(--color-primary-dark); }
-.btn-secondary { background: var(--color-bg-tertiary); color: var(--color-text-body); border: 1px solid var(--color-border); }
-.btn-secondary:hover:not(:disabled) { background: var(--color-border); }
-.btn-sm { font-size: var(--font-size-sm); padding: 4px 10px; }
-.btn-icon { width: 28px; height: 28px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--radius-md); flex-shrink: 0; }
-.btn-danger { background: var(--color-danger-bg); color: var(--color-danger-text); border: 1px solid var(--color-danger-border); }
-.btn-danger:hover { background: var(--color-danger-bg-hover); }
-.seance-block { border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: var(--spacing-lg); display: flex; flex-direction: column; gap: var(--spacing-md); border-left-width: 4px; }
-.seance-block.type-musculation { border-left-color: var(--color-type-musculation-border); }
-.seance-block.type-natation { border-left-color: var(--color-type-natation-border); }
-.seance-block.type-athletisme { border-left-color: var(--color-type-athletisme-border); }
-.seance-block.type-pliometrie { border-left-color: var(--color-type-pliometrie-border); }
-.type-badge { display: inline-flex; align-items: center; font-size: var(--font-size-2xs); font-weight: 500; padding: 2px 8px; border-radius: var(--radius-full); }
-.type-badge-musculation { background: var(--color-type-musculation-bg); color: var(--color-type-musculation-text); }
-.type-badge-natation { background: var(--color-type-natation-bg); color: var(--color-type-natation-text); }
-.type-badge-athletisme { background: var(--color-type-athletisme-bg); color: var(--color-type-athletisme-text); }
-.type-badge-pliometrie { background: var(--color-type-pliometrie-bg); color: var(--color-type-pliometrie-text); }
-.seance-head { display: flex; align-items: center; gap: var(--spacing-sm); }
-.seance-nom { font-size: var(--font-size-base); font-weight: 500; flex: 1; }
-.exo-group { display: flex; flex-direction: column; gap: 10px; padding: var(--spacing-md); background: var(--color-bg-secondary); border-radius: var(--radius-lg); border: 1px solid var(--color-border); }
-.exo-group.is-superset { background: var(--color-superset-bg); border: 1px solid var(--color-superset-border); border-left: 3px solid var(--color-primary); }
-.superset-banner { display: flex; align-items: center; gap: 6px; font-size: var(--font-size-xs); color: var(--color-superset-text); font-weight: 500; }
+.etape-creation { max-width: 480px; }
+.etape-header { display: flex; justify-content: space-between; align-items: center; gap: var(--spacing-md); flex-wrap: wrap; }
+h2 { font-size: var(--font-size-xl); font-weight: 700; margin: 0; }
+
+.seance-block {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  background: var(--color-bg);
+}
+.seance-head { display: flex; align-items: center; gap: var(--spacing-sm); flex-wrap: wrap; }
+.seance-nom { font-size: var(--font-size-base); font-weight: 600; flex: 1; }
+
+.exo-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md);
+  background: var(--color-bg-secondary);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+}
+.exo-group.is-superset { background: var(--color-superset-bg); border: 1px solid var(--color-superset-border); border-left: 4px solid var(--color-primary); }
+.superset-banner { display: flex; align-items: center; gap: 6px; font-size: var(--font-size-xs); color: var(--color-superset-text); font-weight: 600; }
 .exo-config-list { display: flex; flex-direction: column; gap: var(--spacing-sm); }
-.exo-config { display: flex; flex-direction: column; gap: var(--spacing-sm); background: var(--color-bg); border-radius: var(--radius-md); padding: 10px; border: 1px solid var(--color-border); }
-.exo-head { display: flex; align-items: center; gap: var(--spacing-sm); }
-.exo-num, .exo-letter { width: 22px; height: 22px; border-radius: var(--radius-sm); background: var(--color-primary-light); color: var(--color-superset-text); font-size: var(--font-size-xs); font-weight: 600; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.exo-letter { background: var(--color-primary); color: var(--color-bg); }
-.exo-nom { font-size: var(--font-size-md); font-weight: 500; flex: 1; }
-.optionnel-check { display: inline-flex; align-items: center; gap: 4px; font-size: var(--font-size-xs); color: var(--color-text-secondary); cursor: pointer; white-space: nowrap; flex-shrink: 0; }
-.optionnel-check input { width: auto; }
+.exo-config {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  background: var(--color-bg);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-md);
+  border: 1px solid var(--color-border);
+}
 .exo-config.is-optionnel { background: var(--color-bg-tertiary); }
-.optionnel-badge { font-size: var(--font-size-2xs); font-weight: 500; color: var(--color-text-secondary); background: var(--color-bg-tertiary); padding: 2px 6px; border-radius: var(--radius-full); text-transform: uppercase; letter-spacing: 0.3px; }
+.exo-head { display: flex; align-items: center; gap: var(--spacing-sm); flex-wrap: wrap; }
+.exo-num, .exo-letter {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-sm);
+  background: var(--color-primary-light);
+  color: var(--color-superset-text);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.exo-letter { background: var(--color-primary); color: var(--color-on-primary); }
+.exo-nom { font-size: var(--font-size-base); font-weight: 600; flex: 1; }
+.optionnel-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--tap-min);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.optionnel-check input { width: 18px; height: 18px; }
+.optionnel-badge {
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  background: var(--color-bg-tertiary);
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
 strong.is-optionnel { color: var(--color-text-secondary); }
+
 .exo-fields { display: grid; gap: var(--spacing-sm); }
 .exo-fields.grid-muscu { grid-template-columns: repeat(4, 1fr); }
-.exo-fields.grid-nat-edit, .exo-fields.grid-plio-edit { grid-template-columns: repeat(2, 1fr); }
-.field { display: flex; flex-direction: column; gap: 4px; }
-.field label { font-size: var(--font-size-xs); color: var(--color-text-secondary); font-weight: 500; }
-.field input { width: 100%; }
+.exo-fields.grid-duo { grid-template-columns: repeat(2, 1fr); }
+
 .btn-superset { align-self: flex-start; }
-.add-exo-form { display: flex; gap: var(--spacing-sm); align-items: center; padding: var(--spacing-sm); background: var(--color-bg); border-radius: var(--radius-md); border: 1px dashed var(--color-superset-border); }
-.groupe-commun { display: flex; gap: var(--spacing-sm); align-items: flex-end; padding: var(--spacing-sm); background: var(--color-bg); border-radius: var(--radius-md); border: 1px solid var(--color-border); }
+.btn-reset { align-self: flex-start; }
+.add-exo-form {
+  display: flex;
+  gap: var(--spacing-sm);
+  align-items: center;
+  padding: var(--spacing-sm);
+  background: var(--color-bg);
+  border-radius: var(--radius-md);
+  border: 1px dashed var(--color-superset-border);
+  flex-wrap: wrap;
+}
+.groupe-commun {
+  display: flex;
+  gap: var(--spacing-md);
+  align-items: flex-end;
+  padding: var(--spacing-md);
+  background: var(--color-bg);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  flex-wrap: wrap;
+}
+.field-nb { width: 100px; }
+.field-repos { flex: 1; min-width: 140px; }
+
 .series-display { display: flex; flex-direction: column; gap: var(--spacing-sm); }
-.series-summary { font-size: var(--font-size-sm); color: var(--color-superset-text); font-weight: 500; padding-bottom: 4px; border-bottom: 1px solid var(--color-border); }
-.series-count { font-weight: 600; }
-.serie-group-row { display: flex; gap: var(--spacing-md); align-items: flex-start; padding: var(--spacing-sm); background: var(--color-bg); border-radius: var(--radius-md); border: 1px solid var(--color-border); }
-.serie-label { font-size: var(--font-size-xs); font-weight: 600; color: var(--color-superset-text); padding: 4px 8px; background: var(--color-primary-light); border-radius: var(--radius-sm); white-space: nowrap; flex-shrink: 0; }
-.serie-exos { display: flex; flex-direction: column; gap: 6px; flex: 1; }
+.series-summary {
+  font-size: var(--font-size-sm);
+  color: var(--color-superset-text);
+  font-weight: 600;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--color-border);
+}
+.series-count { font-weight: 700; }
+.serie-group-row {
+  display: flex;
+  gap: var(--spacing-md);
+  align-items: flex-start;
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--color-bg);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+}
+.serie-label {
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  color: var(--color-superset-text);
+  padding: 4px 8px;
+  background: var(--color-primary-light);
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.serie-exos { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 0; }
 .serie-exo { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.exo-letter-mini { font-size: var(--font-size-2xs); font-weight: 700; color: var(--color-bg); background: var(--color-primary); padding: 2px 6px; border-radius: var(--radius-sm); }
-.serie-exo strong { font-size: var(--font-size-sm); min-width: 100px; }
-.mini-input { padding: 4px 8px; font-size: var(--font-size-sm); width: 80px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); }
-.add-exercice-form { display: flex; gap: var(--spacing-sm); align-items: center; padding-top: var(--spacing-sm); border-top: 1px dashed var(--color-border); }
-.add-seance-form { display: flex; gap: var(--spacing-sm); align-items: center; padding: var(--spacing-md) var(--spacing-lg); background: var(--color-bg-secondary); border: 1px dashed var(--color-border); border-radius: var(--radius-lg); flex-wrap: wrap; }
-.input-flex { flex: 1; min-width: 0; }
-.badge { display: inline-flex; font-size: var(--font-size-xs); padding: 2px 8px; border-radius: var(--radius-full); }
-.badge-purple { background: var(--color-primary-light); color: var(--color-primary-text); }
-.actions { display: flex; gap: var(--spacing-sm); justify-content: space-between; margin-top: 4px; }
+.exo-letter-mini {
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  color: var(--color-on-primary);
+  background: var(--color-primary);
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+}
+.serie-exo strong { font-size: var(--font-size-sm); font-weight: 600; min-width: 100px; }
+
+.mini-input {
+  min-height: 40px;
+  padding: 0 var(--spacing-sm);
+  font-size: var(--font-size-base);
+  width: 86px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+}
+.mini-input:focus { outline: none; border-color: var(--color-primary); }
+
+.add-exercice-form { display: flex; gap: var(--spacing-sm); align-items: center; padding-top: var(--spacing-sm); border-top: 1px dashed var(--color-border); flex-wrap: wrap; }
+.add-seance-form {
+  display: flex;
+  gap: var(--spacing-sm);
+  align-items: center;
+  padding: var(--spacing-md) var(--spacing-lg);
+  background: var(--color-bg-secondary);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-lg);
+  flex-wrap: wrap;
+}
+.add-seance-form select {
+  min-height: var(--tap-min);
+  padding: 0 var(--spacing-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  background: var(--color-bg);
+}
+.input-flex {
+  flex: 1;
+  min-width: 140px;
+  min-height: var(--tap-min);
+  padding: 0 var(--spacing-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-base);
+  background: var(--color-bg);
+}
+.input-flex:focus { outline: none; border-color: var(--color-primary); }
+
+.actions { display: flex; gap: var(--spacing-sm); justify-content: space-between; margin-top: 4px; flex-wrap: wrap; }
 
 @media (max-width: 768px) {
   .form-wrapper { padding: var(--spacing-md) var(--spacing-lg); }
