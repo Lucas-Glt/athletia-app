@@ -2,9 +2,6 @@
   <div class="app">
     <header class="app-header">
       <div class="brand">
-        <button class="hamburger" @click="drawerOuvert = !drawerOuvert">
-          <i class="ti ti-menu-2"></i>
-        </button>
         <div class="brand-icon" :style="{ background: brandColor }">{{ brandLetter }}</div>
         <div class="brand-text">
           <h1>Athletia</h1>
@@ -19,7 +16,7 @@
       <div class="header-right">
         <slot name="actions" />
         <div class="avatar-wrapper" ref="avatarRef">
-          <div class="avatar" @click="toggleMenu">{{ initiales }}</div>
+          <button class="avatar" @click="toggleMenu">{{ initiales }}</button>
           <div v-if="menuOuvert" class="profile-dropdown">
             <div class="profile-info">
               <div class="profile-nom">{{ authStore.user?.nom }}</div>
@@ -42,26 +39,15 @@
       </div>
     </header>
 
-    <!-- Drawer mobile -->
-    <div class="drawer-overlay" v-if="drawerOuvert" @click="drawerOuvert = false"></div>
-    <div class="drawer" :class="{ open: drawerOuvert }">
-      <div class="drawer-header">
-        <div class="brand-icon" :style="{ background: brandColor }">{{ brandLetter }}</div>
-        <span class="drawer-title">{{ roleLabel }}</span>
-        <button class="drawer-close" @click="drawerOuvert = false"><i class="ti ti-x"></i></button>
-      </div>
-      <div class="drawer-nav" @click="drawerOuvert = false">
-        <slot name="nav" />
-      </div>
-      <div class="drawer-actions">
-        <slot name="actions" />
-      </div>
-    </div>
-
     <div class="main-content">
       <slot />
     </div>
-    
+
+    <!-- Barre d'onglets mobile : la navigation sous le pouce, identique pour tous les rôles -->
+    <nav class="bottom-nav">
+      <slot name="nav" />
+    </nav>
+
     <!-- Modale changement de mot de passe -->
     <div v-if="modalePassword" class="modal-overlay" @click.self="fermerModalePassword">
       <div class="modal">
@@ -88,32 +74,33 @@
           <p v-if="passwordSuccess" class="success">{{ passwordSuccess }}</p>
         </div>
         <div class="modal-footer">
-          <button class="btn-secondary" @click="fermerModalePassword">Annuler</button>
-          <button class="btn-primary" @click="changerPassword" :disabled="loadingPassword">
+          <button class="btn" @click="fermerModalePassword">Annuler</button>
+          <button class="btn btn-primary" @click="changerPassword" :disabled="loadingPassword">
             {{ loadingPassword ? 'Enregistrement...' : 'Enregistrer' }}
           </button>
         </div>
       </div>
     </div>
+
     <!-- Bannière PWA Android/Chrome -->
     <div v-if="showInstallBanner && !isInStandaloneMode" class="install-banner">
       <div class="install-banner-content">
-        <i class="ti ti-device-mobile" style="font-size:24px;color:var(--color-primary)"></i>
+        <i class="ti ti-device-mobile install-icon"></i>
         <div>
           <div class="install-title">Installer Athletia</div>
           <div class="install-sub">Accès rapide depuis ton écran d'accueil</div>
         </div>
       </div>
       <div class="install-actions">
-        <button class="install-btn" @click="installerApp">Installer</button>
-        <button class="install-dismiss" @click="showInstallBanner = false">Plus tard</button>
+        <button class="btn btn-primary btn-sm" @click="installerApp">Installer</button>
+        <button class="btn btn-sm" @click="showInstallBanner = false">Plus tard</button>
       </div>
     </div>
 
     <!-- Bannière PWA iOS -->
     <div v-if="isIos && !isInStandaloneMode && showIosBanner" class="install-banner">
       <div class="install-banner-content">
-        <i class="ti ti-device-mobile" style="font-size:24px;color:var(--color-primary)"></i>
+        <i class="ti ti-device-mobile install-icon"></i>
         <div>
           <div class="install-title">Installer Athletia</div>
           <div class="install-sub">
@@ -122,7 +109,7 @@
         </div>
       </div>
       <div class="install-actions">
-        <button class="install-dismiss" @click="showIosBanner = false">OK</button>
+        <button class="btn btn-sm" @click="showIosBanner = false">OK</button>
       </div>
     </div>
   </div>
@@ -244,7 +231,6 @@ export default {
       }
     }
 
-    const drawerOuvert = ref(false)
     const installPrompt = ref(null)
     const showInstallBanner = ref(false)
     const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent)
@@ -263,7 +249,7 @@ export default {
       authStore, themeStore, roleLabel, brandLetter, brandColor, initiales,
       menuOuvert, toggleMenu, avatarRef, deconnexion,
       modalePassword, ouvrirModalePassword, fermerModalePassword,
-      form, changerPassword, loadingPassword, passwordError, passwordSuccess, drawerOuvert,
+      form, changerPassword, loadingPassword, passwordError, passwordSuccess,
       installPrompt, showInstallBanner, isIos, isInStandaloneMode, showIosBanner, installerApp
     }
   }
@@ -271,12 +257,11 @@ export default {
 </script>
 
 <style scoped>
-* { box-sizing: border-box; }
-
 .app {
   display: flex;
   flex-direction: column;
   height: 100vh;
+  height: 100dvh;
   overflow: hidden;
   background: var(--color-bg-app);
 }
@@ -298,11 +283,11 @@ export default {
 .brand { display: flex; align-items: center; gap: var(--spacing-md); flex-shrink: 0; }
 .brand-icon {
   width: 38px; height: 38px; border-radius: var(--radius-md);
-  color: var(--color-bg); font-size: var(--font-size-xl); font-weight: 700;
+  color: #fff; font-size: var(--font-size-lg); font-weight: 700;
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
 }
-.brand-text h1 { font-size: var(--font-size-xl); font-weight: 700; color: var(--color-text); letter-spacing: -0.3px; margin: 0; line-height: 1.2; }
-.brand-text span { font-size: var(--font-size-xs); color: var(--color-text-muted); }
+.brand-text h1 { font-size: var(--font-size-lg); font-weight: 700; color: var(--color-text); letter-spacing: -0.3px; margin: 0; line-height: 1.2; }
+.brand-text span { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
 
 .header-nav { display: flex; align-items: center; gap: 4px; flex: 1; }
 .header-right { display: flex; align-items: center; gap: var(--spacing-sm); flex-shrink: 0; }
@@ -316,6 +301,8 @@ export default {
   display: flex; align-items: center; justify-content: center;
   font-size: var(--font-size-sm); font-weight: 700; flex-shrink: 0;
   cursor: pointer;
+  border: none;
+  padding: 0;
   transition: opacity 0.15s;
 }
 .avatar:hover { opacity: 0.85; }
@@ -328,21 +315,23 @@ export default {
   border: 1px solid var(--color-primary-light);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-dropdown);
-  min-width: 200px;
+  min-width: 230px;
   z-index: 100;
   overflow: hidden;
 }
 
 .profile-info { padding: var(--spacing-md) var(--spacing-lg); }
-.profile-nom { font-size: var(--font-size-md); font-weight: 600; color: var(--color-text); }
-.profile-role { font-size: var(--font-size-xs); color: var(--color-text-muted); margin-top: 2px; }
+.profile-nom { font-size: var(--font-size-sm); font-weight: 600; color: var(--color-text); }
+.profile-role { font-size: var(--font-size-xs); color: var(--color-text-secondary); margin-top: 2px; }
 
 .dropdown-divider { height: 1px; background: var(--color-bg-tertiary); }
 
 .dropdown-item {
-  width: 100%; padding: var(--spacing-sm) var(--spacing-lg);
+  width: 100%;
+  min-height: var(--tap-min);
+  padding: 0 var(--spacing-lg);
   background: none; border: none;
-  text-align: left; font-size: var(--font-size-md); color: var(--color-text-body);
+  text-align: left; font-size: var(--font-size-sm); color: var(--color-text-body);
   cursor: pointer; display: flex; align-items: center; gap: var(--spacing-sm);
   transition: background 0.1s;
 }
@@ -352,139 +341,17 @@ export default {
 
 .main-content { flex: 1; overflow: hidden; display: flex; flex-direction: column; min-height: 0; }
 
-/* Modale */
-.modal-overlay {
-  position: fixed; inset: 0;
-  background: rgba(0,0,0,0.3);
-  display: flex; align-items: center; justify-content: center;
-  z-index: 200;
-}
-.modal {
-  background: var(--color-bg); border-radius: var(--radius-xl);
-  width: 100%; max-width: 420px;
-  box-shadow: var(--shadow-modal);
-  overflow: hidden;
-}
-.modal-header {
-  padding: var(--spacing-lg) var(--spacing-xl);
-  display: flex; align-items: center; justify-content: space-between;
-  border-bottom: 1px solid var(--color-bg-tertiary);
-}
-.modal-header h3 { margin: 0; font-size: var(--font-size-15); font-weight: 600; }
-.modal-close { background: none; border: none; cursor: pointer; color: var(--color-text-muted); font-size: var(--font-size-xl); padding: 0; }
-.modal-close:hover { color: var(--color-text-body); }
-
-.modal-body { padding: var(--spacing-xl); display: flex; flex-direction: column; gap: 14px; }
-
-.field { display: flex; flex-direction: column; gap: 5px; }
-.field label { font-size: var(--font-size-sm); font-weight: 500; color: var(--color-text-body); }
-.field input {
-  padding: 9px var(--spacing-md); border: 1px solid var(--color-border);
-  border-radius: var(--radius-md); font-size: var(--font-size-base);
-}
-.field input:focus { outline: none; border-color: var(--color-primary); }
-
-.error { font-size: var(--font-size-sm); color: var(--color-danger-text); background: var(--color-danger-bg); padding: var(--spacing-sm) var(--spacing-md); border-radius: var(--radius-md); margin: 0; }
-.success { font-size: var(--font-size-sm); color: var(--color-valid-text); background: var(--color-valid-bg); padding: var(--spacing-sm) var(--spacing-md); border-radius: var(--radius-md); margin: 0; }
-
-.modal-footer {
-  padding: var(--spacing-lg) var(--spacing-xl); border-top: 1px solid var(--color-bg-tertiary);
-  display: flex; justify-content: flex-end; gap: var(--spacing-sm);
-}
-.btn-primary {
-  padding: var(--spacing-sm) var(--spacing-lg); background: var(--color-primary); color: var(--color-bg);
-  border: none; border-radius: var(--radius-lg); font-size: var(--font-size-md); font-weight: 500;
-  cursor: pointer;
-}
-.btn-primary:hover:not(:disabled) { background: var(--color-primary-dark); }
-.btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
-.btn-secondary {
-  padding: var(--spacing-sm) var(--spacing-lg); background: var(--color-bg-tertiary); color: var(--color-text-body);
-  border: none; border-radius: var(--radius-lg); font-size: var(--font-size-md); font-weight: 500;
-  cursor: pointer;
-}
-.btn-secondary:hover { background: var(--color-border); }
-
-.hamburger {
-  display: none;
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: var(--color-text-body);
-  font-size: var(--font-size-xl);
-  padding: 4px;
-  border-radius: var(--radius-md);
-  flex-shrink: 0;
-}
-.hamburger:hover { background: var(--color-bg-tertiary); }
-
-.drawer-overlay {
+/* --- Barre d'onglets mobile --- */
+.bottom-nav {
   display: none;
   position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.3);
-  z-index: 50;
-}
-.drawer {
-  display: none;
-  position: fixed;
-  top: 0; left: 0; bottom: 0;
-  width: 260px;
+  bottom: 0;
+  left: 0;
+  right: 0;
   background: var(--color-bg);
-  z-index: 60;
-  flex-direction: column;
-  transform: translateX(-100%);
-  transition: transform 0.25s ease;
-  box-shadow: var(--shadow-drawer);
-}
-.drawer.open { transform: translateX(0); }
-
-.drawer-header {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-md);
-  padding: var(--spacing-lg);
-  border-bottom: 1px solid var(--color-bg-tertiary);
-}
-.drawer-title { font-size: var(--font-size-md); font-weight: 500; color: var(--color-text-body); flex: 1; }
-.drawer-close {
-  background: none; border: none; cursor: pointer;
-  color: var(--color-text-muted); font-size: var(--font-size-xl); padding: 4px;
-}
-.drawer-nav {
-  flex: 1;
-  padding: var(--spacing-md);
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  overflow-y: auto;
-}
-.drawer-actions {
-  padding: var(--spacing-md) var(--spacing-lg);
-  border-top: 1px solid var(--color-bg-tertiary);
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-sm);
-}
-
-@media (max-width: 768px) {
-  .app-header {
-    padding: 0 var(--spacing-md);
-    gap: var(--spacing-sm);
-    height: var(--header-height-mobile);
-  }
-  .brand-text span { display: none; }
-  .brand-text h1 { font-size: var(--font-size-15); }
-  .brand-icon { width: var(--avatar-md); height: var(--avatar-md); font-size: var(--font-size-15); border-radius: var(--radius-lg); }
-  .header-nav { display: none; }
-  .hamburger { display: flex; align-items: center; justify-content: center; }
-  .drawer-overlay { display: block; }
-  .drawer { display: flex; }
-
-  /* Masquer les actions du header sur mobile — elles sont dans le drawer */
-  .header-right :deep(.btn) { display: none; }
-
-  .modal { width: calc(100vw - 32px); }
+  border-top: 1px solid var(--color-border);
+  z-index: 90;
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 .install-banner {
@@ -509,14 +376,16 @@ export default {
   gap: var(--spacing-md);
 }
 
+.install-icon { font-size: 24px; color: var(--color-primary); }
+
 .install-title {
-  font-size: var(--font-size-md);
+  font-size: var(--font-size-sm);
   font-weight: 600;
   color: var(--color-text);
 }
 
 .install-sub {
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-xs);
   color: var(--color-text-secondary);
   margin-top: 2px;
 }
@@ -527,28 +396,40 @@ export default {
   flex-shrink: 0;
 }
 
-.install-btn {
-  padding: 7px var(--spacing-lg);
-  background: var(--color-primary);
-  color: var(--color-bg);
-  border: none;
-  border-radius: var(--radius-lg);
-  font-size: var(--font-size-md);
-  font-weight: 500;
-  cursor: pointer;
+@media (max-width: 768px) {
+  .app-header {
+    padding: 0 var(--spacing-lg);
+    gap: var(--spacing-sm);
+    height: var(--header-height-mobile);
+  }
+  .brand-text span { display: none; }
+  .brand-text h1 { font-size: var(--font-size-base); }
+  .brand-icon { width: var(--avatar-md); height: var(--avatar-md); font-size: var(--font-size-base); border-radius: var(--radius-md); }
+
+  /* La nav du header part dans la barre du bas ; les actions vivent dans le contenu */
+  .header-nav { display: none; }
+  .header-right :deep(.btn) { display: none; }
+
+  .bottom-nav { display: flex; }
+  .bottom-nav :deep(.nav-item) {
+    flex: 1;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    min-height: var(--bottom-nav-h);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    font-size: var(--font-size-xs);
+    border-radius: 0;
+  }
+  .bottom-nav :deep(.nav-item i) { font-size: 22px; }
+  .bottom-nav :deep(.nav-item.active) {
+    background: transparent;
+    color: var(--color-primary-dark);
+  }
+
+  /* Le contenu ne doit jamais passer sous la barre */
+  .main-content { padding-bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom)); }
+
+  .install-banner { bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom)); }
 }
-
-.install-btn:hover { background: var(--color-primary-dark); }
-
-.install-dismiss {
-  padding: 7px var(--spacing-lg);
-  background: var(--color-bg-tertiary);
-  color: var(--color-text-body);
-  border: none;
-  border-radius: var(--radius-lg);
-  font-size: var(--font-size-md);
-  cursor: pointer;
-}
-
-.install-dismiss:hover { background: var(--color-border); }
 </style>
