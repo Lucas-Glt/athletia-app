@@ -1,0 +1,262 @@
+/* ===========================
+   ATHLETIA — PRIMITIVES PARTAGÉES
+   Une seule définition de bouton/badge/champ/modale pour toute l'app.
+   Les <style scoped> des composants ne gardent que leur mise en page propre.
+   =========================== */
+
+* {
+  box-sizing: border-box;
+}
+
+/* --- Boutons --- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: var(--tap-min);
+  padding: 0 var(--spacing-lg);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  cursor: pointer;
+  background: var(--color-bg);
+  color: var(--color-text-body);
+  white-space: nowrap;
+  transition: background 0.1s;
+}
+.btn:hover { background: var(--color-bg-secondary); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn-primary {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  border-color: var(--color-primary-dark);
+}
+.btn-primary:hover:not(:disabled) { background: var(--color-primary-dark); }
+
+.btn-danger {
+  background: var(--color-danger-bg);
+  color: var(--color-danger-text);
+  border-color: var(--color-danger-border);
+}
+.btn-danger:hover:not(:disabled) { background: var(--color-danger-bg-hover); }
+
+.btn-secondary {
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-body);
+  border-color: var(--color-border);
+}
+.btn-secondary:hover:not(:disabled) { background: var(--color-border); }
+
+.btn-dashed { border-style: dashed; }
+
+.btn-sm {
+  min-height: 36px;
+  padding: 0 var(--spacing-md);
+  font-size: var(--font-size-sm);
+}
+
+.btn-icon {
+  width: var(--tap-min);
+  height: var(--tap-min);
+  min-height: var(--tap-min);
+  padding: 0;
+  flex-shrink: 0;
+  font-size: var(--font-size-lg);
+}
+
+/* Sur mobile, même les "petits" boutons gardent une cible de 44px */
+@media (max-width: 768px) {
+  .btn-sm { min-height: var(--tap-min); }
+}
+
+/* --- Badges --- */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  white-space: nowrap;
+}
+.badge-green { background: var(--color-success-bg); color: var(--color-success-text); }
+.badge-purple { background: var(--color-primary-light); color: var(--color-primary-text); }
+.badge-gray {
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+}
+
+.type-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  white-space: nowrap;
+}
+.type-badge-musculation { background: var(--color-type-musculation-bg); color: var(--color-type-musculation-text); }
+.type-badge-natation { background: var(--color-type-natation-bg); color: var(--color-type-natation-text); }
+.type-badge-athletisme { background: var(--color-type-athletisme-bg); color: var(--color-type-athletisme-text); }
+.type-badge-pliometrie { background: var(--color-type-pliometrie-bg); color: var(--color-type-pliometrie-text); }
+
+/* --- Champs --- */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.field label {
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--color-text-body);
+}
+.field input,
+.field select {
+  min-height: var(--tap-min);
+  padding: 0 var(--spacing-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-base);
+  background: var(--color-bg);
+  transition: border-color 0.15s;
+  width: 100%;
+}
+.field input:focus,
+.field select:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+/* --- Messages --- */
+.error-box,
+.error {
+  font-size: var(--font-size-sm);
+  color: var(--color-danger-text);
+  background: var(--color-danger-bg);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-md);
+  margin: 0;
+}
+.success-box,
+.success {
+  font-size: var(--font-size-sm);
+  color: var(--color-valid-text-strong);
+  background: var(--color-valid-bg);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-md);
+  margin: 0;
+}
+
+/* --- Modales --- */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  padding: var(--spacing-lg);
+}
+.modal {
+  background: var(--color-bg);
+  border-radius: var(--radius-xl);
+  width: 100%;
+  max-width: 440px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-modal);
+  overflow: hidden;
+}
+.modal-header {
+  padding: var(--spacing-lg) var(--spacing-xl);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+.modal-header h3 {
+  margin: 0;
+  font-size: var(--font-size-base);
+  font-weight: 600;
+}
+.modal-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-lg);
+  width: var(--tap-min);
+  height: var(--tap-min);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: calc(-1 * var(--spacing-sm));
+  margin-left: 0;
+}
+.modal-close:hover { color: var(--color-text-body); }
+.modal-body {
+  padding: var(--spacing-xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+  overflow-y: auto;
+}
+.modal-footer {
+  padding: var(--spacing-lg) var(--spacing-xl);
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--spacing-sm);
+  flex-shrink: 0;
+}
+
+/* --- Navigation (items fournis par les slots #nav des dashboards) --- */
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--tap-min);
+  padding: 0 var(--spacing-lg);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  border-radius: var(--radius-md);
+  font-weight: 500;
+  border: none;
+  background: transparent;
+  user-select: none;
+}
+.nav-item:hover { background: var(--color-bg-app); color: var(--color-text-body); }
+.nav-item.active { background: var(--color-primary-light); color: var(--color-primary-dark); }
+.nav-item i { font-size: var(--font-size-lg); }
+
+/* --- Divers --- */
+.section-title {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.empty {
+  color: var(--color-text-muted);
+  text-align: center;
+  padding: var(--spacing-2xl);
+  font-size: var(--font-size-sm);
+}
+
+.card {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}

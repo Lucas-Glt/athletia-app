@@ -6,6 +6,7 @@ import router from './router'
 import { useThemeStore } from './stores/theme'
 
 import './assets/tokens.css'
+import './assets/base.css'
 
 const app = createApp(App)
 
