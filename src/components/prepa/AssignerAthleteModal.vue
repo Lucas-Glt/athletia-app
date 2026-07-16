@@ -3,54 +3,66 @@
     <div class="modal">
       <div class="modal-header">
         <h3>Assigner un athlète</h3>
-        <button class="btn-close" @click="$emit('fermer')"><i class="ti ti-x"></i></button>
+        <button class="modal-close" @click="$emit('fermer')"><i class="ti ti-x"></i></button>
       </div>
 
       <div class="modal-body">
         <!-- Athlètes déjà assignés -->
-        <div class="section-title">Déjà assignés</div>
-        <div class="athletes-list" v-if="athletesAssignes.length > 0">
-          <div class="athlete-row" v-for="a in athletesAssignes" :key="a.id">
-            <div class="mini-av athlete">{{ initiales(a.nom) }}</div>
-            <span class="athlete-nom">{{ a.nom }}</span>
-            <span class="athlete-email">{{ a.email }}</span>
-            <button class="btn btn-sm btn-danger" @click="retirer(a)">Retirer</button>
+        <div class="bloc">
+          <div class="section-title">Déjà assignés</div>
+          <div class="athletes-list" v-if="athletesAssignes.length > 0">
+            <div class="athlete-row" v-for="a in athletesAssignes" :key="a.id">
+              <div class="mini-av">{{ initiales(a.nom) }}</div>
+              <div class="athlete-txt">
+                <span class="athlete-nom">{{ a.nom }}</span>
+                <span class="athlete-email">{{ a.email }}</span>
+              </div>
+              <button class="btn btn-sm btn-danger" @click="retirer(a)">Retirer</button>
+            </div>
           </div>
+          <div class="empty-inline" v-else>Aucun athlète assigné</div>
         </div>
-        <div class="empty" v-else>Aucun athlète assigné</div>
 
         <!-- Athlètes du cercle non assignés -->
-        <div class="section-title" style="margin-top: 16px">Mon cercle</div>
-        <div class="athletes-list" v-if="athletesDisponibles.length > 0">
-          <div class="athlete-row" v-for="a in athletesDisponibles" :key="a.id">
-            <div class="mini-av athlete">{{ initiales(a.nom) }}</div>
-            <span class="athlete-nom">{{ a.nom }}</span>
-            <span class="athlete-email">{{ a.email }}</span>
-            <button class="btn btn-sm btn-primary" @click="assigner(a)">Assigner</button>
+        <div class="bloc">
+          <div class="section-title">Mon cercle</div>
+          <div class="athletes-list" v-if="athletesDisponibles.length > 0">
+            <div class="athlete-row" v-for="a in athletesDisponibles" :key="a.id">
+              <div class="mini-av">{{ initiales(a.nom) }}</div>
+              <div class="athlete-txt">
+                <span class="athlete-nom">{{ a.nom }}</span>
+                <span class="athlete-email">{{ a.email }}</span>
+              </div>
+              <button class="btn btn-sm btn-primary" @click="assigner(a)">Assigner</button>
+            </div>
           </div>
+          <div class="empty-inline" v-else>Tous vos athlètes sont déjà assignés</div>
         </div>
-        <div class="empty" v-else>Tous vos athlètes sont déjà assignés</div>
 
         <!-- Ajouter un nouvel athlète au cercle -->
-        <div class="section-title" style="margin-top: 16px">Ajouter au cercle</div>
-        <div class="search-row">
-          <input v-model="searchEmail" placeholder="Email de l'athlète" type="email" />
-          <button class="btn btn-sm" @click="rechercherAthlète" :disabled="!searchEmail">Rechercher</button>
+        <div class="bloc">
+          <div class="section-title">Ajouter au cercle</div>
+          <div class="search-row">
+            <input v-model="searchEmail" placeholder="Email de l'athlète" type="email" />
+            <button class="btn" @click="rechercherAthlète" :disabled="!searchEmail">Rechercher</button>
+          </div>
+          <div v-if="athleteTrouve" class="athlete-row found">
+            <div class="mini-av">{{ initiales(athleteTrouve.nom) }}</div>
+            <div class="athlete-txt">
+              <span class="athlete-nom">{{ athleteTrouve.nom }}</span>
+              <span class="athlete-email">{{ athleteTrouve.email }}</span>
+            </div>
+            <button class="btn btn-sm btn-primary" @click="ajouterAuCercle">+ Cercle</button>
+          </div>
+          <div v-if="searchError" class="error">{{ searchError }}</div>
         </div>
-        <div v-if="athleteTrouve" class="athlete-row found">
-          <div class="mini-av athlete">{{ initiales(athleteTrouve.nom) }}</div>
-          <span class="athlete-nom">{{ athleteTrouve.nom }}</span>
-          <span class="athlete-email">{{ athleteTrouve.email }}</span>
-          <button class="btn btn-sm btn-primary" @click="ajouterAuCercle">+ Cercle</button>
-        </div>
-        <div v-if="searchError" class="error">{{ searchError }}</div>
       </div>
     </div>
   </div>
 </template>
 
 <script>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed } from 'vue'
 import { useApi } from '../../services/api'
 
 export default {
@@ -86,17 +98,17 @@ export default {
     }
 
     const rechercherAthlète = async () => {
-  searchError.value = ''
-  athleteTrouve.value = null
-  try {
-    const found = await api.get(`/users/recherche?email=${encodeURIComponent(searchEmail.value)}`)
-    if (found.detail) { searchError.value = found.detail; return }
-    if (props.monCercle.find(a => a.id === found.id)) { searchError.value = 'Déjà dans votre cercle'; return }
-    athleteTrouve.value = found
-  } catch {
-    searchError.value = 'Athlète introuvable'
-  }
-}
+      searchError.value = ''
+      athleteTrouve.value = null
+      try {
+        const found = await api.get(`/users/recherche?email=${encodeURIComponent(searchEmail.value)}`)
+        if (found.detail) { searchError.value = found.detail; return }
+        if (props.monCercle.find(a => a.id === found.id)) { searchError.value = 'Déjà dans votre cercle'; return }
+        athleteTrouve.value = found
+      } catch {
+        searchError.value = 'Athlète introuvable'
+      }
+    }
 
     const ajouterAuCercle = async () => {
       await api.post(`/users/mes-athletes/${athleteTrouve.value.id}`)
@@ -115,42 +127,51 @@ export default {
 </script>
 
 <style scoped>
-.modal-overlay {
-  position: fixed; inset: 0; background: rgba(0,0,0,0.4);
-  display: flex; align-items: center; justify-content: center; z-index: 100;
-}
-.modal {
-  background: var(--color-bg); border-radius: var(--radius-xl);
-  width: 480px; max-height: 80vh; display: flex; flex-direction: column;
-  box-shadow: var(--shadow-modal);
-}
-.modal-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: var(--spacing-lg) var(--spacing-xl); border-bottom: 1px solid var(--color-border);
-}
-.modal-header h3 { font-size: var(--font-size-15); font-weight: 500; }
-.btn-close { background: none; border: none; cursor: pointer; font-size: var(--font-size-lg); color: var(--color-text-secondary); }
-.modal-body { padding: var(--spacing-lg) var(--spacing-xl); overflow-y: auto; display: flex; flex-direction: column; gap: var(--spacing-sm); }
-.section-title { font-size: var(--font-size-xs); font-weight: 500; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
+.bloc { display: flex; flex-direction: column; gap: var(--spacing-sm); }
 .athletes-list { display: flex; flex-direction: column; gap: 6px; }
-.athlete-row { display: flex; align-items: center; gap: var(--spacing-sm); padding: var(--spacing-sm); background: var(--color-bg-secondary); border-radius: var(--radius-md); border: 1px solid var(--color-border); }
-.athlete-row.found { border-color: var(--color-primary); background: var(--color-primary-light); }
-.mini-av { width: var(--avatar-md); height: var(--avatar-md); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: var(--font-size-2xs); font-weight: 600; flex-shrink: 0; }
-.mini-av.athlete { background: var(--color-avatar-athlete-bg); color: var(--color-avatar-athlete-text); }
-.athlete-nom { font-size: var(--font-size-md); font-weight: 500; flex: 1; }
-.athlete-email { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
-.search-row { display: flex; gap: var(--spacing-sm); }
-.search-row input { flex: 1; padding: 7px var(--spacing-md); border: 1px solid var(--color-border); border-radius: var(--radius-md); font-size: var(--font-size-md); }
-.btn { display: inline-flex; align-items: center; gap: 4px; padding: 7px 14px; border-radius: var(--radius-md); border: 1px solid var(--color-border); font-size: var(--font-size-md); cursor: pointer; background: transparent; color: var(--color-text-body); }
-.btn-sm { padding: 5px 10px; font-size: var(--font-size-sm); }
-.btn-primary { background: var(--color-primary); color: var(--color-primary-light); border-color: var(--color-primary-dark); }
-.btn-primary:hover { background: var(--color-primary-dark); }
-.btn-danger { background: var(--color-danger-bg); color: var(--color-danger-text); border-color: var(--color-danger-border); }
-.btn-danger:hover { background: var(--color-danger-bg-hover); }
-.empty { font-size: var(--font-size-sm); color: var(--color-text-muted); padding: var(--spacing-sm) 0; }
-.error { font-size: var(--font-size-sm); color: var(--color-danger-text); }
-
-@media (max-width: 768px) {
-  .modal { width: calc(100vw - 32px); max-width: 480px; }
+.athlete-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--color-bg-secondary);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
 }
+.athlete-row.found { border-color: var(--color-primary); background: var(--color-primary-light); }
+.mini-av {
+  width: var(--avatar-md);
+  height: var(--avatar-md);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  flex-shrink: 0;
+  background: var(--color-avatar-athlete-bg);
+  color: var(--color-avatar-athlete-text);
+}
+.athlete-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.athlete-nom { font-size: var(--font-size-sm); font-weight: 600; }
+.athlete-email {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.search-row { display: flex; gap: var(--spacing-sm); }
+.search-row input {
+  flex: 1;
+  min-width: 0;
+  min-height: var(--tap-min);
+  padding: 0 var(--spacing-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-base);
+  background: var(--color-bg);
+}
+.search-row input:focus { outline: none; border-color: var(--color-primary); }
+.empty-inline { font-size: var(--font-size-sm); color: var(--color-text-muted); padding: var(--spacing-sm) 0; }
 </style>
