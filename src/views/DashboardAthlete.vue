@@ -129,7 +129,68 @@
                 Aucune série définie.
               </div>
 
-              <!-- Une carte par série, toujours visible -->
+              <!-- Résumé compact : tout le prescrit lisible, la saisie s'ouvre à la demande -->
+              <template v-else>
+                <div class="resume-exo" v-for="(exo, eidx) in groupe.exercices" :key="'r' + exo.id">
+                  <span class="exo-letter-mini" v-if="groupe.exercices.length > 1">{{ letterFor(eidx) }}</span>
+                  <span v-if="resumeExo(exo).uniforme" class="resume-texte">{{ resumeExo(exo).texte }}</span>
+                  <div v-else class="resume-series-list">
+                    <div v-for="(s, i) in exo.series" :key="s.id" class="resume-ligne">
+                      <span class="resume-s">S{{ i + 1 }}</span>
+                      <span>{{ valeursSerie(exo, i) || '—' }}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="exo-group-foot">
+                  <span class="serie-repos" v-if="groupe.exercices[0].series[0]?.temps_repos">
+                    <i class="ti ti-clock"></i> {{ groupe.exercices[0].series[0].temps_repos }}
+                  </span>
+                  <div class="series-dots">
+                    <span
+                      v-for="i in groupe.exercices[0].series.length"
+                      :key="i"
+                      class="serie-dot"
+                      :class="{ done: isGroupeDone(groupe, i - 1) }"
+                    ></span>
+                  </div>
+                  <button
+                    class="btn btn-sm btn-saisir"
+                    :class="{ 'btn-primary': !isGroupeComplete(groupe) && !seancesCompletees.has(seanceActive.id) }"
+                    @click="ouvrirSaisie(groupe)"
+                  >
+                    <i class="ti" :class="seancesCompletees.has(seanceActive.id) ? 'ti-eye' : 'ti-pencil'"></i>
+                    {{ seancesCompletees.has(seanceActive.id) ? 'Consulter' : 'Saisir' }}
+                  </button>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- Panneau de saisie : les cartes série du groupe choisi, en bottom sheet.
+               Le v-for sur [groupeSaisie] ne fait qu'aliaser groupeSaisie en `groupe`
+               pour que le bloc des cartes série reste identique à l'ancien inline. -->
+          <div v-if="groupeSaisie" class="saisie-overlay" @click.self="fermerSaisie">
+            <div class="saisie-sheet" v-for="groupe in [groupeSaisie]" :key="groupe.key">
+              <div class="saisie-head">
+                <div class="saisie-titres">
+                  <div v-if="groupe.exercices.length > 1" class="superset-banner">
+                    <i class="ti ti-link"></i>
+                    <span>Superset</span>
+                  </div>
+                  <div class="saisie-noms">
+                    <span v-for="(exo, eidx) in groupe.exercices" :key="exo.id" class="saisie-nom">
+                      <span class="exo-letter-mini" v-if="groupe.exercices.length > 1">{{ letterFor(eidx) }}</span>
+                      {{ exo.nom }}
+                    </span>
+                  </div>
+                </div>
+                <button class="btn btn-icon" @click="fermerSaisie" aria-label="Fermer">
+                  <i class="ti ti-x"></i>
+                </button>
+              </div>
+
+              <div class="saisie-body">
               <div
                 v-for="serieIdx in groupe.exercices[0].series.length"
                 :key="serieIdx"
@@ -272,6 +333,13 @@
                   <i :class="getLogs(groupe.exercices[0].id, serieIdx-1).fait ? 'ti ti-check' : 'ti ti-x'"></i>
                   {{ getLogs(groupe.exercices[0].id, serieIdx-1).fait ? 'Fait' : 'Non réalisé' }}
                 </div>
+              </div>
+              </div>
+
+              <div class="saisie-foot">
+                <button class="btn btn-primary btn-saisie-ok" @click="fermerSaisie">
+                  <i class="ti ti-check"></i> Terminé
+                </button>
               </div>
             </div>
           </div>
@@ -441,8 +509,47 @@ export default {
         if (toutesValidees) {
           // Ferme automatiquement l'accordéon
           groupesOuverts.value[groupe.key] = false
+          // Groupe terminé : referme le panneau de saisie, retour à la vue d'ensemble
+          if (groupeSaisie.value?.key === groupe.key) {
+            setTimeout(() => { fermerSaisie() }, 400)
+          }
         }
       }
+    }
+
+    // --- Panneau de saisie par groupe (présentation uniquement) ---
+    const groupeSaisie = ref(null)
+    const ouvrirSaisie = (groupe) => { groupeSaisie.value = groupe }
+    const fermerSaisie = () => { groupeSaisie.value = null }
+
+    // Valeurs prescrites d'une série en une ligne compacte, selon le type de séance
+    const valeursSerie = (exo, idx) => {
+      const s = exo.series[idx]
+      if (!s) return ''
+      const t = seanceActive.value?.type_seance || 'musculation'
+      const parts = []
+      if (t === 'musculation') {
+        if (s.nb_reps) parts.push(`${s.nb_reps} reps`)
+        if (s.poids_cible) parts.push(s.poids_cible)
+        if (s.rm) parts.push(s.rm)
+        if (s.tempo) parts.push(`tempo ${s.tempo}`)
+      } else if (t === 'natation' || t === 'athletisme') {
+        if (s.metres) parts.push(`${s.metres}m`)
+        if (s.intensite) parts.push(s.intensite)
+      } else if (t === 'pliometrie') {
+        if (s.bonds) parts.push(`${s.bonds} bonds`)
+        if (s.intensite) parts.push(s.intensite)
+      }
+      return parts.join(' · ')
+    }
+
+    // « 4 × 8 reps · 80kg » si toutes les séries sont identiques, sinon détail ligne par ligne
+    const resumeExo = (exo) => {
+      const n = exo.series.length
+      if (n === 0) return { uniforme: true, texte: 'Aucune série' }
+      const premiere = valeursSerie(exo, 0)
+      const uniforme = exo.series.every((_, i) => valeursSerie(exo, i) === premiere)
+      return uniforme ? { uniforme: true, texte: `${n} × ${premiere || '—'}` } : { uniforme: false }
     }
 
     const sauvegarderSerie = async (groupe, serieIdx) => {
@@ -678,7 +785,7 @@ export default {
     })
 
     watch(onglet, (v) => { if (v === 'logs') fetchHistorique() })
-    watch(seanceActive, (s) => { if (!s) arreterRepos() })
+    watch(seanceActive, (s) => { if (!s) { arreterRepos(); fermerSaisie() } })
     onUnmounted(() => clearInterval(reposInterval))
 
     const formatDate = (d) => new Date(d).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
@@ -724,7 +831,8 @@ export default {
       seancesCompletees, isSeanceComplete, isSemaineComplete,
       logsParSerie, chargerLogsExistants, getLogsAvecHistorique,
       progressionSeance,
-      sauvegarderSerie, reposActif, arreterRepos, formatTemps
+      sauvegarderSerie, reposActif, arreterRepos, formatTemps,
+      groupeSaisie, ouvrirSaisie, fermerSaisie, valeursSerie, resumeExo
     }
   }
 }
@@ -1059,6 +1167,93 @@ export default {
 
 .empty-series { font-size: var(--font-size-sm); color: var(--color-text-muted); font-style: italic; }
 
+/* --- Vue d'ensemble compacte --- */
+.resume-exo { display: flex; align-items: baseline; gap: var(--spacing-sm); }
+.resume-texte {
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  color: var(--color-text-body);
+  font-variant-numeric: tabular-nums;
+}
+.resume-series-list { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.resume-ligne {
+  display: flex;
+  gap: var(--spacing-sm);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-body);
+  align-items: baseline;
+}
+.resume-s { font-size: var(--font-size-xs); font-weight: 700; color: var(--color-superset-text); min-width: 24px; }
+
+.exo-group-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding-top: var(--spacing-sm);
+  border-top: 1px solid var(--color-border);
+}
+.series-dots { display: flex; gap: 5px; flex: 1; flex-wrap: wrap; align-items: center; }
+.serie-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border-strong);
+}
+.serie-dot.done { background: var(--color-valid-text); border-color: var(--color-valid-text); }
+.btn-saisir { flex-shrink: 0; }
+
+/* --- Panneau de saisie (bottom sheet) --- */
+.saisie-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 150;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.saisie-sheet {
+  background: var(--color-bg);
+  width: 100%;
+  max-width: 720px;
+  max-height: 88dvh;
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-modal);
+}
+.saisie-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-md);
+  padding: var(--spacing-lg);
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+.saisie-titres { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.saisie-noms { display: flex; flex-direction: column; gap: 4px; }
+.saisie-nom { display: flex; align-items: center; gap: var(--spacing-sm); font-size: var(--font-size-lg); font-weight: 700; }
+.saisie-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--spacing-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+.saisie-foot {
+  padding: var(--spacing-md) var(--spacing-lg) calc(var(--spacing-md) + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+.btn-saisie-ok { width: 100%; min-height: var(--input-h); }
+
+@media (min-width: 769px) {
+  .saisie-overlay { align-items: center; padding: var(--spacing-2xl); }
+  .saisie-sheet { border-radius: var(--radius-xl); max-height: 85vh; }
+}
+
 /* --- Timer de repos --- */
 .repos-chip {
   position: fixed;
@@ -1078,7 +1273,7 @@ export default {
   font-variant-numeric: tabular-nums;
   box-shadow: var(--shadow-dropdown);
   cursor: pointer;
-  z-index: 80;
+  z-index: 180; /* au-dessus du panneau de saisie : le décompte reste visible pendant la saisie */
   user-select: none;
 }
 .repos-chip.fini {
