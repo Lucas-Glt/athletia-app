@@ -211,7 +211,7 @@
                     </div>
 
                     <div class="exo-list">
-                      <div v-for="(exo, eidx) in groupe.exercices" :key="exo.id" class="exo-block">
+                      <div v-for="(exo, eidx) in groupe.exercices" :key="exo.id" class="exo-block" :class="{ 'is-optionnel': exo.optionnel }">
                         <div class="exo-head">
                           <span class="exo-letter" v-if="groupe.exercices.length > 1">{{ letterFor(eidx) }}</span>
                           <span class="exo-num" v-else>{{ exo.ordre }}</span>
@@ -224,6 +224,11 @@
                             placeholder="Nom de l'exercice"
                           />
                           <span v-else class="exo-name" style="flex:1">{{ exo.nom }}</span>
+                          <span v-if="!editMode && exo.optionnel" class="optionnel-badge">optionnelle</span>
+                          <label v-if="editMode" class="optionnel-check" @click.stop>
+                            <input type="checkbox" v-model="exo.optionnel" @change="mettreAJourExercice(exo)" />
+                            Optionnelle
+                          </label>
                           <button v-if="editMode" class="btn-icon btn-danger" @click="supprimerExercice(seance, exo)">
                             <i class="ti ti-trash"></i>
                           </button>
@@ -619,7 +624,7 @@ export default {
         const maxGroupe = Math.max(0, ...seance.exercices.map(e => e.groupe || 0))
         numGroupe = maxGroupe + 1
         const premierExo = groupe.exercices[0]
-        await api.patch(`/exercices/${premierExo.id}`, { nom: premierExo.nom, ordre: premierExo.ordre, groupe: numGroupe })
+        await api.patch(`/exercices/${premierExo.id}`, { nom: premierExo.nom, ordre: premierExo.ordre, groupe: numGroupe, optionnel: premierExo.optionnel || false })
         premierExo.groupe = numGroupe
       }
       const data = await api.post(`/seances/${seance.id}/exercices/`, { nom: form._nouvelExoNom, ordre: seance.exercices.length + 1, groupe: numGroupe })
@@ -848,7 +853,8 @@ export default {
       await api.patch(`/exercices/${exo.id}`, {
         nom: exo.nom,
         ordre: exo.ordre,
-        groupe: exo.groupe || null
+        groupe: exo.groupe || null,
+        optionnel: exo.optionnel || false
       })
     }
 
@@ -970,6 +976,11 @@ export default {
 .exo-num, .exo-letter { width: 22px; height: 22px; border-radius: var(--radius-sm); background: var(--color-primary-light); color: var(--color-superset-text); font-size: var(--font-size-xs); font-weight: 600; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .exo-letter { background: var(--color-primary); color: var(--color-bg); }
 .exo-name { font-size: var(--font-size-base); font-weight: 500; }
+.exo-block.is-optionnel { background: var(--color-bg-tertiary); opacity: 0.75; }
+.exo-block.is-optionnel .exo-name { color: var(--color-text-muted); }
+.optionnel-check { display: inline-flex; align-items: center; gap: 4px; font-size: var(--font-size-xs); color: var(--color-text-secondary); cursor: pointer; white-space: nowrap; flex-shrink: 0; }
+.optionnel-check input { width: auto; }
+.optionnel-badge { font-size: var(--font-size-2xs); font-weight: 500; color: var(--color-text-muted); background: var(--color-bg-tertiary); padding: 2px 6px; border-radius: var(--radius-full); text-transform: uppercase; letter-spacing: 0.3px; flex-shrink: 0; }
 .add-exo-superset-form { display: flex; gap: var(--spacing-sm); align-items: center; padding: var(--spacing-sm); background: var(--color-bg); border-radius: var(--radius-md); border: 1px dashed var(--color-superset-border); }
 .groupe-series-head { display: flex; align-items: center; justify-content: space-between; padding: 7px 10px; background: var(--color-bg); border-radius: var(--radius-md); border: 1px solid var(--color-border); cursor: pointer; }
 .groupe-series-head:hover { border-color: var(--color-primary); background: #FAFAFE; }

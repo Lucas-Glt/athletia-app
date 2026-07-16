@@ -49,11 +49,15 @@
 
           <!-- Pour chaque exo du groupe : nom + ses propres champs -->
           <div v-if="!groupe.hasSeries" class="exo-config-list">
-            <div v-for="(exo, eidx) in groupe.exercices" :key="exo.id" class="exo-config">
+            <div v-for="(exo, eidx) in groupe.exercices" :key="exo.id" class="exo-config" :class="{ 'is-optionnel': exo.optionnel }">
               <div class="exo-head">
                 <span class="exo-letter" v-if="groupe.exercices.length > 1">{{ letterFor(eidx) }}</span>
                 <span class="exo-num" v-else>{{ exo.ordre }}</span>
                 <span class="exo-nom">{{ exo.nom }}</span>
+                <label class="optionnel-check">
+                  <input type="checkbox" v-model="exo.optionnel" @change="toggleOptionnel(exo)" />
+                  Optionnelle
+                </label>
                 <button class="btn-icon btn-danger" @click="supprimerExercice(seance, groupe, exo)">
                   <i class="ti ti-trash"></i>
                 </button>
@@ -129,7 +133,8 @@
               <div class="serie-exos">
                 <div v-for="(exo, eidx) in groupe.exercices" :key="exo.id" class="serie-exo">
                   <span class="exo-letter-mini" v-if="groupe.exercices.length > 1">{{ letterFor(eidx) }}</span>
-                  <strong>{{ exo.nom }}</strong>
+                  <strong :class="{ 'is-optionnel': exo.optionnel }">{{ exo.nom }}</strong>
+                  <span v-if="exo.optionnel" class="optionnel-badge">optionnelle</span>
 
                   <template v-if="seance.type_seance === 'musculation' || !seance.type_seance">
                     <input v-model="exo.series[serieIdx-1].nb_reps" @change="mettreAJourSerie(exo.series[serieIdx-1])" placeholder="reps" class="mini-input" />
@@ -273,7 +278,8 @@ export default {
         await api.patch(`/exercices/${premierExo.id}`, {
           nom: premierExo.nom,
           ordre: premierExo.ordre,
-          groupe: groupe.groupeNum
+          groupe: groupe.groupeNum,
+          optionnel: premierExo.optionnel || false
         })
         premierExo.groupe = groupe.groupeNum
       }
@@ -298,6 +304,15 @@ export default {
       if (groupe.exercices.length === 0) {
         seance._groupes = seance._groupes.filter(g => g.id !== groupe.id)
       }
+    }
+
+    const toggleOptionnel = async (exo) => {
+      await api.patch(`/exercices/${exo.id}`, {
+        nom: exo.nom,
+        ordre: exo.ordre,
+        groupe: exo.groupe || null,
+        optionnel: exo.optionnel
+      })
     }
 
     // Génère N séries en utilisant les params PROPRES de chaque exo + repos commun
@@ -380,7 +395,7 @@ export default {
       creerProgramme, ajouterSeance, supprimerSeance,
       ajouterExercice, ajouterAuSuperset, supprimerExercice,
       genererSeriesGroupe, mettreAJourSerie, resetSeriesGroupe,
-      terminer
+      toggleOptionnel, terminer
     }
   }
 }
@@ -423,6 +438,11 @@ button:hover:not(:disabled) { background: var(--color-primary-dark); }
 .exo-num, .exo-letter { width: 22px; height: 22px; border-radius: var(--radius-sm); background: var(--color-primary-light); color: var(--color-superset-text); font-size: var(--font-size-xs); font-weight: 600; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .exo-letter { background: var(--color-primary); color: var(--color-bg); }
 .exo-nom { font-size: var(--font-size-md); font-weight: 500; flex: 1; }
+.optionnel-check { display: inline-flex; align-items: center; gap: 4px; font-size: var(--font-size-xs); color: var(--color-text-secondary); cursor: pointer; white-space: nowrap; flex-shrink: 0; }
+.optionnel-check input { width: auto; }
+.exo-config.is-optionnel { background: var(--color-bg-tertiary); opacity: 0.75; }
+.optionnel-badge { font-size: var(--font-size-2xs); font-weight: 500; color: var(--color-text-muted); background: var(--color-bg-tertiary); padding: 2px 6px; border-radius: var(--radius-full); text-transform: uppercase; letter-spacing: 0.3px; }
+strong.is-optionnel { color: var(--color-text-muted); }
 .exo-fields { display: grid; gap: var(--spacing-sm); }
 .exo-fields.grid-muscu { grid-template-columns: repeat(4, 1fr); }
 .exo-fields.grid-nat-edit, .exo-fields.grid-plio-edit { grid-template-columns: repeat(2, 1fr); }
