@@ -29,7 +29,7 @@
           />
         </div>
         <p v-if="error" class="error">{{ error }}</p>
-        <button type="submit" :disabled="loading">
+        <button type="submit" class="btn btn-primary btn-login" :disabled="loading">
           <span v-if="loading">Connexion...</span>
           <span v-else>Se connecter</span>
         </button>
@@ -103,19 +103,19 @@ export default {
 </script>
 
 <style scoped>
-* { box-sizing: border-box; }
 .login-container {
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--color-bg-tertiary);
+  background: var(--color-bg-app);
   padding: var(--spacing-xl);
 }
 .login-card {
   background: var(--color-bg);
   border-radius: var(--radius-xl);
-  padding: 36px 32px;
+  padding: var(--spacing-3xl) var(--spacing-2xl);
   width: 100%;
   max-width: 400px;
   box-shadow: var(--shadow-card);
@@ -124,32 +124,18 @@ export default {
   gap: var(--spacing-2xl);
 }
 .login-brand { text-align: center; }
-.login-brand h1 { font-size: var(--font-size-24); font-weight: 700; color: var(--color-primary); letter-spacing: -0.5px; margin: 0 0 4px; }
-.login-brand span { font-size: var(--font-size-md); color: var(--color-text-muted); }
-.login-form { display: flex; flex-direction: column; gap: 14px; }
-.field { display: flex; flex-direction: column; gap: 5px; }
-.field label { font-size: var(--font-size-sm); font-weight: 500; color: var(--color-text-body); }
-.field input {
-  padding: 10px 14px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  font-size: var(--font-size-base);
-  transition: border-color 0.15s;
+.login-brand h1 {
+  font-size: var(--font-size-2xl);
+  font-weight: 700;
+  color: var(--color-primary-dark);
+  letter-spacing: -0.5px;
+  margin: 0 0 4px;
 }
-.field input:focus { outline: none; border-color: var(--color-primary); }
-button {
-  padding: 11px;
-  background: var(--color-primary);
-  color: var(--color-bg);
-  border: none;
-  border-radius: var(--radius-lg);
+.login-brand span { font-size: var(--font-size-sm); color: var(--color-text-secondary); }
+.login-form { display: flex; flex-direction: column; gap: var(--spacing-lg); }
+.btn-login {
+  min-height: var(--input-h);
   font-size: var(--font-size-base);
-  font-weight: 500;
-  cursor: pointer;
-  margin-top: 4px;
-  transition: background 0.15s;
+  margin-top: var(--spacing-xs);
 }
-button:hover:not(:disabled) { background: var(--color-primary-dark); }
-button:disabled { opacity: 0.6; cursor: not-allowed; }
-.error { font-size: var(--font-size-sm); color: var(--color-danger-text); background: var(--color-danger-bg); padding: var(--spacing-sm) var(--spacing-md); border-radius: var(--radius-md); margin: 0; }
 </style>
