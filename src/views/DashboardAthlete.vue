@@ -2,284 +2,259 @@
   <AppLayout title="Mon programme">
     <template #nav>
       <div class="nav-item" :class="{ active: onglet === 'programme' }" @click="onglet = 'programme'">
-        <i class="ti ti-calendar"></i> Mon programme
+        <i class="ti ti-barbell"></i> Séances
       </div>
-
-      <div class="nav-programmes" v-if="programmes.length > 0">
-        <div class="nav-programmes-title">Mes programmes</div>
-        <div
-          v-for="p in programmes"
-          :key="p.id"
-          class="nav-prog"
-          :class="{ active: programmeActif?.id === p.id }"
-          @click="onglet = 'programme'; selectProgramme(p)"
-        >
-          <i class="ti ti-point-filled"></i>
-          <span>{{ p.nom }}</span>
-        </div>
-      </div>
-
       <div class="nav-item" :class="{ active: onglet === 'logs' }" @click="onglet = 'logs'">
-        <i class="ti ti-chart-bar"></i> Mes logs
+        <i class="ti ti-history"></i> Historique
       </div>
-    </template>
-
-    <template #actions>
-      <button class="btn" @click="logout"><i class="ti ti-logout"></i> Déconnexion</button>
     </template>
 
     <div class="dashboard-root">
       <div class="empty-state" v-if="programmes.length === 0">
-        <i class="ti ti-calendar-off" style="font-size:40px;color:var(--color-text-muted)"></i>
+        <i class="ti ti-calendar-off empty-icon"></i>
         <p>Aucun programme assigné pour le moment.</p>
         <span>Contactez votre préparateur physique.</span>
       </div>
 
       <!-- ONGLET PROGRAMME -->
       <div v-if="onglet === 'programme' && programmes.length > 0" class="content-body">
-
-        <div class="panel-list">
-          <div class="section-title">Mes programmes</div>
-          <div
-            v-for="p in programmes"
-            :key="p.id"
-            class="prog-card"
-            :class="{ active: programmeActif?.id === p.id }"
-            @click="selectProgramme(p)"
-          >
-            <div class="prog-name">{{ p.nom }}</div>
-            <div class="prog-meta">
-              <span class="badge" :class="p.statut === 'actif' ? 'badge-green' : 'badge-gray'">{{ p.statut }}</span>
+        <!-- ÉCRAN 1 : liste des séances de la semaine -->
+        <template v-if="!seanceActive">
+          <div class="screen">
+            <!-- Sélecteur de programme : seulement s'il y a un choix à faire -->
+            <div class="prog-switcher" v-if="programmes.length > 1">
+              <button
+                v-for="p in programmes"
+                :key="p.id"
+                class="prog-chip"
+                :class="{ active: programmeActif?.id === p.id }"
+                @click="selectProgramme(p)"
+              >
+                {{ p.nom }}
+              </button>
             </div>
-          </div>
-        </div>
 
-        <div class="panel-detail" v-if="programmeActif">
-          <!-- Vue liste des séances -->
-          <template v-if="!seanceActive">
-            <div class="detail-header">
-              <h3>{{ programmeActif.nom }}</h3>
+            <div class="screen-header" v-if="programmeActif">
+              <h2>{{ programmeActif.nom }}</h2>
               <p v-if="programmeActif.description">{{ programmeActif.description }}</p>
             </div>
 
-            <div class="semaines-tabs" v-if="semainesDisponibles.length > 0">
-              <div
+            <div class="semaines-scroll" v-if="semainesDisponibles.length > 0">
+              <button
                 v-for="sem in semainesDisponibles"
                 :key="sem"
-                class="semaine-tab"
+                class="semaine-chip"
                 :class="{ active: semaineActive === sem, 'semaine-complete': isSemaineComplete(sem) }"
                 @click="semaineActive = sem"
               >
                 <i v-if="isSemaineComplete(sem)" class="ti ti-check"></i>
-                Semaine {{ sem }}
-              </div>
+                S{{ sem }}
+              </button>
             </div>
 
             <div v-if="loadingSeances" class="empty">Chargement...</div>
 
-            <div
+            <button
               v-for="seance in seancesFiltrees"
               :key="seance.id"
-              class="seance-block"
-              :class="[`type-${seance.type_seance || 'musculation'}`, 'clickable', { 'seance-complete': seancesCompletees.has(seance.id) }]"
+              class="seance-card"
+              :class="{ 'seance-complete': seancesCompletees.has(seance.id) }"
               @click="demarrerSeance(seance)"
             >
-              <div class="seance-head">
-                <span class="type-badge" :class="`type-badge-${seance.type_seance || 'musculation'}`">
-                  {{ labelType(seance.type_seance) }}
-                </span>
-                <span class="badge badge-purple" v-if="seance.jour">{{ seance.jour }}</span>
-                <span style="flex:1">{{ seance.nom }}</span>
-                <span v-if="seancesCompletees.has(seance.id)" class="badge-complete">
-                  <i class="ti ti-check"></i> Complétée
-                </span>
-                <span class="exo-count">{{ seance.exercices?.length || 0 }} exercices</span>
-                <i class="ti ti-chevron-right" v-if="!seancesCompletees.has(seance.id)"></i>
+              <div class="seance-card-main">
+                <div class="seance-card-titre">{{ seance.nom }}</div>
+                <div class="seance-card-meta">
+                  <span class="type-badge" :class="`type-badge-${seance.type_seance || 'musculation'}`">
+                    {{ labelType(seance.type_seance) }}
+                  </span>
+                  <span class="badge badge-purple" v-if="seance.jour">{{ seance.jour }}</span>
+                  <span class="seance-card-count">{{ seance.exercices?.length || 0 }} exercices</span>
+                </div>
               </div>
-            </div>
-          </template>
+              <span v-if="seancesCompletees.has(seance.id)" class="badge-complete">
+                <i class="ti ti-check"></i> Faite
+              </span>
+              <i v-else class="ti ti-chevron-right seance-card-chevron"></i>
+            </button>
+          </div>
+        </template>
 
-          <!-- Vue séance en cours -->
-          <template v-else>
-            <div class="detail-header">
-              <button class="btn btn-sm" @click="seanceActive = null">
-                <i class="ti ti-arrow-left"></i> Retour
-              </button>
-              <h3 style="margin-top:8px">{{ seanceActive.nom }}</h3>
-              <div style="display:flex;gap:6px;margin-top:4px">
+        <!-- ÉCRAN 2 : la feuille de séance — tout est visible, zéro accordéon -->
+        <template v-else>
+          <div class="seance-topbar">
+            <button class="btn btn-icon" @click="seanceActive = null" aria-label="Retour">
+              <i class="ti ti-arrow-left"></i>
+            </button>
+            <div class="seance-topbar-info">
+              <div class="seance-topbar-titre">{{ seanceActive.nom }}</div>
+              <div class="seance-topbar-meta">
                 <span class="type-badge" :class="`type-badge-${seanceActive.type_seance || 'musculation'}`">
                   {{ labelType(seanceActive.type_seance) }}
                 </span>
                 <span class="badge badge-purple" v-if="seanceActive.jour">{{ seanceActive.jour }}</span>
-                <span class="badge badge-gray">Semaine {{ seanceActive.semaine || 1 }}</span>
+                <span class="badge badge-gray">S{{ seanceActive.semaine || 1 }}</span>
               </div>
             </div>
+          </div>
 
-            <!-- Groupes d'exercices -->
+          <div class="screen feuille">
             <div
               v-for="groupe in grouperExercices(seanceActive.exercices)"
               :key="groupe.key"
               class="exo-group"
               :class="{ 'is-superset': groupe.exercices.length > 1, 'is-complete': isGroupeComplete(groupe) }"
             >
-              <!-- En-tête accordéon groupe -->
-              <div class="exo-group-head" @click="toggleGroupe(groupe.key)">
-                <div class="exo-group-noms">
-                  <div v-if="groupe.exercices.length > 1" class="superset-banner">
-                    <i class="ti ti-link"></i>
-                    <span>Superset · {{ groupe.exercices.length }} exercices</span>
-                  </div>
-                  <div class="exo-noms-list">
-                    <span v-for="(exo, eidx) in groupe.exercices" :key="exo.id" class="exo-nom-inline" :class="{ 'is-optionnel': exo.optionnel }">
-                      <span class="exo-letter" v-if="groupe.exercices.length > 1">{{ letterFor(eidx) }}</span>
-                      <span class="exo-num" v-else>{{ exo.ordre }}</span>
-                      {{ exo.nom }}
-                      <span v-if="exo.optionnel" class="optionnel-badge">optionnelle</span>
-                    </span>
-                  </div>
+              <div class="exo-group-head">
+                <div v-if="groupe.exercices.length > 1" class="superset-banner">
+                  <i class="ti ti-link"></i>
+                  <span>Superset</span>
                 </div>
-                <div class="exo-group-meta">
-                  <span class="series-count-badge">{{ groupe.exercices[0].series.length }} séries</span>
-                  <i class="ti" :class="isGroupeOuvert(groupe.key) ? 'ti-chevron-up' : 'ti-chevron-down'"></i>
+                <div class="exo-noms-list">
+                  <span
+                    v-for="(exo, eidx) in groupe.exercices"
+                    :key="exo.id"
+                    class="exo-nom-inline"
+                    :class="{ 'is-optionnel': exo.optionnel }"
+                  >
+                    <span class="exo-letter" v-if="groupe.exercices.length > 1">{{ letterFor(eidx) }}</span>
+                    <span class="exo-num" v-else>{{ exo.ordre }}</span>
+                    {{ exo.nom }}
+                    <span v-if="exo.optionnel" class="optionnel-badge">optionnelle</span>
+                  </span>
                 </div>
+                <i v-if="isGroupeComplete(groupe)" class="ti ti-circle-check-filled groupe-check"></i>
               </div>
 
-              <!-- Contenu accordéon -->
-              <div v-if="isGroupeOuvert(groupe.key)" class="exo-group-body">
-                <div v-if="groupe.exercices[0].series.length === 0" class="empty-series">
-                  Aucune série définie.
-                </div>
+              <div v-if="groupe.exercices[0].series.length === 0" class="empty-series">
+                Aucune série définie.
+              </div>
 
-            <!-- Séries en colonnes -->
-            <div class="series-cols">
+              <!-- Une carte par série, toujours visible -->
               <div
                 v-for="serieIdx in groupe.exercices[0].series.length"
                 :key="serieIdx"
-                class="serie-col"
+                class="serie-card"
                 :class="{ done: isGroupeDone(groupe, serieIdx - 1) }"
               >
-                <div class="serie-col-label">Série {{ serieIdx }}</div>
+                <div class="serie-head">
+                  <span class="serie-label">Série {{ serieIdx }}</span>
+                  <span
+                    class="serie-repos"
+                    v-if="groupe.exercices[0].series[serieIdx - 1]?.temps_repos"
+                  >
+                    <i class="ti ti-clock"></i> {{ groupe.exercices[0].series[serieIdx - 1].temps_repos }}
+                  </span>
+                </div>
 
-                <!-- Wrapper exos côte à côte sur mobile -->
-                <div class="exos-row">
-                  <div v-for="(exo, eidx) in groupe.exercices" :key="exo.id" class="serie-col-exo">
-                    <span class="exo-letter-mini" v-if="groupe.exercices.length > 1">{{ letterFor(eidx) }}</span>
-
-                    <!-- Prescrit -->
-                    <div class="prescrit-bloc">
-                      <template v-if="seanceActive.type_seance === 'musculation' || !seanceActive.type_seance">
-                        <span class="prescrit-item" v-if="exo.series[serieIdx-1]?.nb_reps">
-                          <span class="prescrit-label">Reps</span>
-                          <span class="prescrit-val">{{ exo.series[serieIdx-1].nb_reps }}</span>
-                        </span>
-                        <span class="prescrit-item" v-if="exo.series[serieIdx-1]?.poids_cible">
-                          <span class="prescrit-label">Charge</span>
-                          <span class="prescrit-val">{{ exo.series[serieIdx-1].poids_cible }}</span>
-                        </span>
-                        <span class="prescrit-item" v-if="exo.series[serieIdx-1]?.rm">
-                          <span class="prescrit-label">%RM</span>
-                          <span class="prescrit-val">{{ exo.series[serieIdx-1].rm }}</span>
-                        </span>
-                        <span class="prescrit-item" v-if="exo.series[serieIdx-1]?.tempo">
-                          <span class="prescrit-label">Tempo</span>
-                          <span class="prescrit-val">{{ exo.series[serieIdx-1].tempo }}</span>
-                        </span>
-                        <span class="prescrit-item prescrit-repos" v-if="groupe.exercices.length === 1 && exo.series[serieIdx-1]?.temps_repos">
-                          <span class="prescrit-label">Repos</span>
-                          <span class="prescrit-val">{{ exo.series[serieIdx-1].temps_repos }}</span>
-                        </span>
-                      </template>
-                      <template v-else-if="seanceActive.type_seance === 'natation' || seanceActive.type_seance === 'athletisme'">
-                        <span class="prescrit-item" v-if="exo.series[serieIdx-1]?.metres">
-                          <span class="prescrit-label">Mètres</span>
-                          <span class="prescrit-val">{{ exo.series[serieIdx-1].metres }}</span>
-                        </span>
-                        <span class="prescrit-item" v-if="exo.series[serieIdx-1]?.intensite">
-                          <span class="prescrit-label">Intensité</span>
-                          <span class="prescrit-val">{{ exo.series[serieIdx-1].intensite }}</span>
-                        </span>
-                        <span class="prescrit-item prescrit-repos" v-if="groupe.exercices.length === 1 && exo.series[serieIdx-1]?.temps_repos">
-                          <span class="prescrit-label">Repos</span>
-                          <span class="prescrit-val">{{ exo.series[serieIdx-1].temps_repos }}</span>
-                        </span>
-                      </template>
-                      <template v-else-if="seanceActive.type_seance === 'pliometrie'">
-                        <span class="prescrit-item" v-if="exo.series[serieIdx-1]?.bonds">
-                          <span class="prescrit-label">Bonds</span>
-                          <span class="prescrit-val">{{ exo.series[serieIdx-1].bonds }}</span>
-                        </span>
-                        <span class="prescrit-item" v-if="exo.series[serieIdx-1]?.intensite">
-                          <span class="prescrit-label">Intensité</span>
-                          <span class="prescrit-val">{{ exo.series[serieIdx-1].intensite }}</span>
-                        </span>
-                        <span class="prescrit-item prescrit-repos" v-if="groupe.exercices.length === 1 && exo.series[serieIdx-1]?.temps_repos">
-                          <span class="prescrit-label">Repos</span>
-                          <span class="prescrit-val">{{ exo.series[serieIdx-1].temps_repos }}</span>
-                        </span>
-                      </template>
-                    </div>
-
-                    <!-- Inputs réalisé -->
-                    <div class="realise-inputs">
-                      <template v-if="seanceActive.type_seance === 'musculation' || !seanceActive.type_seance">
-                        <input
-                          v-model="getLogs(exo.id, serieIdx-1).reps_realisees"
-                          :placeholder="exo.series[serieIdx-1]?.nb_reps || 'reps'"
-                          class="mini-input"
-                          :readonly="seancesCompletees.has(seanceActive.id)"
-                          :class="{ 'input-readonly': seancesCompletees.has(seanceActive.id) }"
-                        />
-                        <input
-                          v-model="getLogs(exo.id, serieIdx-1).poids_realise"
-                          :placeholder="exo.series[serieIdx-1]?.poids_cible || 'charge'"
-                          class="mini-input"
-                          :readonly="seancesCompletees.has(seanceActive.id)"
-                          :class="{ 'input-readonly': seancesCompletees.has(seanceActive.id) }"
-                        />
-                      </template>
-                      <template v-else-if="seanceActive.type_seance === 'natation' || seanceActive.type_seance === 'athletisme'">
-                        <input
-                          v-model="getLogs(exo.id, serieIdx-1).reps_realisees"
-                          :placeholder="exo.series[serieIdx-1]?.metres ? `${exo.series[serieIdx-1].metres}m` : 'mètres'"
-                          class="mini-input"
-                          :readonly="seancesCompletees.has(seanceActive.id)"
-                          :class="{ 'input-readonly': seancesCompletees.has(seanceActive.id) }"
-                        />
-                        <input
-                          v-model="getLogs(exo.id, serieIdx-1).poids_realise"
-                          :placeholder="exo.series[serieIdx-1]?.intensite || 'intensité'"
-                          class="mini-input"
-                          :readonly="seancesCompletees.has(seanceActive.id)"
-                          :class="{ 'input-readonly': seancesCompletees.has(seanceActive.id) }"
-                        />
-                      </template>
-                      <template v-else-if="seanceActive.type_seance === 'pliometrie'">
-                        <input
-                          v-model="getLogs(exo.id, serieIdx-1).reps_realisees"
-                          :placeholder="exo.series[serieIdx-1]?.bonds ? `${exo.series[serieIdx-1].bonds} bonds` : 'bonds'"
-                          class="mini-input"
-                          :readonly="seancesCompletees.has(seanceActive.id)"
-                          :class="{ 'input-readonly': seancesCompletees.has(seanceActive.id) }"
-                        />
-                        <input
-                          v-model="getLogs(exo.id, serieIdx-1).poids_realise"
-                          :placeholder="exo.series[serieIdx-1]?.intensite || 'intensité'"
-                          class="mini-input"
-                          :readonly="seancesCompletees.has(seanceActive.id)"
-                          :class="{ 'input-readonly': seancesCompletees.has(seanceActive.id) }"
-                        />
-                      </template>
-                    </div>
+                <div
+                  v-for="(exo, eidx) in groupe.exercices"
+                  :key="exo.id"
+                  class="serie-exo"
+                >
+                  <div class="serie-exo-head" v-if="groupe.exercices.length > 1">
+                    <span class="exo-letter-mini">{{ letterFor(eidx) }}</span>
+                    <span class="serie-exo-nom">{{ exo.nom }}</span>
                   </div>
 
-                  <!-- Repos superset -->
-                  <div v-if="groupe.exercices.length > 1 && groupe.exercices[0].series[serieIdx-1]?.temps_repos" class="repos-superset-col">
-                    <span class="prescrit-label">Repos</span>
-                    <span class="prescrit-val">{{ groupe.exercices[0].series[serieIdx-1].temps_repos }}</span>
+                  <!-- Prescrit : gros, lisible à 1 m -->
+                  <div class="prescrit-bloc">
+                    <template v-if="seanceActive.type_seance === 'musculation' || !seanceActive.type_seance">
+                      <span class="prescrit-item" v-if="exo.series[serieIdx-1]?.nb_reps">
+                        <span class="prescrit-val">{{ exo.series[serieIdx-1].nb_reps }}</span>
+                        <span class="prescrit-label">reps</span>
+                      </span>
+                      <span class="prescrit-item" v-if="exo.series[serieIdx-1]?.poids_cible">
+                        <span class="prescrit-val">{{ exo.series[serieIdx-1].poids_cible }}</span>
+                        <span class="prescrit-label">charge</span>
+                      </span>
+                      <span class="prescrit-item" v-if="exo.series[serieIdx-1]?.rm">
+                        <span class="prescrit-val">{{ exo.series[serieIdx-1].rm }}</span>
+                        <span class="prescrit-label">%RM</span>
+                      </span>
+                      <span class="prescrit-item" v-if="exo.series[serieIdx-1]?.tempo">
+                        <span class="prescrit-val">{{ exo.series[serieIdx-1].tempo }}</span>
+                        <span class="prescrit-label">tempo</span>
+                      </span>
+                    </template>
+                    <template v-else-if="seanceActive.type_seance === 'natation' || seanceActive.type_seance === 'athletisme'">
+                      <span class="prescrit-item" v-if="exo.series[serieIdx-1]?.metres">
+                        <span class="prescrit-val">{{ exo.series[serieIdx-1].metres }}</span>
+                        <span class="prescrit-label">mètres</span>
+                      </span>
+                      <span class="prescrit-item" v-if="exo.series[serieIdx-1]?.intensite">
+                        <span class="prescrit-val">{{ exo.series[serieIdx-1].intensite }}</span>
+                        <span class="prescrit-label">intensité</span>
+                      </span>
+                    </template>
+                    <template v-else-if="seanceActive.type_seance === 'pliometrie'">
+                      <span class="prescrit-item" v-if="exo.series[serieIdx-1]?.bonds">
+                        <span class="prescrit-val">{{ exo.series[serieIdx-1].bonds }}</span>
+                        <span class="prescrit-label">bonds</span>
+                      </span>
+                      <span class="prescrit-item" v-if="exo.series[serieIdx-1]?.intensite">
+                        <span class="prescrit-val">{{ exo.series[serieIdx-1].intensite }}</span>
+                        <span class="prescrit-label">intensité</span>
+                      </span>
+                    </template>
+                  </div>
+
+                  <!-- Réalisé : 2 champs, clavier numérique quand la donnée l'est -->
+                  <div class="realise-inputs">
+                    <template v-if="seanceActive.type_seance === 'musculation' || !seanceActive.type_seance">
+                      <input
+                        v-model="getLogs(exo.id, serieIdx-1).reps_realisees"
+                        :placeholder="exo.series[serieIdx-1]?.nb_reps || 'reps'"
+                        inputmode="decimal"
+                        class="log-input"
+                        :readonly="seancesCompletees.has(seanceActive.id)"
+                        :class="{ 'input-readonly': seancesCompletees.has(seanceActive.id) }"
+                      />
+                      <input
+                        v-model="getLogs(exo.id, serieIdx-1).poids_realise"
+                        :placeholder="exo.series[serieIdx-1]?.poids_cible || 'charge'"
+                        inputmode="decimal"
+                        class="log-input"
+                        :readonly="seancesCompletees.has(seanceActive.id)"
+                        :class="{ 'input-readonly': seancesCompletees.has(seanceActive.id) }"
+                      />
+                    </template>
+                    <template v-else-if="seanceActive.type_seance === 'natation' || seanceActive.type_seance === 'athletisme'">
+                      <input
+                        v-model="getLogs(exo.id, serieIdx-1).reps_realisees"
+                        :placeholder="exo.series[serieIdx-1]?.metres ? `${exo.series[serieIdx-1].metres}m` : 'mètres'"
+                        inputmode="decimal"
+                        class="log-input"
+                        :readonly="seancesCompletees.has(seanceActive.id)"
+                        :class="{ 'input-readonly': seancesCompletees.has(seanceActive.id) }"
+                      />
+                      <input
+                        v-model="getLogs(exo.id, serieIdx-1).poids_realise"
+                        :placeholder="exo.series[serieIdx-1]?.intensite || 'intensité'"
+                        class="log-input"
+                        :readonly="seancesCompletees.has(seanceActive.id)"
+                        :class="{ 'input-readonly': seancesCompletees.has(seanceActive.id) }"
+                      />
+                    </template>
+                    <template v-else-if="seanceActive.type_seance === 'pliometrie'">
+                      <input
+                        v-model="getLogs(exo.id, serieIdx-1).reps_realisees"
+                        :placeholder="exo.series[serieIdx-1]?.bonds ? `${exo.series[serieIdx-1].bonds} bonds` : 'bonds'"
+                        inputmode="decimal"
+                        class="log-input"
+                        :readonly="seancesCompletees.has(seanceActive.id)"
+                        :class="{ 'input-readonly': seancesCompletees.has(seanceActive.id) }"
+                      />
+                      <input
+                        v-model="getLogs(exo.id, serieIdx-1).poids_realise"
+                        :placeholder="exo.series[serieIdx-1]?.intensite || 'intensité'"
+                        class="log-input"
+                        :readonly="seancesCompletees.has(seanceActive.id)"
+                        :class="{ 'input-readonly': seancesCompletees.has(seanceActive.id) }"
+                      />
+                    </template>
                   </div>
                 </div>
 
-                <!-- Bouton valider série -->
                 <button
                   v-if="!seancesCompletees.has(seanceActive.id)"
                   class="btn-serie"
@@ -287,34 +262,42 @@
                   @click="toggleGroupeDone(groupe, serieIdx - 1)"
                 >
                   <i :class="isGroupeDone(groupe, serieIdx - 1) ? 'ti ti-check' : 'ti ti-circle'"></i>
-                  {{ isGroupeDone(groupe, serieIdx - 1) ? 'Fait' : 'Valider' }}
+                  {{ isGroupeDone(groupe, serieIdx - 1) ? 'Fait' : 'Valider la série' }}
                 </button>
-                <div v-else class="serie-statut-badge" :class="getLogs(groupe.exercices[0].id, serieIdx-1).fait ? 'badge-fait' : 'badge-non-fait'">
+                <div
+                  v-else
+                  class="serie-statut-badge"
+                  :class="getLogs(groupe.exercices[0].id, serieIdx-1).fait ? 'badge-fait' : 'badge-non-fait'"
+                >
                   <i :class="getLogs(groupe.exercices[0].id, serieIdx-1).fait ? 'ti ti-check' : 'ti ti-x'"></i>
                   {{ getLogs(groupe.exercices[0].id, serieIdx-1).fait ? 'Fait' : 'Non réalisé' }}
                 </div>
+              </div>
+            </div>
+          </div>
 
-              </div> <!-- fin serie-col -->
-            </div> <!-- fin series-cols -->
-
-          </div> <!-- fin exo-group-body -->
-        </div> <!-- fin exo-group v-for -->
-
-            <!-- Bouton valider séance -->
-            <button
-              v-if="!seancesCompletees.has(seanceActive.id)"
-              class="btn btn-primary btn-large"
-              @click="validerSeance"
-            >
+          <!-- Barre de validation collante : la progression et la sortie sont toujours visibles -->
+          <div class="valider-bar" v-if="!seancesCompletees.has(seanceActive.id)">
+            <div class="valider-progress">
+              <div class="valider-progress-track">
+                <div
+                  class="valider-progress-fill"
+                  :style="{ width: progressionSeance.total ? (progressionSeance.done / progressionSeance.total * 100) + '%' : '0%' }"
+                ></div>
+              </div>
+              <span class="valider-progress-label">
+                {{ progressionSeance.done }}/{{ progressionSeance.total }} séries
+              </span>
+            </div>
+            <button class="btn btn-primary btn-valider" @click="validerSeance">
               <i class="ti ti-check"></i> Valider la séance
             </button>
-            <div v-else class="seance-complete-banner">
-              <i class="ti ti-check"></i> Séance complétée — consultation uniquement
-            </div>
-
-          </template> <!-- fin vue séance en cours -->
-        </div> <!-- fin panel-detail -->
-      </div> <!-- fin content-body / onglet programme -->
+          </div>
+          <div class="seance-complete-banner" v-else>
+            <i class="ti ti-check"></i> Séance complétée — consultation uniquement
+          </div>
+        </template>
+      </div>
 
       <!-- ONGLET LOGS -->
       <div v-if="onglet === 'logs'" class="logs-page">
@@ -323,6 +306,7 @@
         <div v-for="(group, date) in historiqueGroupe" :key="date" class="historique-day">
           <div class="historique-date">{{ formatDate(date) }}</div>
           <div v-for="log in group" :key="log.id" class="historique-row">
+            <span class="historique-exo">{{ log.exo_nom }}</span>
             <span class="chip" v-if="log.reps_realisees">{{ log.reps_realisees }}</span>
             <span class="chip" v-if="log.poids_realise">{{ log.poids_realise }}</span>
             <span class="chip" :class="log.fait ? 'chip-done' : 'chip-skip'">
@@ -408,7 +392,7 @@ export default {
     const getLogsAvecHistorique = (exo, serieIdx) => {
       const serie = exo.series[serieIdx]
       if (!serie) return getLogs(exo.id, serieIdx)
-      
+
       // Si on a des logs existants pour cette série et qu'on est en consultation
       if (logsParSerie.value[serie.id] && !getLogs(exo.id, serieIdx).fait) {
         const logExistant = logsParSerie.value[serie.id]
@@ -452,7 +436,7 @@ export default {
       try {
         const logs = await api.get(`/logs/programme/${programmeId}/moi`)
         const completees = new Set()
-        
+
         // Groupe les logs par serie_id (garde le plus récent)
         logs.forEach(log => {
           logsParSerie.value[log.serie.id] = {
@@ -472,7 +456,7 @@ export default {
             if (toutesFaites) completees.add(seance.id)
           })
         }
-        
+
         seancesCompletees.value = completees
       } catch (e) {
         console.error('Erreur chargement logs:', e)
@@ -516,7 +500,7 @@ export default {
       const semaines = [...new Set(seances.value.map(s => s.semaine || 1))]
       semaineActive.value = semaines[0] || 1
       loadingSeances.value = false
-      
+
       // Charge les logs existants après les séances
       await chargerLogsExistants(p.id)
     }
@@ -547,46 +531,46 @@ export default {
       })
     }
 
-const validerSeance = async () => {
-  for (const exo of seanceActive.value.exercices) {
-    for (let i = 0; i < exo.series.length; i++) {
-      const serie = exo.series[i]
-      const log = getLogs(exo.id, i)
-      await api.post(`/series/${serie.id}/logs/`, {
-        reps_realisees: log.reps_realisees || null,
-        poids_realise: log.poids_realise || null,
-        fait: log.fait
-      })
-    }
-  }
+    const validerSeance = async () => {
+      for (const exo of seanceActive.value.exercices) {
+        for (let i = 0; i < exo.series.length; i++) {
+          const serie = exo.series[i]
+          const log = getLogs(exo.id, i)
+          await api.post(`/series/${serie.id}/logs/`, {
+            reps_realisees: log.reps_realisees || null,
+            poids_realise: log.poids_realise || null,
+            fait: log.fait
+          })
+        }
+      }
 
-  seancesCompletees.value.add(seanceActive.value.id)
-  const seanceValidee = seanceActive.value
-  seanceActive.value = null
+      seancesCompletees.value.add(seanceActive.value.id)
+      const seanceValidee = seanceActive.value
+      seanceActive.value = null
 
-  // Vérifie si la semaine est complète
-  const semaine = seanceValidee.semaine || 1
-  const seancesDeLaSemaine = seances.value.filter(s => (s.semaine || 1) === semaine)
-  const semaineComplete = seancesDeLaSemaine.every(s => seancesCompletees.value.has(s.id))
+      // Vérifie si la semaine est complète
+      const semaine = seanceValidee.semaine || 1
+      const seancesDeLaSemaine = seances.value.filter(s => (s.semaine || 1) === semaine)
+      const semaineComplete = seancesDeLaSemaine.every(s => seancesCompletees.value.has(s.id))
 
-  if (semaineComplete) {
-    // Vérifie si une semaine suivante existe déjà
-    const semaineSuivante = semaine + 1
-    const semaineSuivanteExiste = semainesDisponibles.value.includes(semaineSuivante)
+      if (semaineComplete) {
+        // Vérifie si une semaine suivante existe déjà
+        const semaineSuivante = semaine + 1
+        const semaineSuivanteExiste = semainesDisponibles.value.includes(semaineSuivante)
 
-    if (!semaineSuivanteExiste) {
-      try {
-        await api.post(`/programmes/${programmeActif.value.id}/seances/auto-semaine-suivante`)
-        // Recharge les séances
-        const data = await api.get(`/programmes/${programmeActif.value.id}/seances/`)
-        seances.value = data
-        semaineActive.value = semaineSuivante
-      } catch (e) {
-        console.error('Erreur auto-semaine:', e)
+        if (!semaineSuivanteExiste) {
+          try {
+            await api.post(`/programmes/${programmeActif.value.id}/seances/auto-semaine-suivante`)
+            // Recharge les séances
+            const data = await api.get(`/programmes/${programmeActif.value.id}/seances/`)
+            seances.value = data
+            semaineActive.value = semaineSuivante
+          } catch (e) {
+            console.error('Erreur auto-semaine:', e)
+          }
+        }
       }
     }
-  }
-}
 
     const fetchHistorique = async () => {
       historique.value = []
@@ -630,6 +614,22 @@ const validerSeance = async () => {
       return true
     }
 
+    // Progression de la séance en cours (présentation uniquement) :
+    // alimente la barre collante « x/y séries — Valider la séance »
+    const progressionSeance = computed(() => {
+      if (!seanceActive.value) return { done: 0, total: 0 }
+      let done = 0
+      let total = 0
+      grouperExercices(seanceActive.value.exercices).forEach(groupe => {
+        const nb = groupe.exercices[0].series.length
+        total += nb
+        for (let i = 0; i < nb; i++) {
+          if (isGroupeDone(groupe, i)) done++
+        }
+      })
+      return { done, total }
+    })
+
     return {
       programmes, programmeActif, seances, seanceActive, logs, historique,
       loadingSeances, onglet, historiqueGroupe,
@@ -640,134 +640,297 @@ const validerSeance = async () => {
       selectProgramme, demarrerSeance, validerSeance,
       formatDate, logout, panelListVisible, isGroupeComplete,
       seancesCompletees, isSeanceComplete, isSemaineComplete,
-      logsParSerie, chargerLogsExistants
+      logsParSerie, chargerLogsExistants, getLogsAvecHistorique,
+      progressionSeance
     }
   }
 }
 </script>
 
 <style scoped>
-* { box-sizing: border-box; }
-.dashboard-root { display: flex; flex: 1; overflow: hidden; min-height: 0; }
-.content-body { display: flex; flex: 1; overflow: hidden; min-height: 0; min-width: 0; }
-.btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: var(--radius-md); border: 1px solid var(--color-border); font-size: var(--font-size-md); cursor: pointer; background: transparent; color: var(--color-text-body); }
-.btn:hover { background: var(--color-bg-secondary); }
-.btn-primary { background: var(--color-primary); color: var(--color-primary-light); border-color: var(--color-primary-dark); }
-.btn-primary:hover { background: var(--color-primary-dark); }
-.btn-sm { padding: 5px 10px; font-size: var(--font-size-sm); }
-.btn-large { padding: 10px 20px; font-size: var(--font-size-base); width: 100%; justify-content: center; margin-top: var(--spacing-sm); }
-.nav-item { display: flex; align-items: center; gap: 6px; padding: 6px 12px; font-size: var(--font-size-md); cursor: pointer; color: var(--color-text-secondary); border-radius: var(--radius-md); font-weight: 500; border: none; background: transparent; }
-.nav-item:hover { background: var(--color-bg-app); color: var(--color-text-body); }
-.nav-item.active { background: var(--color-primary-light); color: var(--color-primary-dark); }
-.empty-state { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--spacing-sm); color: var(--color-text-secondary); }
-.panel-list { width: 220px; border-right: 1px solid var(--color-border); overflow-y: auto; padding: var(--spacing-md); flex-shrink: 0; display: flex; flex-direction: column; gap: var(--spacing-sm); }
-.panel-detail { flex: 1; overflow-y: auto; padding: var(--spacing-lg) var(--spacing-xl); display: flex; flex-direction: column; gap: var(--spacing-md); min-height: 0; }
-.section-title { font-size: var(--font-size-sm); font-weight: 500; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
-.prog-card { border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: 10px var(--spacing-md); cursor: pointer; }
-.prog-card:hover { border-color: var(--color-border-strong); background: var(--color-bg-secondary); }
-.prog-card.active { border-color: var(--color-primary); background: var(--color-primary-light); }
-.prog-card.active .prog-name { color: var(--color-primary-text); }
-.prog-name { font-size: var(--font-size-base); font-weight: 500; margin-bottom: 4px; }
-.prog-meta { display: flex; gap: 6px; align-items: center; font-size: var(--font-size-xs); }
-.badge { display: inline-flex; font-size: var(--font-size-xs); padding: 2px 8px; border-radius: var(--radius-full); }
-.badge-green { background: var(--color-success-bg); color: var(--color-success-text); }
-.badge-purple { background: var(--color-primary-light); color: var(--color-primary-text); }
-.badge-gray { background: var(--color-bg-tertiary); color: var(--color-text-secondary); border: 1px solid var(--color-border); }
-.detail-header h3 { font-size: var(--font-size-17); font-weight: 600; margin-bottom: 3px; }
-.detail-header p { font-size: var(--font-size-md); color: var(--color-text-secondary); }
-.semaines-tabs { display: flex; gap: 4px; flex-wrap: wrap; }
-.semaine-tab { display: inline-flex; align-items: center; padding: 6px 12px; border: 1px solid var(--color-border); border-radius: var(--radius-md); font-size: var(--font-size-md); cursor: pointer; background: var(--color-bg); color: var(--color-text-secondary); }
-.semaine-tab:hover { border-color: var(--color-primary); }
-.semaine-tab.active { background: var(--color-primary-light); border-color: var(--color-primary); color: var(--color-primary-text); font-weight: 500; }
-.seance-block { border: 1px solid var(--color-border); border-radius: var(--radius-lg); overflow: hidden; flex-shrink: 0; border-left-width: 4px; }
-.seance-block.type-musculation { border-left-color: var(--color-type-musculation-border); }
-.seance-block.type-natation { border-left-color: var(--color-type-natation-border); }
-.seance-block.type-athletisme { border-left-color: var(--color-type-athletisme-border); }
-.seance-block.type-pliometrie { border-left-color: var(--color-type-pliometrie-border); }
-.seance-block.clickable { cursor: pointer; }
-.seance-block.clickable:hover { border-color: var(--color-primary); }
-.type-badge { display: inline-flex; align-items: center; font-size: var(--font-size-xs); font-weight: 500; padding: 2px 8px; border-radius: var(--radius-full); }
-.type-badge-musculation { background: var(--color-type-musculation-bg); color: var(--color-type-musculation-text); }
-.type-badge-natation { background: var(--color-type-natation-bg); color: var(--color-type-natation-text); }
-.type-badge-athletisme { background: var(--color-type-athletisme-bg); color: var(--color-type-athletisme-text); }
-.type-badge-pliometrie { background: var(--color-type-pliometrie-bg); color: var(--color-type-pliometrie-text); }
-.seance-head { padding: 14px var(--spacing-lg); background: var(--color-bg-secondary); display: flex; align-items: center; gap: var(--spacing-sm); font-size: var(--font-size-base); font-weight: 500; }
-.exo-count { font-size: var(--font-size-sm); color: var(--color-text-secondary); font-weight: 400; }
+.dashboard-root { display: flex; flex: 1; flex-direction: column; overflow: hidden; min-height: 0; }
+.content-body { display: flex; flex: 1; flex-direction: column; overflow: hidden; min-height: 0; min-width: 0; }
 
-/* Groupes */
-.exo-group { background: var(--color-bg-secondary); border: 1px solid var(--color-border); border-radius: 10px; overflow: hidden; flex-shrink: 0; }
-.exo-group.is-superset { background: var(--color-superset-bg); border: 1px solid var(--color-superset-border); border-left: 3px solid var(--color-primary); }
+.empty-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+  color: var(--color-text-secondary);
+  text-align: center;
+  padding: var(--spacing-xl);
+}
+.empty-icon { font-size: 40px; color: var(--color-text-muted); }
 
-/* En-tête accordéon groupe */
-.exo-group-head { display: flex; align-items: center; justify-content: space-between; padding: 12px var(--spacing-lg); cursor: pointer; user-select: none; gap: var(--spacing-md); }
-.exo-group-head:hover { background: rgba(0,0,0,0.02); }
-.exo-group-noms { display: flex; flex-direction: column; gap: 4px; flex: 1; }
-.superset-banner { display: flex; align-items: center; gap: 6px; font-size: var(--font-size-xs); color: var(--color-superset-text); font-weight: 500; margin-bottom: 2px; }
-.exo-noms-list { display: flex; flex-direction: column; gap: 3px; }
-.exo-nom-inline { display: flex; align-items: center; gap: var(--spacing-sm); font-size: var(--font-size-base); font-weight: 500; color: var(--color-text); }
-.exo-nom-inline.is-optionnel { color: var(--color-text-secondary); }
-.optionnel-badge { font-size: var(--font-size-2xs); font-weight: 500; color: var(--color-text-secondary); background: var(--color-bg-tertiary); padding: 2px 6px; border-radius: var(--radius-full); text-transform: uppercase; letter-spacing: 0.3px; }
-.exo-group-meta { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
-.series-count-badge { font-size: var(--font-size-sm); color: var(--color-superset-text); font-weight: 600; background: var(--color-primary-light); padding: 2px 10px; border-radius: var(--radius-full); }
-.exo-num, .exo-letter { width: 22px; height: 22px; border-radius: var(--radius-sm); background: var(--color-primary-light); color: var(--color-superset-text); font-size: var(--font-size-xs); font-weight: 600; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.exo-letter { background: var(--color-primary); color: var(--color-bg); }
+/* --- Écrans (colonne centrée, mobile-first) --- */
+.screen {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--spacing-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+  min-height: 0;
+}
 
-/* Corps accordéon */
-.exo-group-body { border-top: 1px solid var(--color-border); padding: 12px var(--spacing-lg); background: var(--color-bg); }
+.screen-header h2 { font-size: var(--font-size-xl); font-weight: 700; margin: 0 0 4px; }
+.screen-header p { font-size: var(--font-size-sm); color: var(--color-text-secondary); margin: 0; }
 
-/* Séries en colonnes */
-.series-cols { display: flex; flex-wrap: wrap; gap: 10px; }
-.serie-col { display: flex; flex-direction: column; gap: var(--spacing-sm); padding: var(--spacing-md); background: var(--color-bg-secondary); border: 1px solid var(--color-border); border-radius: var(--radius-lg); min-width: 140px; flex: 1; max-width: 200px; }
-.serie-col.done { background: var(--color-valid-bg-soft); border-color: var(--color-valid-border); }
-.serie-col-label { font-size: var(--font-size-sm); font-weight: 700; color: var(--color-superset-text); text-align: center; padding: 4px 0; border-bottom: 1px solid var(--color-border); margin-bottom: 4px; }
-.serie-col-exo { display: flex; flex-direction: column; gap: 4px; }
-.exo-letter-mini { font-size: var(--font-size-2xs); font-weight: 700; color: var(--color-bg); background: var(--color-primary); padding: 2px 6px; border-radius: var(--radius-sm); align-self: flex-start; }
+/* --- Sélecteur de programme (seulement si > 1) --- */
+.prog-switcher { display: flex; gap: var(--spacing-sm); overflow-x: auto; flex-shrink: 0; padding-bottom: 2px; }
+.prog-chip {
+  min-height: var(--tap-min);
+  padding: 0 var(--spacing-lg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-bg);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.prog-chip.active {
+  background: var(--color-primary-light);
+  border-color: var(--color-primary);
+  color: var(--color-primary-text);
+  font-weight: 600;
+}
 
-/* Prescrit */
-.prescrit-bloc { display: flex; flex-wrap: wrap; gap: var(--spacing-sm); }
-.prescrit-item { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
-.prescrit-label { font-size: var(--font-size-2xs); color: var(--color-text-muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.3px; }
-.prescrit-val { font-size: var(--font-size-base); font-weight: 700; color: var(--color-text); }
-.prescrit-repos .prescrit-label { color: var(--color-superset-border); }
-.prescrit-repos .prescrit-val { color: var(--color-superset-text); font-size: var(--font-size-md); }
-
-/* Repos superset colonne */
-.repos-superset-col { display: flex; align-items: center; gap: 6px; padding: 4px 0; border-top: 1px dashed var(--color-border); }
-
-/* Inputs */
-.realise-inputs { display: flex; gap: 4px; flex-wrap: wrap; }
-.mini-input { padding: 6px 8px; font-size: var(--font-size-md); width: 100%; border: 1px solid var(--color-border); border-radius: var(--radius-md); }
-.mini-input:focus { outline: none; border-color: var(--color-primary); }
-
-/* Bouton valider */
-.btn-serie { display: inline-flex; align-items: center; justify-content: center; gap: 5px; padding: 7px 10px; border-radius: var(--radius-md); cursor: pointer; font-size: var(--font-size-sm); font-weight: 500; border: 1px solid var(--color-border); background: var(--color-bg); color: var(--color-text-secondary); width: 100%; margin-top: 4px; }
-.btn-todo:hover { color: var(--color-primary-dark); border-color: var(--color-primary); }
-.btn-done { background: var(--color-primary); color: var(--color-bg); border-color: var(--color-primary-dark); }
-.btn-done:hover { background: var(--color-primary-dark); }
-
-.empty-series { font-size: var(--font-size-md); color: var(--color-text-muted); font-style: italic; }
-.empty { color: var(--color-text-muted); text-align: center; padding: var(--spacing-xl); font-size: var(--font-size-md); }
-.logs-page { flex: 1; padding: var(--spacing-xl) var(--spacing-2xl); display: flex; flex-direction: column; gap: var(--spacing-md); overflow-y: auto; }
-.historique-day { display: flex; flex-direction: column; gap: 6px; }
-.historique-date { font-size: var(--font-size-md); font-weight: 500; color: var(--color-superset-text); text-transform: capitalize; }
-.historique-row { display: flex; gap: 6px; padding: var(--spacing-sm) var(--spacing-md); background: var(--color-bg-secondary); border: 1px solid var(--color-border); border-radius: var(--radius-md); }
-.chip { font-size: var(--font-size-xs); background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 2px 6px; color: var(--color-text-secondary); }
-.chip-done { background: var(--color-valid-bg); color: var(--color-valid-text); border-color: var(--color-valid-border); }
-.chip-skip { background: var(--color-bg-tertiary); color: var(--color-text-muted); }
-
-.semaine-tab.semaine-complete {
+/* --- Semaines --- */
+.semaines-scroll { display: flex; gap: var(--spacing-sm); overflow-x: auto; flex-shrink: 0; padding-bottom: 2px; }
+.semaine-chip {
+  min-height: var(--tap-min);
+  min-width: var(--tap-min);
+  padding: 0 var(--spacing-lg);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--color-bg);
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+}
+.semaine-chip.active {
+  background: var(--color-primary-light);
+  border-color: var(--color-primary);
+  color: var(--color-primary-text);
+}
+.semaine-chip.semaine-complete {
   background: var(--color-valid-bg);
   border-color: var(--color-valid-border);
-  color: var(--color-valid-text);
-  font-weight: 500;
-}
-
-.semaine-tab.semaine-complete.active {
-  background: var(--color-valid-bg-strong);
-  border-color: var(--color-valid-border-strong);
   color: var(--color-valid-text-strong);
 }
+.semaine-chip.semaine-complete.active {
+  background: var(--color-valid-bg-strong);
+  border-color: var(--color-valid-border-strong);
+}
 
+/* --- Cartes séance --- */
+.seance-card {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-lg);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  text-align: left;
+  flex-shrink: 0;
+  width: 100%;
+  transition: border-color 0.1s;
+}
+.seance-card:hover { border-color: var(--color-primary); }
+.seance-card-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.seance-card-titre { font-size: var(--font-size-base); font-weight: 600; color: var(--color-text); }
+.seance-card-meta { display: flex; align-items: center; gap: var(--spacing-sm); flex-wrap: wrap; }
+.seance-card-count { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+.seance-card-chevron { color: var(--color-text-muted); font-size: var(--font-size-lg); flex-shrink: 0; }
+
+.seance-card.seance-complete { border-color: var(--color-valid-border); background: var(--color-valid-bg-soft); }
+.seance-card.seance-complete:hover { border-color: var(--color-valid-border-strong); }
+
+.badge-complete {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--color-valid-text-strong);
+  background: var(--color-valid-bg);
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  flex-shrink: 0;
+}
+
+/* --- Barre haute de séance --- */
+.seance-topbar {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-sm) var(--spacing-lg);
+  background: var(--color-bg);
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+.seance-topbar-info { flex: 1; min-width: 0; }
+.seance-topbar-titre {
+  font-size: var(--font-size-base);
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.seance-topbar-meta { display: flex; gap: 6px; margin-top: 2px; flex-wrap: wrap; }
+
+/* --- Feuille de séance --- */
+.feuille { gap: var(--spacing-lg); padding-bottom: var(--spacing-lg); }
+
+.exo-group {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  flex-shrink: 0;
+}
+.exo-group.is-superset { border-color: var(--color-superset-border); border-left: 4px solid var(--color-primary); }
+.exo-group.is-complete { border-color: var(--color-valid-border); background: var(--color-valid-bg-soft); }
+
+.exo-group-head { display: flex; align-items: flex-start; gap: var(--spacing-md); }
+.exo-group-head .exo-noms-list { flex: 1; }
+.groupe-check { color: var(--color-valid-text); font-size: 24px; flex-shrink: 0; }
+
+.superset-banner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--font-size-xs);
+  color: var(--color-superset-text);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  flex-shrink: 0;
+}
+
+.exo-noms-list { display: flex; flex-direction: column; gap: 6px; }
+.exo-nom-inline {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  color: var(--color-text);
+}
+.exo-nom-inline.is-optionnel { color: var(--color-text-secondary); }
+.optionnel-badge {
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  background: var(--color-bg-tertiary);
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.exo-num, .exo-letter {
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-sm);
+  background: var(--color-primary-light);
+  color: var(--color-superset-text);
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.exo-letter { background: var(--color-primary); color: var(--color-on-primary); }
+
+/* --- Cartes série --- */
+.serie-card {
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+.serie-card.done { background: var(--color-valid-bg-soft); border-color: var(--color-valid-border); }
+
+.serie-head { display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-sm); }
+.serie-label { font-size: var(--font-size-sm); font-weight: 700; color: var(--color-superset-text); }
+.serie-repos {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-primary-text);
+  background: var(--color-primary-light);
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+}
+
+.serie-exo { display: flex; flex-direction: column; gap: var(--spacing-sm); }
+.serie-exo + .serie-exo { padding-top: var(--spacing-sm); border-top: 1px dashed var(--color-border); }
+.serie-exo-head { display: flex; align-items: center; gap: var(--spacing-sm); }
+.serie-exo-nom { font-size: var(--font-size-sm); font-weight: 600; color: var(--color-text-body); }
+.exo-letter-mini {
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  color: var(--color-on-primary);
+  background: var(--color-primary);
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+
+/* Prescrit : valeurs en gros, labels discrets */
+.prescrit-bloc { display: flex; flex-wrap: wrap; gap: var(--spacing-lg); align-items: baseline; }
+.prescrit-item { display: inline-flex; align-items: baseline; gap: 5px; }
+.prescrit-val { font-size: var(--font-size-xl); font-weight: 700; color: var(--color-text); line-height: 1.1; }
+.prescrit-label {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+/* Réalisé */
+.realise-inputs { display: flex; gap: var(--spacing-sm); }
+.log-input {
+  height: var(--input-h);
+  padding: 0 var(--spacing-md);
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  width: 100%;
+  min-width: 0;
+  flex: 1;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  text-align: center;
+}
+.log-input:focus { outline: none; border-color: var(--color-primary); }
 .input-readonly {
   background: var(--color-bg-tertiary);
   color: var(--color-text-secondary);
@@ -775,218 +938,137 @@ const validerSeance = async () => {
   border-color: var(--color-border);
 }
 
+/* Bouton valider série */
+.btn-serie {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: var(--input-h);
+  padding: 0 var(--spacing-lg);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-bg);
+  color: var(--color-text-body);
+  width: 100%;
+}
+.btn-todo:hover { color: var(--color-primary-dark); border-color: var(--color-primary); }
+.btn-done { background: var(--color-primary); color: var(--color-on-primary); border-color: var(--color-primary-dark); }
+.btn-done:hover { background: var(--color-primary-dark); }
+
 .serie-statut-badge {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 4px;
-  padding: 6px 10px;
+  min-height: var(--tap-min);
+  padding: 0 var(--spacing-md);
   border-radius: var(--radius-md);
   font-size: var(--font-size-sm);
-  font-weight: 500;
+  font-weight: 600;
   width: 100%;
-  justify-content: center;
-  margin-top: 4px;
 }
+.badge-fait { background: var(--color-valid-bg); color: var(--color-valid-text-strong); }
+.badge-non-fait { background: var(--color-danger-bg); color: var(--color-danger-text); }
 
-.badge-fait {
-  background: var(--color-valid-bg);
-  color: var(--color-valid-text);
-}
+.empty-series { font-size: var(--font-size-sm); color: var(--color-text-muted); font-style: italic; }
 
-.badge-non-fait {
-  background: var(--color-danger-bg);
-  color: var(--color-danger-text);
+/* --- Barre de validation collante --- */
+.valider-bar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-lg);
+  padding: var(--spacing-md) var(--spacing-lg);
+  background: var(--color-bg);
+  border-top: 1px solid var(--color-border);
 }
+.valider-progress { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.valider-progress-track {
+  height: 6px;
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+.valider-progress-fill {
+  height: 100%;
+  background: var(--color-primary);
+  border-radius: var(--radius-full);
+  transition: width 0.2s;
+}
+.valider-progress-label { font-size: var(--font-size-xs); font-weight: 600; color: var(--color-text-secondary); }
+.btn-valider { flex-shrink: 0; min-height: var(--input-h); }
 
 .seance-complete-banner {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: var(--spacing-sm);
   padding: var(--spacing-md);
+  margin: var(--spacing-md) var(--spacing-lg);
   background: var(--color-valid-bg);
-  color: var(--color-valid-text);
+  color: var(--color-valid-text-strong);
   border-radius: var(--radius-lg);
-  font-size: var(--font-size-base);
-  font-weight: 500;
-  margin-top: var(--spacing-sm);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
 }
 
-.exos-row {
+/* --- Historique --- */
+.logs-page {
+  flex: 1;
+  padding: var(--spacing-lg);
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-sm);
+  gap: var(--spacing-md);
+  overflow-y: auto;
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
 }
-
-.seance-block.seance-complete {
-  border-color: var(--color-valid-border);
-  border-left-color: var(--color-valid-text);
-  opacity: 0.85;
-  cursor: pointer;
+.historique-day { display: flex; flex-direction: column; gap: 6px; }
+.historique-date {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-superset-text);
+  text-transform: capitalize;
 }
-
-.seance-block.seance-complete .seance-head {
-  background: var(--color-valid-bg-soft);
-}
-
-.seance-block.seance-complete:hover {
-  border-color: var(--color-valid-border-strong);
-  opacity: 1;
-}
-
-.badge-complete {
-  display: inline-flex;
+.historique-row {
+  display: flex;
+  gap: 6px;
   align-items: center;
-  gap: 4px;
+  flex-wrap: wrap;
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+.historique-exo {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-text-body);
+  flex: 1;
+  min-width: 120px;
+}
+.chip {
   font-size: var(--font-size-xs);
-  font-weight: 500;
-  color: var(--color-valid-text);
-  background: var(--color-valid-bg);
-  padding: 2px 8px;
-  border-radius: var(--radius-full);
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 3px 8px;
+  color: var(--color-text-secondary);
 }
+.chip-done { background: var(--color-valid-bg); color: var(--color-valid-text-strong); border-color: var(--color-valid-border); }
+.chip-skip { background: var(--color-bg-tertiary); color: var(--color-text-muted); }
 
-.exo-group.is-complete {
-  border-color: var(--color-valid-border);
-  background: var(--color-valid-bg-soft);
-}
-
-.exo-group.is-complete .exo-group-head {
-  background: var(--color-valid-bg);
-}
-
-.exo-group.is-complete .exo-group-noms .exo-nom-inline {
-  color: var(--color-valid-text);
-}
-
-.exo-group.is-complete .series-count-badge {
-  background: var(--color-valid-bg);
-  color: var(--color-valid-text);
-}
-
-/* Override superset si complet */
-.exo-group.is-superset.is-complete {
-  border-color: var(--color-valid-border);
-  border-left-color: var(--color-valid-text);
-  background: var(--color-valid-bg-soft);
-}
-
-.nav-programmes {
-  display: none;
-}
-
-@media (max-width: 768px) {
-  .content-body { flex-direction: column; position: relative; }
-
-  .panel-list {
-    display: flex;
-    width: 100%;
-    border-right: none;
-    border-bottom: 1px solid var(--color-border);
-    padding: var(--spacing-sm) var(--spacing-md);
-    flex-direction: row;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    gap: 6px;
-    flex-shrink: 0;
-  }
-
-  .prog-card {
-    flex-shrink: 0;
-    min-width: 130px;
-  }
-
-  .panel-detail { padding: 10px var(--spacing-md); }
-
-  .series-cols {
-    flex-direction: column;
-    gap: 10px;
-  }
-
-  .serie-col {
-    min-width: 100%;
-    max-width: 100%;
-    flex: none;
-  }
-
-  .exos-row {
-    flex-direction: row;
-    align-items: flex-start;
-    gap: var(--spacing-sm);
-  }
-
-  .serie-col-exo {
-    flex: 1;
-    min-width: 0;
-    background: var(--color-bg-tertiary);
-    border-radius: var(--radius-md);
-    padding: var(--spacing-sm);
-  }
-
-  .repos-superset-col {
-    flex-shrink: 0;
-    align-self: center;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 2px;
-    padding: var(--spacing-sm);
-    background: var(--color-primary-light);
-    border-radius: var(--radius-md);
-  }
-
-  .mini-input {
-    width: 100%;
-    box-sizing: border-box;
-  }
-
-  .btn-serie {
-    margin-top: 6px;
-  }
-
-  /* Repos solo aligné inline */
-  .prescrit-repos {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    gap: 4px;
-  }
-
-  .nav-programmes {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    padding: 4px 0 4px 12px;
-    margin: 2px 0;
-    border-left: 2px solid var(--color-primary-light);
-  }
-
-  .nav-programmes-title {
-    font-size: var(--font-size-2xs);
-    font-weight: 500;
-    color: var(--color-text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    padding: 4px var(--spacing-sm);
-  }
-
-  .nav-prog {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    padding: 7px var(--spacing-sm);
-    font-size: var(--font-size-md);
-    color: var(--color-text-secondary);
-    border-radius: var(--radius-md);
-    cursor: pointer;
-  }
-
-  .nav-prog:hover { background: var(--color-bg-app); color: var(--color-text-body); }
-
-  .nav-prog.active {
-    background: var(--color-primary-light);
-    color: var(--color-primary-dark);
-    font-weight: 500;
-  }
+/* --- Desktop : plus d'air, la feuille reste une colonne --- */
+@media (min-width: 769px) {
+  .screen, .logs-page { padding: var(--spacing-2xl); }
+  .valider-bar { padding: var(--spacing-md) var(--spacing-2xl); }
+  .valider-bar, .seance-topbar { padding-left: max(var(--spacing-2xl), calc((100% - 720px) / 2)); padding-right: max(var(--spacing-2xl), calc((100% - 720px) / 2)); }
+  .realise-inputs { max-width: 360px; }
 }
 </style>
