@@ -276,6 +276,15 @@
             </div>
           </div>
 
+          <!-- Timer de repos : lancé à la validation d'une série, ignorable d'un tap -->
+          <div v-if="reposActif" class="repos-chip" :class="{ fini: reposActif.restant === 0 }" @click="arreterRepos">
+            <i class="ti" :class="reposActif.restant === 0 ? 'ti-bell-ringing' : 'ti-clock'"></i>
+            <span class="repos-chip-temps">
+              {{ reposActif.restant === 0 ? 'Repos terminé !' : formatTemps(reposActif.restant) }}
+            </span>
+            <i class="ti ti-x repos-chip-close"></i>
+          </div>
+
           <!-- Barre de validation collante : la progression et la sortie sont toujours visibles -->
           <div class="valider-bar" v-if="!seancesCompletees.has(seanceActive.id)">
             <div class="valider-progress">
@@ -320,7 +329,7 @@
 </template>
 
 <script>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useApi } from '../services/api'
@@ -416,6 +425,13 @@ export default {
         getLogs(exo.id, serieIdx).fait = !isDone
       })
 
+      // Sauvegarde immédiate : plus de perte si l'athlète ferme l'app
+      // avant le bouton final (le backend upserte par jour, pas de doublons)
+      sauvegarderSerie(groupe, serieIdx)
+
+      // Timer de repos au moment où la série vient d'être validée
+      if (!isDone) demarrerRepos(groupe, serieIdx)
+
       // Après validation, vérifie si toutes les séries du groupe sont complètes
       if (!isDone) {
         const nbSeries = groupe.exercices[0].series.length
@@ -429,6 +445,72 @@ export default {
       }
     }
 
+    const sauvegarderSerie = async (groupe, serieIdx) => {
+      try {
+        for (const exo of groupe.exercices) {
+          const serie = exo.series[serieIdx]
+          if (!serie) continue
+          const log = getLogs(exo.id, serieIdx)
+          await api.post(`/series/${serie.id}/logs/`, {
+            reps_realisees: log.reps_realisees || null,
+            poids_realise: log.poids_realise || null,
+            fait: log.fait
+          })
+        }
+      } catch (e) {
+        // Pas bloquant : la validation finale re-synchronise tout
+        console.error('Erreur sauvegarde série:', e)
+      }
+    }
+
+    // --- Timer de repos (présentation uniquement) ---
+    const reposActif = ref(null) // { total, restant }
+    let reposInterval = null
+
+    // "2min", "1min30", "1'30", "1:30", "90s", "90" (secondes si ≥ 10, minutes sinon)
+    const parseRepos = (str) => {
+      if (!str) return null
+      const s = String(str).toLowerCase().replace(/\s/g, '').replace(',', '.')
+      let m
+      if ((m = s.match(/^(\d+)(?:min|mn|m|')(\d+)?/))) return parseInt(m[1]) * 60 + (m[2] ? parseInt(m[2]) : 0)
+      if ((m = s.match(/^(\d+):(\d+)$/))) return parseInt(m[1]) * 60 + parseInt(m[2])
+      if ((m = s.match(/^(\d+)(?:s|sec)$/))) return parseInt(m[1])
+      if ((m = s.match(/^(\d+)$/))) {
+        const n = parseInt(m[1])
+        return n < 10 ? n * 60 : n
+      }
+      return null
+    }
+
+    const arreterRepos = () => {
+      clearInterval(reposInterval)
+      reposInterval = null
+      reposActif.value = null
+    }
+
+    const demarrerRepos = (groupe, serieIdx) => {
+      const secondes = parseRepos(groupe.exercices[0].series[serieIdx]?.temps_repos)
+      if (!secondes) return
+      clearInterval(reposInterval)
+      reposActif.value = { total: secondes, restant: secondes }
+      reposInterval = setInterval(() => {
+        if (!reposActif.value) { clearInterval(reposInterval); return }
+        reposActif.value.restant--
+        if (reposActif.value.restant <= 0) {
+          clearInterval(reposInterval)
+          reposActif.value.restant = 0
+          if (navigator.vibrate) navigator.vibrate([200, 100, 200])
+          setTimeout(() => { if (reposActif.value?.restant === 0) reposActif.value = null }, 4000)
+        }
+      }, 1000)
+    }
+
+    const formatTemps = (s) => {
+      const min = Math.floor(s / 60)
+      const sec = s % 60
+      return min > 0 ? `${min}:${String(sec).padStart(2, '0')}` : `${sec}s`
+    }
+
     const seancesCompletees = ref(new Set())
     const logsParSerie = ref({}) // { serie_id: { reps_realisees, poids_realise, fait } }
 
@@ -437,12 +519,16 @@ export default {
         const logs = await api.get(`/logs/programme/${programmeId}/moi`)
         const completees = new Set()
 
-        // Groupe les logs par serie_id (garde le plus récent)
+        // Groupe les logs par serie_id — l'API renvoie du plus récent au plus
+        // ancien, on ne garde que la première occurrence (donc la plus récente ;
+        // l'ancien code écrasait à chaque tour et gardait la plus VIEILLE)
         logs.forEach(log => {
-          logsParSerie.value[log.serie.id] = {
-            reps_realisees: log.reps_realisees || '',
-            poids_realise: log.poids_realise || '',
-            fait: log.fait
+          if (!logsParSerie.value[log.serie.id]) {
+            logsParSerie.value[log.serie.id] = {
+              reps_realisees: log.reps_realisees || '',
+              poids_realise: log.poids_realise || '',
+              fait: log.fait
+            }
           }
         })
 
@@ -575,16 +661,10 @@ export default {
     const fetchHistorique = async () => {
       historique.value = []
       if (!programmeActif.value) return
-      const allLogs = []
-      for (const seance of seances.value) {
-        for (const exo of seance.exercices || []) {
-          for (const s of exo.series || []) {
-            const logsSerie = await api.get(`/series/${s.id}/logs/`)
-            allLogs.push(...logsSerie.map(l => ({ ...l, exo_nom: exo.nom })))
-          }
-        }
-      }
-      historique.value = allLogs
+      // Un seul appel : l'endpoint renvoie les logs enrichis (série, exercice,
+      // séance) — l'ancien code faisait une requête PAR série du programme
+      const logs = await api.get(`/logs/programme/${programmeActif.value.id}/moi`)
+      historique.value = logs.map(l => ({ ...l, exo_nom: l.exercice?.nom || '' }))
     }
 
     const historiqueGroupe = computed(() => {
@@ -598,6 +678,8 @@ export default {
     })
 
     watch(onglet, (v) => { if (v === 'logs') fetchHistorique() })
+    watch(seanceActive, (s) => { if (!s) arreterRepos() })
+    onUnmounted(() => clearInterval(reposInterval))
 
     const formatDate = (d) => new Date(d).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
     const logout = () => { authStore.logout(); router.push('/') }
@@ -641,7 +723,8 @@ export default {
       formatDate, logout, panelListVisible, isGroupeComplete,
       seancesCompletees, isSeanceComplete, isSemaineComplete,
       logsParSerie, chargerLogsExistants, getLogsAvecHistorique,
-      progressionSeance
+      progressionSeance,
+      sauvegarderSerie, reposActif, arreterRepos, formatTemps
     }
   }
 }
@@ -976,6 +1059,37 @@ export default {
 
 .empty-series { font-size: var(--font-size-sm); color: var(--color-text-muted); font-style: italic; }
 
+/* --- Timer de repos --- */
+.repos-chip {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(var(--bottom-nav-h) + 92px);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  min-height: var(--tap-min);
+  padding: 0 var(--spacing-lg);
+  background: var(--color-primary-dark);
+  color: #ffffff;
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  box-shadow: var(--shadow-dropdown);
+  cursor: pointer;
+  z-index: 80;
+  user-select: none;
+}
+.repos-chip.fini {
+  background: var(--color-valid-text);
+  animation: repos-pulse 0.6s ease-in-out 3;
+}
+.repos-chip-close { font-size: var(--font-size-sm); opacity: 0.7; }
+@keyframes repos-pulse {
+  50% { transform: translateX(-50%) scale(1.08); }
+}
+
 /* --- Barre de validation collante --- */
 .valider-bar {
   flex-shrink: 0;
@@ -1070,5 +1184,6 @@ export default {
   .valider-bar { padding: var(--spacing-md) var(--spacing-2xl); }
   .valider-bar, .seance-topbar { padding-left: max(var(--spacing-2xl), calc((100% - 720px) / 2)); padding-right: max(var(--spacing-2xl), calc((100% - 720px) / 2)); }
   .realise-inputs { max-width: 360px; }
+  .repos-chip { bottom: 96px; } /* pas de barre d'onglets basse sur desktop */
 }
 </style>
