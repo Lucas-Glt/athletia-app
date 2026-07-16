@@ -24,6 +24,7 @@ input, select, textarea, button {
   --color-primary: #7F77DD;
   --color-primary-dark: #534AB7;
   --color-primary-light: #EEEDFE;
+  --color-primary-lighter: #C8C4F5;
   --color-primary-text: #3C3489;
 
   /* --- Couleurs de surface --- */
@@ -36,6 +37,9 @@ input, select, textarea, button {
   --color-border: #e5e7eb;
   --color-border-strong: #d1d5db;
 
+  /* --- Survol de surface --- */
+  --color-bg-hover: #FAFAFE;
+
   /* --- Texte --- */
   --color-text: #111827;
   --color-text-body: #374151;
@@ -47,14 +51,25 @@ input, select, textarea, button {
   --color-success-text: #3B6D11;
   --color-danger-bg: #fee2e2;
   --color-danger-text: #dc2626;
+  --color-danger-bg-soft: #fef2f2;
+  --color-danger-bg-hover: #fecaca;
+  --color-danger-border: #fca5a5;
   --color-warning-bg: #fef9c3;
   --color-warning-text: #854d0e;
+  --color-warning-bg-soft: #fffbeb;
+  --color-warning-bg-hover: #fde68a;
+  --color-warning-border: #fcd34d;
+  --color-warning-text-strong: #b45309;
+  --color-warning-icon: #d97706;
 
   /* --- Validation (séries/séances faites) --- */
   --color-valid-bg: #dcfce7;
   --color-valid-bg-soft: #f0fdf4;
+  --color-valid-bg-strong: #bbf7d0;
   --color-valid-text: #16a34a;
+  --color-valid-text-strong: #166534;
   --color-valid-border: #86efac;
+  --color-valid-border-strong: #4ade80;
 
   /* --- Superset / groupe --- */
   --color-superset-border: #AFA9EC;
@@ -138,6 +153,7 @@ input, select, textarea, button {
   --color-primary: #9D97E8;
   --color-primary-dark: #7F77DD;
   --color-primary-light: #2D2B4A;
+  --color-primary-lighter: #3C3489;
   --color-primary-text: #C4C0F5;
 
   --color-bg: #111827;
@@ -148,6 +164,8 @@ input, select, textarea, button {
   --color-border: #374151;
   --color-border-strong: #4b5563;
 
+  --color-bg-hover: #1f2937;
+
   --color-text: #f9fafb;
   --color-text-body: #e5e7eb;
   --color-text-secondary: #9ca3af;
@@ -157,11 +175,25 @@ input, select, textarea, button {
   --color-success-text: #86efac;
   --color-danger-bg: #7f1d1d;
   --color-danger-text: #fca5a5;
+  --color-danger-bg-soft: #2a1518;
+  --color-danger-bg-hover: #991b1b;
+  --color-danger-border: #b91c1c;
+
+  --color-warning-bg: #422006;
+  --color-warning-text: #fde68a;
+  --color-warning-bg-soft: #2a2210;
+  --color-warning-bg-hover: #a16207;
+  --color-warning-border: #a16207;
+  --color-warning-text-strong: #fcd34d;
+  --color-warning-icon: #fbbf24;
 
   --color-valid-bg: #14532d;
   --color-valid-bg-soft: #0d2818;
+  --color-valid-bg-strong: #166534;
   --color-valid-text: #4ade80;
+  --color-valid-text-strong: #86efac;
   --color-valid-border: #16a34a;
+  --color-valid-border-strong: #22c55e;
 
   --color-superset-border: #534AB7;
   --color-superset-bg: #2D2B4A;

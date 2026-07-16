@@ -705,8 +705,8 @@ const validerSeance = async () => {
 .superset-banner { display: flex; align-items: center; gap: 6px; font-size: var(--font-size-xs); color: var(--color-superset-text); font-weight: 500; margin-bottom: 2px; }
 .exo-noms-list { display: flex; flex-direction: column; gap: 3px; }
 .exo-nom-inline { display: flex; align-items: center; gap: var(--spacing-sm); font-size: var(--font-size-base); font-weight: 500; color: var(--color-text); }
-.exo-nom-inline.is-optionnel { color: var(--color-text-muted); }
-.optionnel-badge { font-size: var(--font-size-2xs); font-weight: 500; color: var(--color-text-muted); background: var(--color-bg-tertiary); padding: 2px 6px; border-radius: var(--radius-full); text-transform: uppercase; letter-spacing: 0.3px; }
+.exo-nom-inline.is-optionnel { color: var(--color-text-secondary); }
+.optionnel-badge { font-size: var(--font-size-2xs); font-weight: 500; color: var(--color-text-secondary); background: var(--color-bg-tertiary); padding: 2px 6px; border-radius: var(--radius-full); text-transform: uppercase; letter-spacing: 0.3px; }
 .exo-group-meta { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
 .series-count-badge { font-size: var(--font-size-sm); color: var(--color-superset-text); font-weight: 600; background: var(--color-primary-light); padding: 2px 10px; border-radius: var(--radius-full); }
 .exo-num, .exo-letter { width: 22px; height: 22px; border-radius: var(--radius-sm); background: var(--color-primary-light); color: var(--color-superset-text); font-size: var(--font-size-xs); font-weight: 600; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
@@ -763,8 +763,9 @@ const validerSeance = async () => {
 }
 
 .semaine-tab.semaine-complete.active {
-  background: #bbf7d0;
-  border-color: #4ade80;
+  background: var(--color-valid-bg-strong);
+  border-color: var(--color-valid-border-strong);
+  color: var(--color-valid-text-strong);
 }
 
 .input-readonly {
@@ -829,7 +830,7 @@ const validerSeance = async () => {
 }
 
 .seance-block.seance-complete:hover {
-  border-color: #4ade80;
+  border-color: var(--color-valid-border-strong);
   opacity: 1;
 }
 

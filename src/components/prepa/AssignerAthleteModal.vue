@@ -145,8 +145,8 @@ export default {
 .btn-sm { padding: 5px 10px; font-size: var(--font-size-sm); }
 .btn-primary { background: var(--color-primary); color: var(--color-primary-light); border-color: var(--color-primary-dark); }
 .btn-primary:hover { background: var(--color-primary-dark); }
-.btn-danger { background: var(--color-danger-bg); color: var(--color-danger-text); border-color: #fca5a5; }
-.btn-danger:hover { background: #fecaca; }
+.btn-danger { background: var(--color-danger-bg); color: var(--color-danger-text); border-color: var(--color-danger-border); }
+.btn-danger:hover { background: var(--color-danger-bg-hover); }
 .empty { font-size: var(--font-size-sm); color: var(--color-text-muted); padding: var(--spacing-sm) 0; }
 .error { font-size: var(--font-size-sm); color: var(--color-danger-text); }
 

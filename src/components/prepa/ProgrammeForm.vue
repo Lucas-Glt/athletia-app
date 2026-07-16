@@ -415,8 +415,8 @@ button:hover:not(:disabled) { background: var(--color-primary-dark); }
 .btn-secondary:hover:not(:disabled) { background: var(--color-border); }
 .btn-sm { font-size: var(--font-size-sm); padding: 4px 10px; }
 .btn-icon { width: 28px; height: 28px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--radius-md); flex-shrink: 0; }
-.btn-danger { background: var(--color-danger-bg); color: var(--color-danger-text); border: 1px solid #fca5a5; }
-.btn-danger:hover { background: #fecaca; }
+.btn-danger { background: var(--color-danger-bg); color: var(--color-danger-text); border: 1px solid var(--color-danger-border); }
+.btn-danger:hover { background: var(--color-danger-bg-hover); }
 .seance-block { border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: var(--spacing-lg); display: flex; flex-direction: column; gap: var(--spacing-md); border-left-width: 4px; }
 .seance-block.type-musculation { border-left-color: var(--color-type-musculation-border); }
 .seance-block.type-natation { border-left-color: var(--color-type-natation-border); }
@@ -440,9 +440,9 @@ button:hover:not(:disabled) { background: var(--color-primary-dark); }
 .exo-nom { font-size: var(--font-size-md); font-weight: 500; flex: 1; }
 .optionnel-check { display: inline-flex; align-items: center; gap: 4px; font-size: var(--font-size-xs); color: var(--color-text-secondary); cursor: pointer; white-space: nowrap; flex-shrink: 0; }
 .optionnel-check input { width: auto; }
-.exo-config.is-optionnel { background: var(--color-bg-tertiary); opacity: 0.75; }
-.optionnel-badge { font-size: var(--font-size-2xs); font-weight: 500; color: var(--color-text-muted); background: var(--color-bg-tertiary); padding: 2px 6px; border-radius: var(--radius-full); text-transform: uppercase; letter-spacing: 0.3px; }
-strong.is-optionnel { color: var(--color-text-muted); }
+.exo-config.is-optionnel { background: var(--color-bg-tertiary); }
+.optionnel-badge { font-size: var(--font-size-2xs); font-weight: 500; color: var(--color-text-secondary); background: var(--color-bg-tertiary); padding: 2px 6px; border-radius: var(--radius-full); text-transform: uppercase; letter-spacing: 0.3px; }
+strong.is-optionnel { color: var(--color-text-secondary); }
 .exo-fields { display: grid; gap: var(--spacing-sm); }
 .exo-fields.grid-muscu { grid-template-columns: repeat(4, 1fr); }
 .exo-fields.grid-nat-edit, .exo-fields.grid-plio-edit { grid-template-columns: repeat(2, 1fr); }

@@ -98,7 +98,7 @@
     <!-- Bannière PWA Android/Chrome -->
     <div v-if="showInstallBanner && !isInStandaloneMode" class="install-banner">
       <div class="install-banner-content">
-        <i class="ti ti-device-mobile" style="font-size:24px;color:#7F77DD"></i>
+        <i class="ti ti-device-mobile" style="font-size:24px;color:var(--color-primary)"></i>
         <div>
           <div class="install-title">Installer Athletia</div>
           <div class="install-sub">Accès rapide depuis ton écran d'accueil</div>
@@ -113,7 +113,7 @@
     <!-- Bannière PWA iOS -->
     <div v-if="isIos && !isInStandaloneMode && showIosBanner" class="install-banner">
       <div class="install-banner-content">
-        <i class="ti ti-device-mobile" style="font-size:24px;color:#7F77DD"></i>
+        <i class="ti ti-device-mobile" style="font-size:24px;color:var(--color-primary)"></i>
         <div>
           <div class="install-title">Installer Athletia</div>
           <div class="install-sub">
@@ -348,7 +348,7 @@ export default {
 }
 .dropdown-item:hover { background: var(--color-bg-secondary); }
 .dropdown-item.danger { color: var(--color-danger-text); }
-.dropdown-item.danger:hover { background: #fef2f2; }
+.dropdown-item.danger:hover { background: var(--color-danger-bg-soft); }
 
 .main-content { flex: 1; overflow: hidden; display: flex; flex-direction: column; min-height: 0; }
 
