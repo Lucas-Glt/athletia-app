@@ -1085,7 +1085,7 @@ export default {
 /* Prescrit : valeurs en gros, labels discrets */
 .prescrit-bloc { display: flex; flex-wrap: wrap; gap: var(--spacing-lg); align-items: baseline; }
 .prescrit-item { display: inline-flex; align-items: baseline; gap: 5px; }
-.prescrit-val { font-size: var(--font-size-xl); font-weight: 700; color: var(--color-text); line-height: 1.1; }
+.prescrit-val { font-size: var(--font-size-lg); font-weight: 700; color: var(--color-text); line-height: 1.1; }
 .prescrit-label {
   font-size: var(--font-size-xs);
   color: var(--color-text-secondary);
@@ -1097,9 +1097,9 @@ export default {
 /* Réalisé */
 .realise-inputs { display: flex; gap: var(--spacing-sm); }
 .log-input {
-  height: var(--input-h);
-  padding: 0 var(--spacing-md);
-  font-size: var(--font-size-base);
+  height: 40px;
+  padding: 0 var(--spacing-sm);
+  font-size: var(--font-size-sm);
   font-weight: 600;
   width: 100%;
   min-width: 0;
@@ -1227,7 +1227,7 @@ export default {
 }
 .saisie-titres { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .saisie-noms { display: flex; flex-direction: column; gap: 4px; }
-.saisie-nom { display: flex; align-items: center; gap: var(--spacing-sm); font-size: var(--font-size-lg); font-weight: 700; }
+.saisie-nom { display: flex; align-items: center; gap: var(--spacing-sm); font-size: var(--font-size-xl); font-weight: 700; }
 .saisie-body {
   flex: 1;
   overflow-y: auto;
