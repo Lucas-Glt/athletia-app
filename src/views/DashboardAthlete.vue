@@ -58,7 +58,6 @@
               v-for="seance in seancesFiltrees"
               :key="seance.id"
               class="seance-card"
-              :class="{ 'seance-complete': seancesCompletees.has(seance.id) }"
               @click="demarrerSeance(seance)"
             >
               <div class="seance-card-main">
@@ -155,11 +154,11 @@
                     </div>
                     <button
                       class="btn btn-sm btn-saisir"
-                      :class="{ 'btn-primary': !isGroupeComplete(groupe) && !seancesCompletees.has(seanceActive.id) }"
+                      :class="{ 'btn-primary': !isGroupeComplete(groupe) }"
                       @click="ouvrirSaisie(groupe)"
                     >
-                      <i class="ti" :class="seancesCompletees.has(seanceActive.id) ? 'ti-eye' : 'ti-pencil'"></i>
-                      {{ seancesCompletees.has(seanceActive.id) ? 'Consulter' : 'Saisir' }}
+                      <i class="ti ti-pencil"></i>
+                      Saisir
                     </button>
                   </div>
                 </template>
@@ -187,7 +186,16 @@
                 </button>
               </div>
 
-              <div class="saisie-body">
+              <div
+                class="saisie-body"
+                @pointerdown="onSaisieSwipeStart"
+                @pointerup="onSaisieSwipeEnd"
+                @pointercancel="onSaisieSwipeEnd"
+              >
+              <div v-if="voirHistoriqueSaisie" class="saisie-mode-banner">
+                <span><i class="ti ti-history"></i> Dernière performance</span>
+                <button class="saisie-mode-retour" @click="voirHistoriqueSaisie = false">Retour à la saisie</button>
+              </div>
               <div
                 v-for="serieIdx in groupe.exercices[0].series.length"
                 :key="serieIdx"
@@ -256,24 +264,21 @@
                     </template>
                   </div>
 
-                  <!-- Réalisé : 2 champs, clavier numérique quand la donnée l'est -->
-                  <div class="realise-inputs">
+                  <!-- Réalisé : 2 champs, clavier numérique quand la donnée l'est.
+                       Swipe droit dans le panneau → dernière performance à la place. -->
+                  <div class="realise-inputs" v-if="!voirHistoriqueSaisie">
                     <template v-if="seanceActive.type_seance === 'musculation' || !seanceActive.type_seance">
                       <input
                         v-model="getLogs(exo.id, serieIdx-1).reps_realisees"
                         :placeholder="exo.series[serieIdx-1]?.nb_reps || 'reps'"
                         inputmode="decimal"
                         class="log-input"
-                        :readonly="seancesCompletees.has(seanceActive.id)"
-                        :class="{ 'input-readonly': seancesCompletees.has(seanceActive.id) }"
                       />
                       <input
                         v-model="getLogs(exo.id, serieIdx-1).poids_realise"
                         :placeholder="exo.series[serieIdx-1]?.poids_cible || 'charge'"
                         inputmode="decimal"
                         class="log-input"
-                        :readonly="seancesCompletees.has(seanceActive.id)"
-                        :class="{ 'input-readonly': seancesCompletees.has(seanceActive.id) }"
                       />
                     </template>
                     <template v-else-if="seanceActive.type_seance === 'natation' || seanceActive.type_seance === 'athletisme'">
@@ -282,15 +287,11 @@
                         :placeholder="exo.series[serieIdx-1]?.metres ? `${exo.series[serieIdx-1].metres}m` : 'mètres'"
                         inputmode="decimal"
                         class="log-input"
-                        :readonly="seancesCompletees.has(seanceActive.id)"
-                        :class="{ 'input-readonly': seancesCompletees.has(seanceActive.id) }"
                       />
                       <input
                         v-model="getLogs(exo.id, serieIdx-1).poids_realise"
                         :placeholder="exo.series[serieIdx-1]?.intensite || 'intensité'"
                         class="log-input"
-                        :readonly="seancesCompletees.has(seanceActive.id)"
-                        :class="{ 'input-readonly': seancesCompletees.has(seanceActive.id) }"
                       />
                     </template>
                     <template v-else-if="seanceActive.type_seance === 'pliometrie'">
@@ -299,22 +300,29 @@
                         :placeholder="exo.series[serieIdx-1]?.bonds ? `${exo.series[serieIdx-1].bonds} bonds` : 'bonds'"
                         inputmode="decimal"
                         class="log-input"
-                        :readonly="seancesCompletees.has(seanceActive.id)"
-                        :class="{ 'input-readonly': seancesCompletees.has(seanceActive.id) }"
                       />
                       <input
                         v-model="getLogs(exo.id, serieIdx-1).poids_realise"
                         :placeholder="exo.series[serieIdx-1]?.intensite || 'intensité'"
                         class="log-input"
-                        :readonly="seancesCompletees.has(seanceActive.id)"
-                        :class="{ 'input-readonly': seancesCompletees.has(seanceActive.id) }"
                       />
                     </template>
+                  </div>
+                  <div class="historique-inline" v-else>
+                    <template v-if="historiqueSeriePourExo(exo, serieIdx)">
+                      <span class="historique-inline-date">{{ formatDateCourt(historiqueSeriePourExo(exo, serieIdx).date) }}</span>
+                      <span class="chip" v-if="historiqueSeriePourExo(exo, serieIdx).log.reps_realisees">
+                        {{ historiqueSeriePourExo(exo, serieIdx).log.reps_realisees }}
+                      </span>
+                      <span class="chip" v-if="historiqueSeriePourExo(exo, serieIdx).log.poids_realise">
+                        {{ historiqueSeriePourExo(exo, serieIdx).log.poids_realise }}
+                      </span>
+                    </template>
+                    <span v-else class="historique-inline-vide">Pas d'historique pour cet exercice</span>
                   </div>
                 </div>
 
                 <button
-                  v-if="!seancesCompletees.has(seanceActive.id)"
                   class="btn-serie"
                   :class="isGroupeDone(groupe, serieIdx - 1) ? 'btn-done' : 'btn-todo'"
                   @click="toggleGroupeDone(groupe, serieIdx - 1)"
@@ -322,14 +330,6 @@
                   <i :class="isGroupeDone(groupe, serieIdx - 1) ? 'ti ti-check' : 'ti ti-circle'"></i>
                   {{ isGroupeDone(groupe, serieIdx - 1) ? 'Fait' : 'Valider la série' }}
                 </button>
-                <div
-                  v-else
-                  class="serie-statut-badge"
-                  :class="getLogs(groupe.exercices[0].id, serieIdx-1).fait ? 'badge-fait' : 'badge-non-fait'"
-                >
-                  <i :class="getLogs(groupe.exercices[0].id, serieIdx-1).fait ? 'ti ti-check' : 'ti ti-x'"></i>
-                  {{ getLogs(groupe.exercices[0].id, serieIdx-1).fait ? 'Fait' : 'Non réalisé' }}
-                </div>
               </div>
               </div>
 
@@ -350,8 +350,9 @@
             <i class="ti ti-x repos-chip-close"></i>
           </div>
 
-          <!-- Barre de validation collante : la progression et la sortie sont toujours visibles -->
-          <div class="valider-bar" v-if="!seancesCompletees.has(seanceActive.id)">
+          <!-- Barre de validation collante : toujours visible, la séance reste
+               modifiable même après validation (juste un rappel de progression) -->
+          <div class="valider-bar">
             <div class="valider-progress">
               <div class="valider-progress-track">
                 <div
@@ -366,9 +367,6 @@
             <button class="btn btn-primary btn-valider" @click="validerSeance">
               <i class="ti ti-check"></i> Valider la séance
             </button>
-          </div>
-          <div class="seance-complete-banner" v-else>
-            <i class="ti ti-check"></i> Séance complétée — consultation uniquement
           </div>
         </template>
       </div>
@@ -516,8 +514,45 @@ export default {
 
     // --- Panneau de saisie par groupe (présentation uniquement) ---
     const groupeSaisie = ref(null)
-    const ouvrirSaisie = (groupe) => { groupeSaisie.value = groupe }
-    const fermerSaisie = () => { groupeSaisie.value = null }
+    const voirHistoriqueSaisie = ref(false)
+    const ouvrirSaisie = (groupe) => { groupeSaisie.value = groupe; voirHistoriqueSaisie.value = false }
+    const fermerSaisie = () => { groupeSaisie.value = null; voirHistoriqueSaisie.value = false }
+
+    // Swipe droit/gauche dans le panneau de saisie : bascule entre les champs
+    // de saisie et la dernière performance connue pour cet exercice.
+    // Détection au relâché uniquement (pas de suivi live) pour ne jamais
+    // interférer avec le scroll vertical ou les clics sur inputs/boutons.
+    const saisieSwipeState = { startX: 0, startY: 0, active: false }
+    const onSaisieSwipeStart = (e) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return
+      saisieSwipeState.startX = e.clientX
+      saisieSwipeState.startY = e.clientY
+      saisieSwipeState.active = true
+    }
+    const onSaisieSwipeEnd = (e) => {
+      if (!saisieSwipeState.active) return
+      saisieSwipeState.active = false
+      const dx = e.clientX - saisieSwipeState.startX
+      const dy = e.clientY - saisieSwipeState.startY
+      if (Math.abs(dy) > Math.abs(dx) + 10) return
+      if (dx >= 60) voirHistoriqueSaisie.value = true
+      else if (dx <= -60) voirHistoriqueSaisie.value = false
+    }
+
+    // Dernière performance connue pour cet exercice (hors séries de la séance en cours),
+    // avec correspondance positionnelle : la Nème série d'aujourd'hui est comparée à la
+    // Nème série de la dernière fois où l'exercice a été fait.
+    const historiqueSeriePourExo = (exo, serieIdx) => {
+      const idsActuels = new Set((exo.series || []).map(s => s.id))
+      const entries = historique.value.filter(l => l.exo_nom === exo.nom && !idsActuels.has(l.serie?.id))
+      if (entries.length === 0) return null
+      entries.sort((a, b) => new Date(b.date) - new Date(a.date))
+      const dateRecente = entries[0].date.split('T')[0]
+      const duJour = entries.filter(l => l.date.split('T')[0] === dateRecente)
+      return { date: dateRecente, log: duJour[serieIdx - 1] || duJour[0] }
+    }
+
+    const formatDateCourt = (d) => new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
 
     // Valeurs prescrites d'une série en une ligne compacte, selon le type de séance
     const valeursSerie = (exo, idx) => {
@@ -693,6 +728,9 @@ export default {
 
       // Charge les logs existants après les séances
       await chargerLogsExistants(p.id)
+      // Précharge l'historique complet : nécessaire dès l'écran de saisie
+      // pour la comparaison au swipe, pas seulement l'onglet Historique
+      fetchHistorique()
     }
 
     const demarrerSeance = (seance) => {
@@ -735,31 +773,9 @@ export default {
       }
 
       seancesCompletees.value.add(seanceActive.value.id)
-      const seanceValidee = seanceActive.value
       seanceActive.value = null
-
-      // Vérifie si la semaine est complète
-      const semaine = seanceValidee.semaine || 1
-      const seancesDeLaSemaine = seances.value.filter(s => (s.semaine || 1) === semaine)
-      const semaineComplete = seancesDeLaSemaine.every(s => seancesCompletees.value.has(s.id))
-
-      if (semaineComplete) {
-        // Vérifie si une semaine suivante existe déjà
-        const semaineSuivante = semaine + 1
-        const semaineSuivanteExiste = semainesDisponibles.value.includes(semaineSuivante)
-
-        if (!semaineSuivanteExiste) {
-          try {
-            await api.post(`/programmes/${programmeActif.value.id}/seances/auto-semaine-suivante`)
-            // Recharge les séances
-            const data = await api.get(`/programmes/${programmeActif.value.id}/seances/`)
-            seances.value = data
-            semaineActive.value = semaineSuivante
-          } catch (e) {
-            console.error('Erreur auto-semaine:', e)
-          }
-        }
-      }
+      // La progression d'une semaine à l'autre est décidée par le prépa dans
+      // le programme, plus par l'athlète en validant ses séances.
     }
 
     const fetchHistorique = async () => {
@@ -829,7 +845,9 @@ export default {
       logsParSerie, chargerLogsExistants, getLogsAvecHistorique,
       progressionSeance,
       sauvegarderSerie, reposActif, arreterRepos, formatTemps,
-      groupeSaisie, ouvrirSaisie, fermerSaisie, valeursSerie, resumeExo
+      groupeSaisie, ouvrirSaisie, fermerSaisie, valeursSerie, resumeExo,
+      voirHistoriqueSaisie, onSaisieSwipeStart, onSaisieSwipeEnd,
+      historiqueSeriePourExo, formatDateCourt
     }
   }
 }
@@ -947,17 +965,15 @@ export default {
 .seance-card-count { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
 .seance-card-chevron { color: var(--color-text-muted); font-size: var(--font-size-lg); flex-shrink: 0; }
 
-.seance-card.seance-complete { border-color: var(--color-valid-border); background: var(--color-valid-bg-soft); }
-.seance-card.seance-complete:hover { border-color: var(--color-valid-border-strong); }
-
 .badge-complete {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   font-size: var(--font-size-xs);
-  font-weight: 600;
-  color: var(--color-valid-text-strong);
-  background: var(--color-valid-bg);
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
   padding: 3px 10px;
   border-radius: var(--radius-full);
   flex-shrink: 0;
@@ -1096,6 +1112,20 @@ export default {
 
 /* Réalisé */
 .realise-inputs { display: flex; gap: var(--spacing-sm); }
+.historique-inline {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  min-height: 32px;
+}
+.historique-inline-date {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+  text-transform: capitalize;
+}
+.historique-inline-vide { font-size: var(--font-size-xs); color: var(--color-text-muted); font-style: italic; }
 .log-input {
   height: 32px;
   padding: 0 var(--spacing-sm);
@@ -1110,12 +1140,6 @@ export default {
   text-align: center;
 }
 .log-input:focus { outline: none; border-color: var(--color-primary); }
-.input-readonly {
-  background: var(--color-bg-tertiary);
-  color: var(--color-text-secondary);
-  cursor: not-allowed;
-  border-color: var(--color-border);
-}
 
 /* Bouton valider série */
 .btn-serie {
@@ -1137,21 +1161,6 @@ export default {
 .btn-todo:hover { color: var(--color-primary-dark); border-color: var(--color-primary); }
 .btn-done { background: var(--color-primary); color: var(--color-on-primary); border-color: var(--color-primary-dark); }
 .btn-done:hover { background: var(--color-primary-dark); }
-
-.serie-statut-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  min-height: var(--tap-min);
-  padding: 0 var(--spacing-md);
-  border-radius: var(--radius-md);
-  font-size: var(--font-size-sm);
-  font-weight: 600;
-  width: 100%;
-}
-.badge-fait { background: var(--color-valid-bg); color: var(--color-valid-text-strong); }
-.badge-non-fait { background: var(--color-danger-bg); color: var(--color-danger-text); }
 
 .empty-series { font-size: var(--font-size-sm); color: var(--color-text-muted); font-style: italic; }
 
@@ -1235,6 +1244,29 @@ export default {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-md);
+  touch-action: pan-y;
+}
+.saisie-mode-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--color-primary-light);
+  color: var(--color-primary-text);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+.saisie-mode-retour {
+  background: none;
+  border: none;
+  color: inherit;
+  text-decoration: underline;
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
 }
 .saisie-foot {
   padding: var(--spacing-md) var(--spacing-lg) calc(var(--spacing-md) + env(safe-area-inset-bottom));
@@ -1304,21 +1336,6 @@ export default {
 }
 .valider-progress-label { font-size: var(--font-size-xs); font-weight: 600; color: var(--color-text-secondary); }
 .btn-valider { flex-shrink: 0; min-height: var(--input-h); }
-
-.seance-complete-banner {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-md);
-  margin: var(--spacing-md) var(--spacing-lg);
-  background: var(--color-valid-bg);
-  color: var(--color-valid-text-strong);
-  border-radius: var(--radius-lg);
-  font-size: var(--font-size-sm);
-  font-weight: 600;
-}
 
 /* --- Historique --- */
 .logs-page {
