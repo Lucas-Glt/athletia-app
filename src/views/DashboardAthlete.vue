@@ -105,10 +105,7 @@
               :class="{ 'is-superset': groupe.exercices.length > 1, 'is-complete': isGroupeComplete(groupe) }"
             >
               <div class="exo-group-head">
-                <div v-if="groupe.exercices.length > 1" class="superset-banner">
-                  <i class="ti ti-link"></i>
-                  <span>Superset</span>
-                </div>
+                <span class="exo-num">{{ groupe.ordre }}</span>
                 <div class="exo-noms-list">
                   <span
                     v-for="(exo, eidx) in groupe.exercices"
@@ -117,7 +114,6 @@
                     :class="{ 'is-optionnel': exo.optionnel }"
                   >
                     <span class="exo-letter" v-if="groupe.exercices.length > 1">{{ letterFor(eidx) }}</span>
-                    <span class="exo-num" v-else>{{ exo.ordre }}</span>
                     {{ exo.nom }}
                     <span v-if="exo.optionnel" class="optionnel-badge">optionnelle</span>
                   </span>
@@ -173,11 +169,8 @@
           <div v-if="groupeSaisie" class="saisie-overlay" @click.self="fermerSaisie">
             <div class="saisie-sheet" v-for="groupe in [groupeSaisie]" :key="groupe.key">
               <div class="saisie-head">
+                <span class="exo-num">{{ groupe.ordre }}</span>
                 <div class="saisie-titres">
-                  <div v-if="groupe.exercices.length > 1" class="superset-banner">
-                    <i class="ti ti-link"></i>
-                    <span>Superset</span>
-                  </div>
                   <div class="saisie-noms">
                     <span v-for="(exo, eidx) in groupe.exercices" :key="exo.id" class="saisie-nom">
                       <span class="exo-letter-mini" v-if="groupe.exercices.length > 1">{{ letterFor(eidx) }}</span>
@@ -435,12 +428,12 @@ export default {
       sorted.forEach(exo => {
         if (exo.groupe) {
           if (!map[exo.groupe]) {
-            map[exo.groupe] = { key: `g${exo.groupe}`, exercices: [] }
+            map[exo.groupe] = { key: `g${exo.groupe}`, ordre: groupes.length + 1, exercices: [] }
             groupes.push(map[exo.groupe])
           }
           map[exo.groupe].exercices.push(exo)
         } else {
-          groupes.push({ key: `e${exo.id}`, exercices: [exo] })
+          groupes.push({ key: `e${exo.id}`, ordre: groupes.length + 1, exercices: [exo] })
         }
       })
       return groupes
@@ -1006,24 +999,12 @@ export default {
 .exo-group-head .exo-noms-list { flex: 1; }
 .groupe-check { color: var(--color-valid-text); font-size: 24px; flex-shrink: 0; }
 
-.superset-banner {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: var(--font-size-xs);
-  color: var(--color-superset-text);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-  flex-shrink: 0;
-}
-
 .exo-noms-list { display: flex; flex-direction: column; gap: 6px; }
 .exo-nom-inline {
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
-  font-size: var(--font-size-lg);
+  font-size: var(--font-size-xl);
   font-weight: 600;
   color: var(--color-text);
 }
@@ -1170,8 +1151,8 @@ export default {
 /* --- Vue d'ensemble compacte --- */
 .resume-exo { display: flex; align-items: baseline; gap: var(--spacing-sm); }
 .resume-texte {
-  font-size: var(--font-size-base);
-  font-weight: 600;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
   color: var(--color-text-body);
   font-variant-numeric: tabular-nums;
 }
@@ -1201,7 +1182,13 @@ export default {
   border: 1px solid var(--color-border-strong);
 }
 .serie-dot.done { background: var(--color-valid-text); border-color: var(--color-valid-text); }
-.btn-saisir { flex-shrink: 0; }
+.btn-saisir {
+  flex-shrink: 0;
+  min-height: 30px;
+  height: 30px;
+  padding: 0 var(--spacing-sm);
+  font-size: var(--font-size-xs);
+}
 
 /* --- Panneau de saisie (bottom sheet) --- */
 .saisie-overlay {
