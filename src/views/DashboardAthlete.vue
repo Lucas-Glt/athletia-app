@@ -1011,7 +1011,7 @@ export default {
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
-  font-size: var(--font-size-base);
+  font-size: var(--font-size-sm);
   font-weight: 600;
   color: var(--color-text);
 }
@@ -1158,7 +1158,7 @@ export default {
 /* --- Vue d'ensemble compacte --- */
 .resume-exo { display: flex; align-items: baseline; gap: var(--spacing-sm); }
 .resume-texte {
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-xs);
   font-weight: 500;
   color: var(--color-text-body);
   font-variant-numeric: tabular-nums;
@@ -1167,7 +1167,7 @@ export default {
 .resume-ligne {
   display: flex;
   gap: var(--spacing-sm);
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-xs);
   color: var(--color-text-body);
   align-items: baseline;
 }
