@@ -310,13 +310,25 @@
                   </div>
                   <div class="historique-inline" v-else>
                     <template v-if="historiqueSeriePourExo(exo, serieIdx)">
-                      <span class="historique-inline-date">{{ formatDateCourt(historiqueSeriePourExo(exo, serieIdx).date) }}</span>
-                      <span class="chip" v-if="historiqueSeriePourExo(exo, serieIdx).log.reps_realisees">
-                        {{ historiqueSeriePourExo(exo, serieIdx).log.reps_realisees }}
+                      <span class="historique-inline-date">
+                        <i class="ti ti-lock"></i> {{ formatDateCourt(historiqueSeriePourExo(exo, serieIdx).date) }}
                       </span>
-                      <span class="chip" v-if="historiqueSeriePourExo(exo, serieIdx).log.poids_realise">
-                        {{ historiqueSeriePourExo(exo, serieIdx).log.poids_realise }}
-                      </span>
+                      <div class="realise-inputs">
+                        <input
+                          class="log-input log-input-locked"
+                          :class="{ done: historiqueSeriePourExo(exo, serieIdx).log.fait }"
+                          readonly
+                          tabindex="-1"
+                          :value="historiqueSeriePourExo(exo, serieIdx).log.reps_realisees || '—'"
+                        />
+                        <input
+                          class="log-input log-input-locked"
+                          :class="{ done: historiqueSeriePourExo(exo, serieIdx).log.fait }"
+                          readonly
+                          tabindex="-1"
+                          :value="historiqueSeriePourExo(exo, serieIdx).log.poids_realise || '—'"
+                        />
+                      </div>
                     </template>
                     <span v-else class="historique-inline-vide">Pas d'historique pour cet exercice</span>
                   </div>
@@ -339,15 +351,6 @@
                 </button>
               </div>
             </div>
-          </div>
-
-          <!-- Timer de repos : lancé à la validation d'une série, ignorable d'un tap -->
-          <div v-if="reposActif" class="repos-chip" :class="{ fini: reposActif.restant === 0 }" @click="arreterRepos">
-            <i class="ti" :class="reposActif.restant === 0 ? 'ti-bell-ringing' : 'ti-clock'"></i>
-            <span class="repos-chip-temps">
-              {{ reposActif.restant === 0 ? 'Repos terminé !' : formatTemps(reposActif.restant) }}
-            </span>
-            <i class="ti ti-x repos-chip-close"></i>
           </div>
 
           <!-- Barre de validation collante : toujours visible, la séance reste
@@ -392,7 +395,7 @@
 </template>
 
 <script>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useApi } from '../services/api'
@@ -492,9 +495,6 @@ export default {
       // avant le bouton final (le backend upserte par jour, pas de doublons)
       sauvegarderSerie(groupe, serieIdx)
 
-      // Timer de repos au moment où la série vient d'être validée
-      if (!isDone) demarrerRepos(groupe, serieIdx)
-
       // Après validation, vérifie si toutes les séries du groupe sont complètes
       if (!isDone) {
         const nbSeries = groupe.exercices[0].series.length
@@ -543,8 +543,7 @@ export default {
     // avec correspondance positionnelle : la Nème série d'aujourd'hui est comparée à la
     // Nème série de la dernière fois où l'exercice a été fait.
     const historiqueSeriePourExo = (exo, serieIdx) => {
-      const idsActuels = new Set((exo.series || []).map(s => s.id))
-      const entries = historique.value.filter(l => l.exo_nom === exo.nom && !idsActuels.has(l.serie?.id))
+      const entries = historique.value.filter(l => l.exo_nom === exo.nom)
       if (entries.length === 0) return null
       entries.sort((a, b) => new Date(b.date) - new Date(a.date))
       const dateRecente = entries[0].date.split('T')[0]
@@ -600,54 +599,6 @@ export default {
         // Pas bloquant : la validation finale re-synchronise tout
         console.error('Erreur sauvegarde série:', e)
       }
-    }
-
-    // --- Timer de repos (présentation uniquement) ---
-    const reposActif = ref(null) // { total, restant }
-    let reposInterval = null
-
-    // "2min", "1min30", "1'30", "1:30", "90s", "90" (secondes si ≥ 10, minutes sinon)
-    const parseRepos = (str) => {
-      if (!str) return null
-      const s = String(str).toLowerCase().replace(/\s/g, '').replace(',', '.')
-      let m
-      if ((m = s.match(/^(\d+)(?:min|mn|m|')(\d+)?/))) return parseInt(m[1]) * 60 + (m[2] ? parseInt(m[2]) : 0)
-      if ((m = s.match(/^(\d+):(\d+)$/))) return parseInt(m[1]) * 60 + parseInt(m[2])
-      if ((m = s.match(/^(\d+)(?:s|sec)$/))) return parseInt(m[1])
-      if ((m = s.match(/^(\d+)$/))) {
-        const n = parseInt(m[1])
-        return n < 10 ? n * 60 : n
-      }
-      return null
-    }
-
-    const arreterRepos = () => {
-      clearInterval(reposInterval)
-      reposInterval = null
-      reposActif.value = null
-    }
-
-    const demarrerRepos = (groupe, serieIdx) => {
-      const secondes = parseRepos(groupe.exercices[0].series[serieIdx]?.temps_repos)
-      if (!secondes) return
-      clearInterval(reposInterval)
-      reposActif.value = { total: secondes, restant: secondes }
-      reposInterval = setInterval(() => {
-        if (!reposActif.value) { clearInterval(reposInterval); return }
-        reposActif.value.restant--
-        if (reposActif.value.restant <= 0) {
-          clearInterval(reposInterval)
-          reposActif.value.restant = 0
-          if (navigator.vibrate) navigator.vibrate([200, 100, 200])
-          setTimeout(() => { if (reposActif.value?.restant === 0) reposActif.value = null }, 4000)
-        }
-      }, 1000)
-    }
-
-    const formatTemps = (s) => {
-      const min = Math.floor(s / 60)
-      const sec = s % 60
-      return min > 0 ? `${min}:${String(sec).padStart(2, '0')}` : `${sec}s`
     }
 
     const seancesCompletees = ref(new Set())
@@ -735,27 +686,14 @@ export default {
 
     const demarrerSeance = (seance) => {
       seanceActive.value = seance
+      // Toujours une saisie vierge : la séance se rejoue à l'identique à
+      // chaque ouverture, la dernière performance validée reste consultable
+      // via le swipe dans le panneau de saisie, pas pré-remplie ici.
       logs.value = {}
       groupesOuverts.value = {}
 
-      // Pré-remplir les logs depuis l'historique
-      seance.exercices?.forEach(exo => {
-        exo.series?.forEach((serie, idx) => {
-          if (logsParSerie.value[serie.id]) {
-            logs.value[exo.id] = logs.value[exo.id] || {}
-            logs.value[exo.id][idx] = {
-              reps_realisees: logsParSerie.value[serie.id].reps_realisees || '',
-              poids_realise: logsParSerie.value[serie.id].poids_realise || '',
-              fait: logsParSerie.value[serie.id].fait
-            }
-          }
-        })
-      })
-
-      // Ferme tous les groupes par défaut
       grouperExercices(seance.exercices).forEach(g => {
         groupesOuverts.value[g.key] = false
-        // Si groupe déjà complet, le marquer
       })
     }
 
@@ -798,8 +736,7 @@ export default {
     })
 
     watch(onglet, (v) => { if (v === 'logs') fetchHistorique() })
-    watch(seanceActive, (s) => { if (!s) { arreterRepos(); fermerSaisie() } })
-    onUnmounted(() => clearInterval(reposInterval))
+    watch(seanceActive, (s) => { if (!s) fermerSaisie() })
 
     const formatDate = (d) => new Date(d).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
     const logout = () => { authStore.logout(); router.push('/') }
@@ -844,7 +781,7 @@ export default {
       seancesCompletees, isSeanceComplete, isSemaineComplete,
       logsParSerie, chargerLogsExistants, getLogsAvecHistorique,
       progressionSeance,
-      sauvegarderSerie, reposActif, arreterRepos, formatTemps,
+      sauvegarderSerie,
       groupeSaisie, ouvrirSaisie, fermerSaisie, valeursSerie, resumeExo,
       voirHistoriqueSaisie, onSaisieSwipeStart, onSaisieSwipeEnd,
       historiqueSeriePourExo, formatDateCourt
@@ -1112,13 +1049,11 @@ export default {
 
 /* Réalisé */
 .realise-inputs { display: flex; gap: var(--spacing-sm); }
-.historique-inline {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  min-height: 32px;
-}
+.historique-inline { display: flex; flex-direction: column; gap: 6px; }
 .historique-inline-date {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: var(--font-size-xs);
   font-weight: 600;
   color: var(--color-text-secondary);
@@ -1140,6 +1075,18 @@ export default {
   text-align: center;
 }
 .log-input:focus { outline: none; border-color: var(--color-primary); }
+.log-input-locked {
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-secondary);
+  cursor: not-allowed;
+  border-color: var(--color-border);
+}
+.log-input-locked:focus { border-color: var(--color-border); }
+.log-input-locked.done {
+  background: var(--color-valid-bg-soft);
+  color: var(--color-valid-text-strong);
+  border-color: var(--color-valid-border);
+}
 
 /* Bouton valider série */
 .btn-serie {
@@ -1280,37 +1227,6 @@ export default {
   .saisie-sheet { border-radius: var(--radius-xl); max-height: 85vh; }
 }
 
-/* --- Timer de repos --- */
-.repos-chip {
-  position: fixed;
-  left: 50%;
-  transform: translateX(-50%);
-  bottom: calc(var(--bottom-nav-h) + 92px);
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  min-height: var(--tap-min);
-  padding: 0 var(--spacing-lg);
-  background: var(--color-primary-dark);
-  color: #ffffff;
-  border-radius: var(--radius-full);
-  font-size: var(--font-size-lg);
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  box-shadow: var(--shadow-dropdown);
-  cursor: pointer;
-  z-index: 180; /* au-dessus du panneau de saisie : le décompte reste visible pendant la saisie */
-  user-select: none;
-}
-.repos-chip.fini {
-  background: var(--color-valid-text);
-  animation: repos-pulse 0.6s ease-in-out 3;
-}
-.repos-chip-close { font-size: var(--font-size-sm); opacity: 0.7; }
-@keyframes repos-pulse {
-  50% { transform: translateX(-50%) scale(1.08); }
-}
-
 /* --- Barre de validation collante --- */
 .valider-bar {
   flex-shrink: 0;
@@ -1390,6 +1306,5 @@ export default {
   .valider-bar { padding: var(--spacing-md) var(--spacing-2xl); }
   .valider-bar, .seance-topbar { padding-left: max(var(--spacing-2xl), calc((100% - 720px) / 2)); padding-right: max(var(--spacing-2xl), calc((100% - 720px) / 2)); }
   .realise-inputs { max-width: 360px; }
-  .repos-chip { bottom: 96px; } /* pas de barre d'onglets basse sur desktop */
 }
 </style>
