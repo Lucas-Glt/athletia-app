@@ -101,65 +101,69 @@
             <div
               v-for="groupe in grouperExercices(seanceActive.exercices)"
               :key="groupe.key"
-              class="exo-group"
-              :class="{ 'is-superset': groupe.exercices.length > 1, 'is-complete': isGroupeComplete(groupe) }"
+              class="exo-item"
             >
-              <div class="exo-group-head">
-                <span class="exo-num">{{ groupe.ordre }}</span>
-                <div class="exo-noms-list">
-                  <span
-                    v-for="(exo, eidx) in groupe.exercices"
-                    :key="exo.id"
-                    class="exo-nom-inline"
-                    :class="{ 'is-optionnel': exo.optionnel }"
-                  >
-                    <span class="exo-letter" v-if="groupe.exercices.length > 1">{{ letterFor(eidx) }}</span>
-                    {{ exo.nom }}
-                    <span v-if="exo.optionnel" class="optionnel-badge">optionnelle</span>
-                  </span>
+              <span class="exo-num">{{ groupe.ordre }}</span>
+              <div
+                class="exo-group"
+                :class="{ 'is-superset': groupe.exercices.length > 1, 'is-complete': isGroupeComplete(groupe) }"
+              >
+                <div class="exo-group-head">
+                  <div class="exo-noms-list">
+                    <span
+                      v-for="(exo, eidx) in groupe.exercices"
+                      :key="exo.id"
+                      class="exo-nom-inline"
+                      :class="{ 'is-optionnel': exo.optionnel }"
+                    >
+                      <span class="exo-letter" v-if="groupe.exercices.length > 1">{{ letterFor(eidx) }}</span>
+                      {{ exo.nom }}
+                      <span v-if="exo.optionnel" class="optionnel-badge">optionnelle</span>
+                    </span>
+                  </div>
+                  <i v-if="isGroupeComplete(groupe)" class="ti ti-circle-check-filled groupe-check"></i>
                 </div>
-                <i v-if="isGroupeComplete(groupe)" class="ti ti-circle-check-filled groupe-check"></i>
-              </div>
 
-              <div v-if="groupe.exercices[0].series.length === 0" class="empty-series">
-                Aucune série définie.
-              </div>
+                <div v-if="groupe.exercices[0].series.length === 0" class="empty-series">
+                  Aucune série définie.
+                </div>
 
-              <!-- Résumé compact : tout le prescrit lisible, la saisie s'ouvre à la demande -->
-              <template v-else>
-                <div class="resume-exo" v-for="(exo, eidx) in groupe.exercices" :key="'r' + exo.id">
-                  <span class="exo-letter-mini" v-if="groupe.exercices.length > 1">{{ letterFor(eidx) }}</span>
-                  <span v-if="resumeExo(exo).uniforme" class="resume-texte">{{ resumeExo(exo).texte }}</span>
-                  <div v-else class="resume-series-list">
-                    <div v-for="(s, i) in exo.series" :key="s.id" class="resume-ligne">
-                      <span class="resume-s">S{{ i + 1 }}</span>
-                      <span>{{ valeursSerie(exo, i) || '—' }}</span>
+                <!-- Résumé compact : tout le prescrit lisible, la saisie s'ouvre à la demande -->
+                <template v-else>
+                  <div class="resume-exo" v-for="(exo, eidx) in groupe.exercices" :key="'r' + exo.id">
+                    <span class="exo-letter-mini" v-if="groupe.exercices.length > 1">{{ letterFor(eidx) }}</span>
+                    <span v-if="resumeExo(exo).uniforme" class="resume-texte">{{ resumeExo(exo).texte }}</span>
+                    <div v-else class="resume-series-list">
+                      <div v-for="(s, i) in exo.series" :key="s.id" class="resume-ligne">
+                        <span class="resume-s">S{{ i + 1 }}</span>
+                        <span>{{ valeursSerie(exo, i) || '—' }}</span>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div class="exo-group-foot">
-                  <span class="serie-repos" v-if="groupe.exercices[0].series[0]?.temps_repos">
-                    <i class="ti ti-clock"></i> {{ groupe.exercices[0].series[0].temps_repos }}
-                  </span>
-                  <div class="series-dots">
-                    <span
-                      v-for="i in groupe.exercices[0].series.length"
-                      :key="i"
-                      class="serie-dot"
-                      :class="{ done: isGroupeDone(groupe, i - 1) }"
-                    ></span>
+                  <div class="exo-group-foot">
+                    <span class="serie-repos" v-if="groupe.exercices[0].series[0]?.temps_repos">
+                      <i class="ti ti-clock"></i> {{ groupe.exercices[0].series[0].temps_repos }}
+                    </span>
+                    <div class="series-dots">
+                      <span
+                        v-for="i in groupe.exercices[0].series.length"
+                        :key="i"
+                        class="serie-dot"
+                        :class="{ done: isGroupeDone(groupe, i - 1) }"
+                      ></span>
+                    </div>
+                    <button
+                      class="btn btn-sm btn-saisir"
+                      :class="{ 'btn-primary': !isGroupeComplete(groupe) && !seancesCompletees.has(seanceActive.id) }"
+                      @click="ouvrirSaisie(groupe)"
+                    >
+                      <i class="ti" :class="seancesCompletees.has(seanceActive.id) ? 'ti-eye' : 'ti-pencil'"></i>
+                      {{ seancesCompletees.has(seanceActive.id) ? 'Consulter' : 'Saisir' }}
+                    </button>
                   </div>
-                  <button
-                    class="btn btn-sm btn-saisir"
-                    :class="{ 'btn-primary': !isGroupeComplete(groupe) && !seancesCompletees.has(seanceActive.id) }"
-                    @click="ouvrirSaisie(groupe)"
-                  >
-                    <i class="ti" :class="seancesCompletees.has(seanceActive.id) ? 'ti-eye' : 'ti-pencil'"></i>
-                    {{ seancesCompletees.has(seanceActive.id) ? 'Consulter' : 'Saisir' }}
-                  </button>
-                </div>
-              </template>
+                </template>
+              </div>
             </div>
           </div>
 
@@ -995,6 +999,9 @@ export default {
 .exo-group.is-superset { border-color: var(--color-superset-border); border-left: 4px solid var(--color-primary); }
 .exo-group.is-complete { border-color: var(--color-valid-border); background: var(--color-valid-bg-soft); }
 
+.exo-item { display: flex; align-items: center; gap: var(--spacing-sm); }
+.exo-item .exo-group { flex: 1; min-width: 0; }
+
 .exo-group-head { display: flex; align-items: flex-start; gap: var(--spacing-md); }
 .exo-group-head .exo-noms-list { flex: 1; }
 .groupe-check { color: var(--color-valid-text); font-size: 24px; flex-shrink: 0; }
@@ -1004,7 +1011,7 @@ export default {
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
-  font-size: var(--font-size-xl);
+  font-size: var(--font-size-base);
   font-weight: 600;
   color: var(--color-text);
 }
@@ -1023,7 +1030,6 @@ export default {
 .exo-num, .exo-letter {
   width: 26px;
   height: 26px;
-  border-radius: var(--radius-sm);
   background: var(--color-primary-light);
   color: var(--color-superset-text);
   font-size: var(--font-size-sm);
@@ -1033,7 +1039,8 @@ export default {
   justify-content: center;
   flex-shrink: 0;
 }
-.exo-letter { background: var(--color-primary); color: var(--color-on-primary); }
+.exo-num { border-radius: var(--radius-full); }
+.exo-letter { border-radius: var(--radius-sm); background: var(--color-primary); color: var(--color-on-primary); }
 
 /* --- Cartes série --- */
 .serie-card {
@@ -1212,7 +1219,7 @@ export default {
 }
 .saisie-head {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: var(--spacing-md);
   padding: var(--spacing-lg);
   border-bottom: 1px solid var(--color-border);
