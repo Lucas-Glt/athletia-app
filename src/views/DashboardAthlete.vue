@@ -104,126 +104,65 @@
               class="exo-item"
             >
               <span class="exo-num">{{ groupe.ordre }}</span>
-              <div class="exo-item-body">
-                <div class="exo-item-track">
-                  <div
-                    class="carousel-track"
-                    :class="{ 'no-transition': draggingKey === groupe.key }"
-                    :style="{ transform: `translateX(calc(${-pageActuelle(groupe) * 100}% + ${dragOffset[groupe.key] || 0}px))` }"
-                    @pointerdown="onDragStart($event, groupe)"
-                    @pointermove="onDragMove($event, groupe)"
-                    @pointerup="onDragEnd($event, groupe)"
-                    @pointercancel="onDragEnd($event, groupe)"
-                  >
-                    <!-- Pages d'historique : la plus ancienne en premier (à gauche), pour
-                         qu'un glissement vers la droite remonte progressivement le temps. -->
-                    <div
-                      class="carousel-page exo-group is-historique"
-                      v-for="page in [...pagesHistorique(groupe)].reverse()"
-                      :key="page.date"
+              <div
+                class="exo-group"
+                :class="{ 'is-superset': groupe.exercices.length > 1, 'is-complete': isGroupeComplete(groupe) }"
+              >
+                <div class="exo-group-head">
+                  <div class="exo-noms-list">
+                    <span
+                      v-for="(exo, eidx) in groupe.exercices"
+                      :key="exo.id"
+                      class="exo-nom-inline"
+                      :class="{ 'is-optionnel': exo.optionnel }"
                     >
-                      <div class="exo-group-head">
-                        <div class="exo-noms-list">
-                          <span
-                            v-for="(exo, eidx) in groupe.exercices"
-                            :key="exo.id"
-                            class="exo-nom-inline"
-                          >
-                            <span class="exo-letter" v-if="groupe.exercices.length > 1">{{ letterFor(eidx) }}</span>
-                            {{ exo.nom }}
-                          </span>
-                        </div>
-                        <span class="historique-page-date">{{ formatDateCourt(page.date) }}</span>
-                      </div>
-                      <div class="historique-page-body">
-                        <div
-                          v-for="log in page.entries"
-                          :key="log.id"
-                          class="historique-row"
-                        >
-                          <span class="exo-letter-mini" v-if="groupe.exercices.length > 1">{{ letterFor(log._eidx) }}</span>
-                          <span class="chip" v-if="log.reps_realisees">{{ log.reps_realisees }}</span>
-                          <span class="chip" v-if="log.poids_realise">{{ log.poids_realise }}</span>
-                          <span class="chip" :class="log.fait ? 'chip-done' : 'chip-skip'">
-                            {{ log.fait ? '✓ fait' : 'non réalisé' }}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
+                      <span class="exo-letter" v-if="groupe.exercices.length > 1">{{ letterFor(eidx) }}</span>
+                      {{ exo.nom }}
+                      <span v-if="exo.optionnel" class="optionnel-badge">optionnelle</span>
+                    </span>
+                  </div>
+                  <i v-if="isGroupeComplete(groupe)" class="ti ti-circle-check-filled groupe-check"></i>
+                </div>
 
-                    <!-- Dernière page de la piste : séance du jour, prescrit + saisie -->
-                    <div
-                      class="carousel-page exo-group"
-                      :class="{ 'is-superset': groupe.exercices.length > 1, 'is-complete': isGroupeComplete(groupe) }"
-                    >
-                      <div class="exo-group-head">
-                        <div class="exo-noms-list">
-                          <span
-                            v-for="(exo, eidx) in groupe.exercices"
-                            :key="exo.id"
-                            class="exo-nom-inline"
-                            :class="{ 'is-optionnel': exo.optionnel }"
-                          >
-                            <span class="exo-letter" v-if="groupe.exercices.length > 1">{{ letterFor(eidx) }}</span>
-                            {{ exo.nom }}
-                            <span v-if="exo.optionnel" class="optionnel-badge">optionnelle</span>
-                          </span>
-                        </div>
-                        <i v-if="isGroupeComplete(groupe)" class="ti ti-circle-check-filled groupe-check"></i>
+                <div v-if="groupe.exercices[0].series.length === 0" class="empty-series">
+                  Aucune série définie.
+                </div>
+
+                <!-- Résumé compact : tout le prescrit lisible, la saisie s'ouvre à la demande -->
+                <template v-else>
+                  <div class="resume-exo" v-for="(exo, eidx) in groupe.exercices" :key="'r' + exo.id">
+                    <span class="exo-letter-mini" v-if="groupe.exercices.length > 1">{{ letterFor(eidx) }}</span>
+                    <span v-if="resumeExo(exo).uniforme" class="resume-texte">{{ resumeExo(exo).texte }}</span>
+                    <div v-else class="resume-series-list">
+                      <div v-for="(s, i) in exo.series" :key="s.id" class="resume-ligne">
+                        <span class="resume-s">S{{ i + 1 }}</span>
+                        <span>{{ valeursSerie(exo, i) || '—' }}</span>
                       </div>
-
-                      <div v-if="groupe.exercices[0].series.length === 0" class="empty-series">
-                        Aucune série définie.
-                      </div>
-
-                      <!-- Résumé compact : tout le prescrit lisible, la saisie s'ouvre à la demande -->
-                      <template v-else>
-                        <div class="resume-exo" v-for="(exo, eidx) in groupe.exercices" :key="'r' + exo.id">
-                          <span class="exo-letter-mini" v-if="groupe.exercices.length > 1">{{ letterFor(eidx) }}</span>
-                          <span v-if="resumeExo(exo).uniforme" class="resume-texte">{{ resumeExo(exo).texte }}</span>
-                          <div v-else class="resume-series-list">
-                            <div v-for="(s, i) in exo.series" :key="s.id" class="resume-ligne">
-                              <span class="resume-s">S{{ i + 1 }}</span>
-                              <span>{{ valeursSerie(exo, i) || '—' }}</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div class="exo-group-foot">
-                          <span class="serie-repos" v-if="groupe.exercices[0].series[0]?.temps_repos">
-                            <i class="ti ti-clock"></i> {{ groupe.exercices[0].series[0].temps_repos }}
-                          </span>
-                          <div class="series-dots">
-                            <span
-                              v-for="i in groupe.exercices[0].series.length"
-                              :key="i"
-                              class="serie-dot"
-                              :class="{ done: isGroupeDone(groupe, i - 1) }"
-                            ></span>
-                          </div>
-                          <button
-                            class="btn btn-sm btn-saisir"
-                            :class="{ 'btn-primary': !isGroupeComplete(groupe) && !seancesCompletees.has(seanceActive.id) }"
-                            @click="ouvrirSaisie(groupe)"
-                          >
-                            <i class="ti" :class="seancesCompletees.has(seanceActive.id) ? 'ti-eye' : 'ti-pencil'"></i>
-                            {{ seancesCompletees.has(seanceActive.id) ? 'Consulter' : 'Saisir' }}
-                          </button>
-                        </div>
-                      </template>
                     </div>
                   </div>
-                </div>
 
-                <div class="carousel-dots" v-if="nbPages(groupe) > 1">
-                  <span
-                    v-for="i in nbPages(groupe)"
-                    :key="i"
-                    class="carousel-dot"
-                    :class="{ active: i - 1 === pageActuelle(groupe) }"
-                    @click="allerAPage(groupe, i - 1)"
-                  ></span>
-                </div>
+                  <div class="exo-group-foot">
+                    <span class="serie-repos" v-if="groupe.exercices[0].series[0]?.temps_repos">
+                      <i class="ti ti-clock"></i> {{ groupe.exercices[0].series[0].temps_repos }}
+                    </span>
+                    <div class="series-dots">
+                      <span
+                        v-for="i in groupe.exercices[0].series.length"
+                        :key="i"
+                        class="serie-dot"
+                        :class="{ done: isGroupeDone(groupe, i - 1) }"
+                      ></span>
+                    </div>
+                    <button
+                      class="btn btn-sm btn-saisir"
+                      :class="{ 'btn-primary': !isGroupeComplete(groupe) && !seancesCompletees.has(seanceActive.id) }"
+                      @click="ouvrirSaisie(groupe)"
+                    >
+                      <i class="ti" :class="seancesCompletees.has(seanceActive.id) ? 'ti-eye' : 'ti-pencil'"></i>
+                      {{ seancesCompletees.has(seanceActive.id) ? 'Consulter' : 'Saisir' }}
+                    </button>
+                  </div>
+                </template>
               </div>
             </div>
           </div>
@@ -580,93 +519,6 @@ export default {
     const ouvrirSaisie = (groupe) => { groupeSaisie.value = groupe }
     const fermerSaisie = () => { groupeSaisie.value = null }
 
-    // --- Carrousel par bloc d'exercice : dernière page = séance du jour,
-    //     pages précédentes = anciennes perfs du même exercice, façon
-    //     carrousel Instagram (glisser à droite = remonter dans le temps) ---
-    const MAX_HISTORIQUE_PAGES = 6
-    const DRAG_THRESHOLD = 50
-    const pageIndex = ref({})
-    const dragOffset = ref({})
-    const draggingKey = ref(null)
-    const dragState = { key: null, startX: 0, startY: 0, startIndex: 0, active: false }
-
-    const historiqueDuGroupe = (groupe) => {
-      if (!groupe) return {}
-      const idsActuels = new Set(groupe.exercices.flatMap(e => (e.series || []).map(s => s.id)))
-      const entries = []
-      groupe.exercices.forEach((exo, eidx) => {
-        historique.value
-          .filter(l => l.exo_nom === exo.nom && !idsActuels.has(l.serie?.id))
-          .forEach(l => entries.push({ ...l, _eidx: eidx }))
-      })
-      entries.sort((a, b) => new Date(b.date) - new Date(a.date))
-      const groups = {}
-      entries.forEach(l => {
-        const date = l.date.split('T')[0]
-        if (!groups[date]) groups[date] = []
-        groups[date].push(l)
-      })
-      return groups
-    }
-
-    // Une page par date d'historique (la plus récente en premier), plafonné
-    const pagesHistorique = (groupe) => {
-      const grouped = historiqueDuGroupe(groupe)
-      return Object.keys(grouped)
-        .slice(0, MAX_HISTORIQUE_PAGES)
-        .map(date => ({ date, entries: grouped[date] }))
-    }
-
-    const nbPages = (groupe) => 1 + pagesHistorique(groupe).length
-
-    // "Aujourd'hui" est toujours la dernière page de la piste (les pages
-    // d'historique, de la plus ancienne à la plus récente, la précèdent) :
-    // ainsi glisser vers la droite révèle mécaniquement une page plus ancienne.
-    const indexAujourdhui = (groupe) => nbPages(groupe) - 1
-    const pageActuelle = (groupe) => pageIndex.value[groupe.key] ?? indexAujourdhui(groupe)
-
-    const allerAPage = (groupe, i) => { pageIndex.value[groupe.key] = i }
-
-    const onDragStart = (e, groupe) => {
-      if (dragState.active) return
-      if (e.pointerType === 'mouse' && e.button !== 0) return
-      dragState.key = groupe.key
-      dragState.startX = e.clientX
-      dragState.startY = e.clientY
-      dragState.startIndex = pageActuelle(groupe)
-      dragState.active = true
-      draggingKey.value = groupe.key
-    }
-    const onDragMove = (e, groupe) => {
-      if (!dragState.active || dragState.key !== groupe.key) return
-      const dx = e.clientX - dragState.startX
-      const dy = e.clientY - dragState.startY
-      if (Math.abs(dy) > Math.abs(dx) + 10) {
-        dragState.active = false
-        draggingKey.value = null
-        dragOffset.value[groupe.key] = 0
-        return
-      }
-      const total = nbPages(groupe)
-      // Résistance élastique en bout de course (aujourd'hui ou plus ancienne page)
-      const enButee = (dragState.startIndex === 0 && dx > 0) || (dragState.startIndex === total - 1 && dx < 0)
-      dragOffset.value[groupe.key] = enButee ? dx * 0.35 : dx
-    }
-    const onDragEnd = (e, groupe) => {
-      if (!dragState.active || dragState.key !== groupe.key) return
-      dragState.active = false
-      draggingKey.value = null
-      const dx = dragOffset.value[groupe.key] || 0
-      dragOffset.value[groupe.key] = 0
-      const total = nbPages(groupe)
-      let idx = dragState.startIndex
-      if (dx <= -DRAG_THRESHOLD) idx = Math.min(idx + 1, total - 1)
-      else if (dx >= DRAG_THRESHOLD) idx = Math.max(idx - 1, 0)
-      pageIndex.value[groupe.key] = idx
-    }
-
-    const formatDateCourt = (d) => new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
-
     // Valeurs prescrites d'une série en une ligne compacte, selon le type de séance
     const valeursSerie = (exo, idx) => {
       const s = exo.series[idx]
@@ -841,9 +693,6 @@ export default {
 
       // Charge les logs existants après les séances
       await chargerLogsExistants(p.id)
-      // Précharge l'historique complet : nécessaire dès l'écran de séance
-      // pour le panneau d'historique révélé par swipe, pas seulement l'onglet Historique
-      fetchHistorique()
     }
 
     const demarrerSeance = (seance) => {
@@ -980,9 +829,7 @@ export default {
       logsParSerie, chargerLogsExistants, getLogsAvecHistorique,
       progressionSeance,
       sauvegarderSerie, reposActif, arreterRepos, formatTemps,
-      groupeSaisie, ouvrirSaisie, fermerSaisie, valeursSerie, resumeExo,
-      pageIndex, dragOffset, draggingKey, onDragStart, onDragMove, onDragEnd,
-      pagesHistorique, nbPages, allerAPage, formatDateCourt, pageActuelle
+      groupeSaisie, ouvrirSaisie, fermerSaisie, valeursSerie, resumeExo
     }
   }
 }
@@ -1147,45 +994,13 @@ export default {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-md);
+  flex-shrink: 0;
 }
 .exo-group.is-superset { border-color: var(--color-superset-border); border-left: 4px solid var(--color-primary); }
 .exo-group.is-complete { border-color: var(--color-valid-border); background: var(--color-valid-bg-soft); }
-.exo-group.is-historique { background: var(--color-bg-secondary); }
 
 .exo-item { display: flex; align-items: center; gap: var(--spacing-sm); }
-.exo-item-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
-.exo-item-track {
-  position: relative;
-  overflow: hidden;
-  border-radius: var(--radius-lg);
-}
-.carousel-track {
-  display: flex;
-  align-items: stretch;
-  touch-action: pan-y;
-  transition: transform 0.25s ease;
-}
-.carousel-track.no-transition { transition: none; }
-.carousel-page { flex: 0 0 100%; min-width: 0; }
-
-.historique-page-date {
-  font-size: var(--font-size-xs);
-  font-weight: 600;
-  color: var(--color-text-secondary);
-  flex-shrink: 0;
-  text-transform: capitalize;
-}
-.historique-page-body { display: flex; flex-direction: column; gap: 6px; }
-
-.carousel-dots { display: flex; justify-content: center; align-items: center; gap: 6px; }
-.carousel-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: var(--radius-full);
-  background: var(--color-border-strong);
-  cursor: pointer;
-}
-.carousel-dot.active { width: 16px; background: var(--color-primary); }
+.exo-item .exo-group { flex: 1; min-width: 0; }
 
 .exo-group-head { display: flex; align-items: flex-start; gap: var(--spacing-md); }
 .exo-group-head .exo-noms-list { flex: 1; }
