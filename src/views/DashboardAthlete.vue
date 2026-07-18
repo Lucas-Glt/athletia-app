@@ -181,6 +181,10 @@
                       {{ exo.nom }}
                     </span>
                   </div>
+                  <div class="saisie-swipe-hint">
+                    <span class="swipe-hint-item"><i class="ti ti-chevron-left"></i> Historique</span>
+                    <span class="swipe-hint-item">Courbe progression <i class="ti ti-chevron-right"></i></span>
+                  </div>
                 </div>
                 <button class="btn btn-icon" @click="fermerSaisie" aria-label="Fermer">
                   <i class="ti ti-x"></i>
@@ -194,9 +198,13 @@
                 @pointercancel="onSaisieSwipeEnd"
               >
               <div v-if="saisieVue !== 'saisie'" class="saisie-mode-banner">
-                <span v-if="saisieVue === 'historique'"><i class="ti ti-history"></i> Dernière performance</span>
+                <span v-if="saisieVue === 'historique'">
+                  <i class="ti ti-history"></i>
+                  {{ historiqueIndex === 0 ? 'Dernière performance' : `Performance n-${historiqueIndex + 1}` }}
+                  <span class="saisie-mode-pager" v-if="nbTentativesGroupe > 1">({{ historiqueIndex + 1 }}/{{ nbTentativesGroupe }})</span>
+                </span>
                 <span v-else><i class="ti ti-chart-line"></i> Courbe de progression</span>
-                <button class="saisie-mode-retour" @click="saisieVue = 'saisie'">Retour à la saisie</button>
+                <button class="saisie-mode-retour" @click="retourSaisie">Retour à la saisie</button>
               </div>
 
               <template v-if="saisieVue === 'progression'">
@@ -554,13 +562,44 @@ export default {
 
     // --- Panneau de saisie par groupe (présentation uniquement) ---
     const groupeSaisie = ref(null)
-    // 'saisie' (centre) | 'historique' (swipe droit, dernière perf) | 'progression' (swipe gauche, courbe)
+    // 'saisie' (centre) | 'historique' (swipe droit, tentatives passées) | 'progression' (swipe gauche, courbe)
     const saisieVue = ref('saisie')
-    const ouvrirSaisie = (groupe) => { groupeSaisie.value = groupe; saisieVue.value = 'saisie' }
-    const fermerSaisie = () => { groupeSaisie.value = null; saisieVue.value = 'saisie' }
+    // Profondeur dans l'historique en mode 'historique' : 0 = n-1 (la plus récente
+    // tentative passée), 1 = n-2, etc. Chaque nouveau swipe droit y creuse plus loin.
+    const historiqueIndex = ref(0)
+    const ouvrirSaisie = (groupe) => { groupeSaisie.value = groupe; saisieVue.value = 'saisie'; historiqueIndex.value = 0 }
+    const fermerSaisie = () => { groupeSaisie.value = null; saisieVue.value = 'saisie'; historiqueIndex.value = 0 }
+    const retourSaisie = () => { saisieVue.value = 'saisie'; historiqueIndex.value = 0 }
+
+    // Regroupe les logs d'un exercice par tentative : le session_id (généré par
+    // demarrerSeance) distingue deux resaisies le même jour ; à défaut (logs
+    // antérieurs à cette fonctionnalité), on retombe sur le jour calendaire.
+    const cleTentative = (l) => l.session_id || l.date.split('T')[0]
+
+    // Toutes les tentatives passées d'un exercice, la plus récente en premier :
+    // [[logs de la tentative n-1], [logs de la tentative n-2], ...]
+    const tentativesExo = (exo) => {
+      const parTentative = {}
+      historique.value
+        .filter(l => l.exo_nom === exo.nom)
+        .forEach(l => {
+          const cle = cleTentative(l)
+          if (!parTentative[cle]) parTentative[cle] = []
+          parTentative[cle].push(l)
+        })
+      return Object.values(parTentative)
+        .sort((a, b) => new Date(b[0].date) - new Date(a[0].date))
+    }
+
+    // Le plus grand nombre de tentatives passées parmi les exercices du groupe
+    // ouvert, pour borner la pagination du swipe droit.
+    const nbTentativesGroupe = computed(() => {
+      if (!groupeSaisie.value) return 0
+      return Math.max(0, ...groupeSaisie.value.exercices.map(exo => tentativesExo(exo).length))
+    })
 
     // Swipe droit/gauche dans le panneau de saisie : bascule entre la saisie
-    // (centre), la dernière performance connue (droite) et la courbe de
+    // (centre), les tentatives passées (droite, paginable) et la courbe de
     // progression complète de l'exercice/superset (gauche).
     // Détection au relâché uniquement (pas de suivi live) pour ne jamais
     // interférer avec le scroll vertical ou les clics sur inputs/boutons.
@@ -577,44 +616,53 @@ export default {
       const dx = e.clientX - saisieSwipeState.startX
       const dy = e.clientY - saisieSwipeState.startY
       if (Math.abs(dy) > Math.abs(dx) + 10) return
-      if (dx >= 60) saisieVue.value = saisieVue.value === 'progression' ? 'saisie' : 'historique'
-      else if (dx <= -60) saisieVue.value = saisieVue.value === 'historique' ? 'saisie' : 'progression'
+      if (dx >= 60) {
+        if (saisieVue.value === 'progression') saisieVue.value = 'saisie'
+        else if (saisieVue.value === 'saisie') { saisieVue.value = 'historique'; historiqueIndex.value = 0 }
+        else if (historiqueIndex.value < nbTentativesGroupe.value - 1) historiqueIndex.value += 1
+      } else if (dx <= -60) {
+        if (saisieVue.value === 'historique') {
+          if (historiqueIndex.value > 0) historiqueIndex.value -= 1
+          else saisieVue.value = 'saisie'
+        } else if (saisieVue.value === 'saisie') saisieVue.value = 'progression'
+      }
     }
 
-    // Regroupe les logs d'un exercice par tentative : le session_id (généré par
-    // demarrerSeance) distingue deux resaisies le même jour ; à défaut (logs
-    // antérieurs à cette fonctionnalité), on retombe sur le jour calendaire.
-    const cleTentative = (l) => l.session_id || l.date.split('T')[0]
+    // Log d'une tentative correspondant à une série précise de l'exercice.
+    // Match par serie.id (stable) plutôt que par position dans le tableau :
+    // l'API trie par date décroissante, donc la dernière série saisie arrive
+    // en tête et un appariement positionnel mélangerait les séries entre elles.
+    const logTentativePourSerie = (tentative, exo, serieIdx) => {
+      const serieId = exo.series[serieIdx - 1]?.id
+      return tentative.find(l => l.serie.id === serieId) || tentative[0]
+    }
 
-    // Dernière performance connue pour cet exercice (hors séries de la séance en cours),
-    // avec correspondance positionnelle : la Nème série d'aujourd'hui est comparée à la
-    // Nème série de la dernière tentative où l'exercice a été fait.
+    // Performance à la tentative n-(historiqueIndex+1) pour cet exercice
+    // (hors séries de la séance en cours).
     const historiqueSeriePourExo = (exo, serieIdx) => {
-      const entries = historique.value.filter(l => l.exo_nom === exo.nom)
-      if (entries.length === 0) return null
-      entries.sort((a, b) => new Date(b.date) - new Date(a.date))
-      const tentativeRecente = cleTentative(entries[0])
-      const dateRecente = entries[0].date.split('T')[0]
-      const duJour = entries.filter(l => cleTentative(l) === tentativeRecente)
-      return { date: dateRecente, log: duJour[serieIdx - 1] || duJour[0] }
+      const tentative = tentativesExo(exo)[historiqueIndex.value]
+      if (!tentative) return null
+      return { date: tentative[0].date.split('T')[0], log: logTentativePourSerie(tentative, exo, serieIdx) }
     }
 
     const formatDateCourt = (d) => new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
 
-    // Écart entre la saisie en cours et la dernière performance connue, pour
-    // un retour immédiat sur la progression (reps/charge en musculation).
+    // Écart entre la saisie en cours et la dernière performance connue (n-1
+    // toujours, indépendant de la pagination historique), pour un retour
+    // immédiat sur la progression.
     const diffVsHistorique = (exo, serieIdx, champ) => {
-      const hist = historiqueSeriePourExo(exo, serieIdx)
-      if (!hist) return null
+      const tentative = tentativesExo(exo)[0]
+      if (!tentative) return null
       const actuel = parseFloat(getLogs(exo.id, serieIdx - 1)[champ])
-      const precedent = parseFloat(hist.log[champ])
+      const precedent = parseFloat(logTentativePourSerie(tentative, exo, serieIdx)[champ])
       if (isNaN(actuel) || isNaN(precedent)) return null
       const ecart = Math.round((actuel - precedent) * 100) / 100
       if (ecart === 0) return { texte: '=', classe: 'diff-neutre' }
       return { texte: (ecart > 0 ? '+' : '') + ecart, classe: ecart > 0 ? 'diff-positif' : 'diff-negatif' }
     }
 
-    // Champs numériques à tracer selon le type de séance, avec leur libellé/unité
+    // Un seul champ tracé selon le type de séance : la dimension "charge" de
+    // l'effort (poids en musculation, distance en natation/athlé, bonds en pliométrie).
     const champsGraphique = computed(() => {
       const t = seanceActive.value?.type_seance || 'musculation'
       if (t === 'natation' || t === 'athletisme') {
@@ -623,29 +671,27 @@ export default {
       if (t === 'pliometrie') {
         return [{ champ: 'reps_realisees', label: 'Bonds', unite: '' }]
       }
-      return [
-        { champ: 'poids_realise', label: 'Charge', unite: 'kg' },
-        { champ: 'reps_realisees', label: 'Répétitions', unite: '' }
-      ]
+      return [{ champ: 'poids_realise', label: 'Charge', unite: 'kg' }]
     })
 
-    // Série chronologique (une valeur par tentative, la meilleure série de la
+    // Série chronologique (une valeur par tentative, moyenne des séries de la
     // tentative) pour la courbe de progression d'un exercice — tout
-    // l'historique, toutes séries confondues. Une tentative = une (re)saisie
-    // de la séance, donc deux tentatives le même jour donnent bien 2 points.
+    // l'historique confondu. Une tentative = une (re)saisie de la séance,
+    // donc deux tentatives le même jour donnent bien 2 points distincts.
     const courbeExo = (exo, champ) => {
-      const meilleurParTentative = {}
+      const parTentative = {}
       historique.value
         .filter(l => l.exo_nom === exo.nom)
         .forEach(l => {
           const cle = cleTentative(l)
           const valeur = parseFloat(l[champ])
           if (isNaN(valeur)) return
-          if (!(cle in meilleurParTentative) || valeur > meilleurParTentative[cle].valeur) {
-            meilleurParTentative[cle] = { date: l.date.split('T')[0], valeur }
-          }
+          if (!parTentative[cle]) parTentative[cle] = { date: l.date.split('T')[0], total: 0, n: 0 }
+          parTentative[cle].total += valeur
+          parTentative[cle].n += 1
         })
-      return Object.values(meilleurParTentative)
+      return Object.values(parTentative)
+        .map(t => ({ date: t.date, valeur: Math.round((t.total / t.n) * 100) / 100 }))
         .sort((a, b) => new Date(a.date) - new Date(b.date))
     }
 
@@ -890,7 +936,8 @@ export default {
       progressionSeance,
       sauvegarderSerie,
       groupeSaisie, ouvrirSaisie, fermerSaisie, valeursSerie, resumeExo,
-      saisieVue, onSaisieSwipeStart, onSaisieSwipeEnd,
+      saisieVue, historiqueIndex, nbTentativesGroupe, retourSaisie,
+      onSaisieSwipeStart, onSaisieSwipeEnd,
       historiqueSeriePourExo, formatDateCourt, diffVsHistorique,
       champsGraphique, courbeExo
     }
@@ -1307,6 +1354,15 @@ export default {
 .saisie-titres { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .saisie-noms { display: flex; flex-direction: column; gap: 4px; }
 .saisie-nom { display: flex; align-items: center; gap: var(--spacing-sm); font-size: var(--font-size-sm); font-weight: 700; }
+.saisie-swipe-hint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+.swipe-hint-item { display: inline-flex; align-items: center; gap: 2px; }
 .saisie-body {
   flex: 1;
   overflow-y: auto;
@@ -1328,6 +1384,7 @@ export default {
   font-size: var(--font-size-sm);
   font-weight: 600;
 }
+.saisie-mode-pager { font-weight: 400; opacity: 0.8; margin-left: 4px; }
 .saisie-mode-retour {
   background: none;
   border: none;

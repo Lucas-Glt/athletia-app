@@ -1,7 +1,7 @@
 <template>
   <div class="courbe">
     <div class="courbe-head">
-      <span class="courbe-label">{{ label }}</span>
+      <span class="courbe-label">{{ label }}<span v-if="unite" class="courbe-unite"> ({{ unite }})</span></span>
       <span v-if="delta" class="courbe-delta" :class="delta.classe">{{ delta.texte }}</span>
     </div>
 
@@ -10,32 +10,33 @@
     </div>
 
     <template v-else>
-      <svg class="courbe-svg" viewBox="0 0 300 140" preserveAspectRatio="none">
-        <polyline class="courbe-ligne" :points="lignePoints" />
-        <circle
-          v-for="(p, i) in coords"
-          :key="i"
-          class="courbe-point"
-          :cx="p.x"
-          :cy="p.y"
-          r="3"
-        />
-        <text class="courbe-valeur" :x="coords[0].x" :y="coords[0].y - 8" text-anchor="start">
-          {{ formatValeur(points[0].valeur) }}
-        </text>
-        <text
-          class="courbe-valeur"
-          :x="coords[coords.length - 1].x"
-          :y="coords[coords.length - 1].y - 8"
-          text-anchor="end"
-        >
-          {{ formatValeur(points[points.length - 1].valeur) }}
-        </text>
-      </svg>
+      <div class="courbe-plot">
+        <div class="courbe-axe-y">
+          <span>{{ formatValeur(maxY) }}</span>
+          <span>{{ formatValeur(minY) }}</span>
+        </div>
+        <svg class="courbe-svg" viewBox="0 0 300 120" preserveAspectRatio="none">
+          <polyline class="courbe-ligne" :points="lignePoints" />
+          <circle
+            v-for="(p, i) in coords"
+            :key="i"
+            class="courbe-point"
+            :class="couleurPoint(i)"
+            :cx="p.x"
+            :cy="p.y"
+            r="4"
+          />
+        </svg>
+      </div>
 
-      <div class="courbe-dates">
-        <span>{{ formatDate(points[0].date) }}</span>
-        <span>{{ formatDate(points[points.length - 1].date) }}</span>
+      <div class="courbe-axe-x">
+        <span v-for="(p, i) in points" :key="i">S{{ i + 1 }}</span>
+      </div>
+
+      <div class="courbe-legende">
+        <span class="courbe-legende-item"><i class="courbe-dot diff-positif"></i> En hausse</span>
+        <span class="courbe-legende-item"><i class="courbe-dot diff-neutre"></i> Stable</span>
+        <span class="courbe-legende-item"><i class="courbe-dot diff-negatif"></i> En baisse</span>
       </div>
     </template>
   </div>
@@ -45,23 +46,26 @@
 import { computed } from 'vue'
 
 const LARGEUR = 300
-const HAUTEUR = 140
-const MARGE = { haut: 22, bas: 6, gauche: 10, droite: 10 }
+const HAUTEUR = 120
+const MARGE = { haut: 10, bas: 10, gauche: 8, droite: 8 }
 
 export default {
   props: {
-    // [{ date: 'YYYY-MM-DD', valeur: Number }], triés du plus ancien au plus récent
+    // [{ date: 'YYYY-MM-DD', valeur: Number }], triés du plus ancien au plus récent,
+    // un point par tentative (S1 = la plus ancienne, Sn = la plus récente)
     points: { type: Array, default: () => [] },
     label: { type: String, required: true },
     unite: { type: String, default: '' }
   },
   setup(props) {
+    const minY = computed(() => Math.min(...props.points.map(p => p.valeur)))
+    const maxY = computed(() => Math.max(...props.points.map(p => p.valeur)))
+
     const coords = computed(() => {
       const n = props.points.length
       if (n === 0) return []
-      const valeurs = props.points.map(p => p.valeur)
-      let min = Math.min(...valeurs)
-      let max = Math.max(...valeurs)
+      let min = minY.value
+      let max = maxY.value
       if (min === max) { min -= 1; max += 1 }
 
       const largeurUtile = LARGEUR - MARGE.gauche - MARGE.droite
@@ -88,16 +92,24 @@ export default {
       }
     })
 
-    const formatValeur = (v) => `${v}${props.unite}`
-    const formatDate = (d) => new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+    // Couleur d'un point selon son évolution par rapport au précédent
+    const couleurPoint = (i) => {
+      if (i === 0) return 'diff-neutre'
+      const ecart = props.points[i].valeur - props.points[i - 1].valeur
+      if (ecart > 0) return 'diff-positif'
+      if (ecart < 0) return 'diff-negatif'
+      return 'diff-neutre'
+    }
 
-    return { coords, lignePoints, delta, formatValeur, formatDate }
+    const formatValeur = (v) => `${v}${props.unite}`
+
+    return { coords, lignePoints, delta, minY, maxY, couleurPoint, formatValeur }
   }
 }
 </script>
 
 <style scoped>
-.courbe { display: flex; flex-direction: column; gap: 4px; }
+.courbe { display: flex; flex-direction: column; gap: 6px; }
 .courbe-head {
   display: flex;
   align-items: center;
@@ -105,6 +117,7 @@ export default {
   gap: var(--spacing-sm);
 }
 .courbe-label { font-size: var(--font-size-xs); font-weight: 700; color: var(--color-text-secondary); }
+.courbe-unite { font-weight: 400; }
 .courbe-delta {
   font-size: 11px;
   font-weight: 700;
@@ -120,14 +133,38 @@ export default {
   font-style: italic;
   padding: var(--spacing-md) 0;
 }
-.courbe-svg { width: 100%; height: 90px; display: block; }
+.courbe-plot { display: flex; align-items: stretch; gap: 6px; }
+.courbe-axe-y {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+  text-align: right;
+}
+.courbe-svg { flex: 1; width: 100%; height: 80px; display: block; }
 .courbe-ligne { fill: none; stroke: var(--color-primary); stroke-width: 2; }
-.courbe-point { fill: var(--color-primary); }
-.courbe-valeur { font-size: 10px; font-weight: 700; fill: var(--color-text); }
-.courbe-dates {
+.courbe-point.diff-positif { fill: var(--color-valid-text-strong); }
+.courbe-point.diff-negatif { fill: var(--color-danger-text); }
+.courbe-point.diff-neutre { fill: var(--color-text-muted); }
+.courbe-axe-x {
   display: flex;
   justify-content: space-between;
   font-size: 10px;
   color: var(--color-text-muted);
+  padding-left: 24px;
 }
+.courbe-legende {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  font-size: 10px;
+  color: var(--color-text-muted);
+}
+.courbe-legende-item { display: inline-flex; align-items: center; gap: 4px; }
+.courbe-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+.courbe-dot.diff-positif { background: var(--color-valid-text-strong); }
+.courbe-dot.diff-negatif { background: var(--color-danger-text); }
+.courbe-dot.diff-neutre { background: var(--color-text-muted); }
 </style>
