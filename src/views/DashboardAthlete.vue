@@ -1044,7 +1044,7 @@ export default {
 </script>
 
 <style scoped>
-.dashboard-root { display: flex; flex: 1; flex-direction: column; overflow: hidden; min-height: 0; }
+.dashboard-root { display: flex; flex: 1; flex-direction: column; overflow: hidden; min-height: 0; touch-action: pan-y; }
 .content-body { display: flex; flex: 1; flex-direction: column; overflow: hidden; min-height: 0; min-width: 0; }
 
 .empty-state {
@@ -1057,6 +1057,7 @@ export default {
   color: var(--color-text-secondary);
   text-align: center;
   padding: var(--spacing-xl);
+  touch-action: pan-y;
 }
 .empty-icon { font-size: 40px; color: var(--color-text-muted); }
 
@@ -1071,6 +1072,7 @@ export default {
   width: 100%;
   max-width: 720px;
   margin: 0 auto;
+  touch-action: pan-y;
   min-height: 0;
 }
 
@@ -1577,6 +1579,7 @@ export default {
   width: 100%;
   max-width: 720px;
   margin: 0 auto;
+  touch-action: pan-y;
 }
 .performance-row {
   display: flex;
