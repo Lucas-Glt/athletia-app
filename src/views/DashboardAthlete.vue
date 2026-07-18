@@ -7,6 +7,9 @@
       <div class="nav-item" :class="{ active: onglet === 'logs' }" @click="onglet = 'logs'">
         <i class="ti ti-history"></i> Historique
       </div>
+      <div class="nav-item" :class="{ active: onglet === 'performances' }" @click="onglet = 'performances'">
+        <i class="ti ti-trophy"></i> Performances
+      </div>
     </template>
 
     <div class="dashboard-root">
@@ -179,6 +182,15 @@
                     <span v-for="(exo, eidx) in groupe.exercices" :key="exo.id" class="saisie-nom">
                       <span class="exo-letter-mini" v-if="groupe.exercices.length > 1">{{ letterFor(eidx) }}</span>
                       {{ exo.nom }}
+                      <button
+                        type="button"
+                        class="btn-suivi"
+                        :class="{ active: exo.suivi }"
+                        @click="toggleSuivi(exo)"
+                        :aria-label="exo.suivi ? 'Ne plus suivre les performances' : 'Suivre les performances'"
+                      >
+                        <i class="ti ti-star"></i>
+                      </button>
                     </span>
                   </div>
                   <div class="saisie-swipe-hint">
@@ -434,6 +446,26 @@
               {{ log.fait ? '✓ fait' : 'non réalisé' }}
             </span>
           </div>
+        </div>
+      </div>
+
+      <!-- ONGLET PERFORMANCES -->
+      <div v-if="onglet === 'performances'" class="performances-page">
+        <div class="section-title">Meilleures performances</div>
+        <div v-if="performances.length === 0" class="empty">
+          Aucun exercice suivi pour l'instant. Touche l'étoile à côté d'un exercice dans le panneau de saisie pour le faire apparaître ici.
+        </div>
+        <div v-for="perf in performances" :key="perf.exercice_id" class="performance-row">
+          <div class="performance-info">
+            <span class="performance-exo">{{ perf.exercice_nom }}</span>
+            <span class="performance-meta">{{ perf.seance_nom }} · {{ perf.programme_nom }}</span>
+          </div>
+          <div class="performance-valeur" v-if="perf.meilleure_valeur !== null">
+            <span class="performance-val">{{ perf.meilleure_valeur }}</span>
+            <span class="performance-unite">{{ perf.unite }}</span>
+            <span class="performance-date">{{ formatDateCourt(perf.date) }}</span>
+          </div>
+          <span class="performance-vide" v-else>Aucune donnée</span>
         </div>
       </div>
     </div>
@@ -888,7 +920,27 @@ export default {
       return groups
     })
 
-    watch(onglet, (v) => { if (v === 'logs') fetchHistorique() })
+    const performances = ref([])
+    const fetchPerformances = async () => {
+      performances.value = await api.get('/performances/moi')
+    }
+
+    // Optimiste : le panneau de saisie reste réactif immédiatement, on
+    // resynchronise avec le serveur en tâche de fond.
+    const toggleSuivi = async (exo) => {
+      const suivi = !exo.suivi
+      exo.suivi = suivi
+      try {
+        await api.patch(`/exercices/${exo.id}/suivi`, { suivi })
+      } catch {
+        exo.suivi = !suivi
+      }
+    }
+
+    watch(onglet, (v) => {
+      if (v === 'logs') fetchHistorique()
+      if (v === 'performances') fetchPerformances()
+    })
     watch(seanceActive, (s) => { if (!s) fermerSaisie() })
 
     const formatDate = (d) => new Date(d).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
@@ -939,7 +991,8 @@ export default {
       saisieVue, historiqueIndex, nbTentativesGroupe, retourSaisie,
       onSaisieSwipeStart, onSaisieSwipeEnd,
       historiqueSeriePourExo, formatDateCourt, diffVsHistorique,
-      champsGraphique, courbeExo
+      champsGraphique, courbeExo,
+      performances, toggleSuivi
     }
   }
 }
@@ -1499,9 +1552,55 @@ export default {
 .chip-done { background: var(--color-valid-bg); color: var(--color-valid-text-strong); border-color: var(--color-valid-border); }
 .chip-skip { background: var(--color-bg-tertiary); color: var(--color-text-muted); }
 
+/* --- Suivi d'un exercice (étoile dans le panneau de saisie) --- */
+.btn-suivi {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  padding: 2px;
+  margin-left: 2px;
+  line-height: 1;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+.btn-suivi .ti { font-size: 16px; line-height: 1; }
+.btn-suivi.active { color: var(--color-warning-icon); }
+
+/* --- Performances --- */
+.performances-page {
+  flex: 1;
+  padding: var(--spacing-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  overflow-y: auto;
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+}
+.performance-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+.performance-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.performance-exo { font-size: var(--font-size-sm); font-weight: 600; color: var(--color-text-body); }
+.performance-meta { font-size: var(--font-size-xs); color: var(--color-text-muted); }
+.performance-valeur { display: flex; align-items: baseline; gap: 4px; flex-shrink: 0; }
+.performance-val { font-size: var(--font-size-lg); font-weight: 700; color: var(--color-primary-text); }
+.performance-unite { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+.performance-date { font-size: var(--font-size-xs); color: var(--color-text-muted); margin-left: 4px; }
+.performance-vide { font-size: var(--font-size-xs); color: var(--color-text-muted); font-style: italic; flex-shrink: 0; }
+
 /* --- Desktop : plus d'air, la feuille reste une colonne --- */
 @media (min-width: 769px) {
-  .screen, .logs-page { padding: var(--spacing-2xl); }
+  .screen, .logs-page, .performances-page { padding: var(--spacing-2xl); }
   .valider-bar { padding: var(--spacing-md) var(--spacing-2xl); }
   .valider-bar, .seance-topbar { padding-left: max(var(--spacing-2xl), calc((100% - 720px) / 2)); padding-right: max(var(--spacing-2xl), calc((100% - 720px) / 2)); }
   .realise-inputs { max-width: 360px; }
