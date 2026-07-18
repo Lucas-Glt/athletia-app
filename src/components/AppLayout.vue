@@ -423,7 +423,7 @@ export default {
   }
   .bottom-nav :deep(.nav-item i) { font-size: 22px; }
   .bottom-nav :deep(.nav-item.active) {
-    background: transparent;
+    background: var(--color-primary-light);
     color: var(--color-primary-dark);
   }
 
