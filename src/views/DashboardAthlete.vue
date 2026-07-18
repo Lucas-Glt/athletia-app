@@ -695,6 +695,11 @@ export default {
       grouperExercices(seance.exercices).forEach(g => {
         groupesOuverts.value[g.key] = false
       })
+
+      // Recharge l'historique à chaque (re)démarrage : sinon il reste figé
+      // sur l'état du chargement de la page et n'inclut pas les performances
+      // validées lors d'une saisie précédente pendant la même session.
+      fetchHistorique()
     }
 
     const validerSeance = async () => {
