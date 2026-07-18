@@ -106,6 +106,7 @@
               <div
                 class="exo-group"
                 :class="{ 'is-superset': groupe.exercices.length > 1, 'is-complete': isGroupeComplete(groupe) }"
+                @click="ouvrirSaisie(groupe)"
               >
                 <div class="exo-group-head">
                   <div class="exo-noms-list">
@@ -268,18 +269,32 @@
                        Swipe droit dans le panneau → dernière performance à la place. -->
                   <div class="realise-inputs" v-if="!voirHistoriqueSaisie">
                     <template v-if="seanceActive.type_seance === 'musculation' || !seanceActive.type_seance">
-                      <input
-                        v-model="getLogs(exo.id, serieIdx-1).reps_realisees"
-                        :placeholder="exo.series[serieIdx-1]?.nb_reps || 'reps'"
-                        inputmode="decimal"
-                        class="log-input"
-                      />
-                      <input
-                        v-model="getLogs(exo.id, serieIdx-1).poids_realise"
-                        :placeholder="exo.series[serieIdx-1]?.poids_cible || 'charge'"
-                        inputmode="decimal"
-                        class="log-input"
-                      />
+                      <div class="log-input-wrap">
+                        <input
+                          v-model="getLogs(exo.id, serieIdx-1).reps_realisees"
+                          :placeholder="exo.series[serieIdx-1]?.nb_reps || 'reps'"
+                          inputmode="decimal"
+                          class="log-input"
+                        />
+                        <span
+                          v-if="diffVsHistorique(exo, serieIdx, 'reps_realisees')"
+                          class="log-input-diff"
+                          :class="diffVsHistorique(exo, serieIdx, 'reps_realisees').classe"
+                        >{{ diffVsHistorique(exo, serieIdx, 'reps_realisees').texte }}</span>
+                      </div>
+                      <div class="log-input-wrap">
+                        <input
+                          v-model="getLogs(exo.id, serieIdx-1).poids_realise"
+                          :placeholder="exo.series[serieIdx-1]?.poids_cible || 'charge'"
+                          inputmode="decimal"
+                          class="log-input"
+                        />
+                        <span
+                          v-if="diffVsHistorique(exo, serieIdx, 'poids_realise')"
+                          class="log-input-diff"
+                          :class="diffVsHistorique(exo, serieIdx, 'poids_realise').classe"
+                        >{{ diffVsHistorique(exo, serieIdx, 'poids_realise').texte }}</span>
+                      </div>
                     </template>
                     <template v-else-if="seanceActive.type_seance === 'natation' || seanceActive.type_seance === 'athletisme'">
                       <input
@@ -553,6 +568,19 @@ export default {
 
     const formatDateCourt = (d) => new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
 
+    // Écart entre la saisie en cours et la dernière performance connue, pour
+    // un retour immédiat sur la progression (reps/charge en musculation).
+    const diffVsHistorique = (exo, serieIdx, champ) => {
+      const hist = historiqueSeriePourExo(exo, serieIdx)
+      if (!hist) return null
+      const actuel = parseFloat(getLogs(exo.id, serieIdx - 1)[champ])
+      const precedent = parseFloat(hist.log[champ])
+      if (isNaN(actuel) || isNaN(precedent)) return null
+      const ecart = Math.round((actuel - precedent) * 100) / 100
+      if (ecart === 0) return { texte: '=', classe: 'diff-neutre' }
+      return { texte: (ecart > 0 ? '+' : '') + ecart, classe: ecart > 0 ? 'diff-positif' : 'diff-negatif' }
+    }
+
     // Valeurs prescrites d'une série en une ligne compacte, selon le type de séance
     const valeursSerie = (exo, idx) => {
       const s = exo.series[idx]
@@ -789,7 +817,7 @@ export default {
       sauvegarderSerie,
       groupeSaisie, ouvrirSaisie, fermerSaisie, valeursSerie, resumeExo,
       voirHistoriqueSaisie, onSaisieSwipeStart, onSaisieSwipeEnd,
-      historiqueSeriePourExo, formatDateCourt
+      historiqueSeriePourExo, formatDateCourt, diffVsHistorique
     }
   }
 }
@@ -953,6 +981,7 @@ export default {
   flex-direction: column;
   gap: var(--spacing-md);
   flex-shrink: 0;
+  cursor: pointer;
 }
 .exo-group.is-superset { border-color: var(--color-superset-border); border-left: 4px solid var(--color-primary); }
 .exo-group.is-complete { border-color: var(--color-valid-border); background: var(--color-valid-bg-soft); }
@@ -1066,6 +1095,7 @@ export default {
   text-transform: capitalize;
 }
 .historique-inline-vide { font-size: var(--font-size-xs); color: var(--color-text-muted); font-style: italic; }
+.log-input-wrap { position: relative; flex: 1; min-width: 0; }
 .log-input {
   height: 32px;
   padding: 0 var(--spacing-sm);
@@ -1073,13 +1103,26 @@ export default {
   font-weight: 600;
   width: 100%;
   min-width: 0;
-  flex: 1;
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-md);
   background: var(--color-bg);
   text-align: center;
 }
 .log-input:focus { outline: none; border-color: var(--color-primary); }
+.log-input-diff {
+  position: absolute;
+  top: -8px;
+  right: -6px;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: var(--radius-full, 999px);
+  line-height: 1.4;
+  pointer-events: none;
+}
+.log-input-diff.diff-positif { background: var(--color-valid-bg); color: var(--color-valid-text-strong); }
+.log-input-diff.diff-negatif { background: var(--color-danger-bg); color: var(--color-danger-text); }
+.log-input-diff.diff-neutre { background: var(--color-bg-tertiary); color: var(--color-text-muted); }
 .log-input-locked {
   background: var(--color-bg-tertiary);
   color: var(--color-text-secondary);
