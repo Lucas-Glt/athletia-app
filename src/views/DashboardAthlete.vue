@@ -447,6 +447,7 @@ export default {
     const programmeActif = ref(null)
     const seances = ref([])
     const seanceActive = ref(null)
+    const sessionSaisieId = ref(null)
     const logs = ref({})
     const historique = ref([])
     const loadingSeances = ref(false)
@@ -580,15 +581,21 @@ export default {
       else if (dx <= -60) saisieVue.value = saisieVue.value === 'historique' ? 'saisie' : 'progression'
     }
 
+    // Regroupe les logs d'un exercice par tentative : le session_id (généré par
+    // demarrerSeance) distingue deux resaisies le même jour ; à défaut (logs
+    // antérieurs à cette fonctionnalité), on retombe sur le jour calendaire.
+    const cleTentative = (l) => l.session_id || l.date.split('T')[0]
+
     // Dernière performance connue pour cet exercice (hors séries de la séance en cours),
     // avec correspondance positionnelle : la Nème série d'aujourd'hui est comparée à la
-    // Nème série de la dernière fois où l'exercice a été fait.
+    // Nème série de la dernière tentative où l'exercice a été fait.
     const historiqueSeriePourExo = (exo, serieIdx) => {
       const entries = historique.value.filter(l => l.exo_nom === exo.nom)
       if (entries.length === 0) return null
       entries.sort((a, b) => new Date(b.date) - new Date(a.date))
+      const tentativeRecente = cleTentative(entries[0])
       const dateRecente = entries[0].date.split('T')[0]
-      const duJour = entries.filter(l => l.date.split('T')[0] === dateRecente)
+      const duJour = entries.filter(l => cleTentative(l) === tentativeRecente)
       return { date: dateRecente, log: duJour[serieIdx - 1] || duJour[0] }
     }
 
@@ -622,20 +629,23 @@ export default {
       ]
     })
 
-    // Série chronologique (une valeur par jour, la meilleure série du jour) pour
-    // la courbe de progression d'un exercice — tout l'historique, toutes séries confondues.
+    // Série chronologique (une valeur par tentative, la meilleure série de la
+    // tentative) pour la courbe de progression d'un exercice — tout
+    // l'historique, toutes séries confondues. Une tentative = une (re)saisie
+    // de la séance, donc deux tentatives le même jour donnent bien 2 points.
     const courbeExo = (exo, champ) => {
-      const meilleurParJour = {}
+      const meilleurParTentative = {}
       historique.value
         .filter(l => l.exo_nom === exo.nom)
         .forEach(l => {
-          const date = l.date.split('T')[0]
+          const cle = cleTentative(l)
           const valeur = parseFloat(l[champ])
           if (isNaN(valeur)) return
-          if (!(date in meilleurParJour) || valeur > meilleurParJour[date]) meilleurParJour[date] = valeur
+          if (!(cle in meilleurParTentative) || valeur > meilleurParTentative[cle].valeur) {
+            meilleurParTentative[cle] = { date: l.date.split('T')[0], valeur }
+          }
         })
-      return Object.entries(meilleurParJour)
-        .map(([date, valeur]) => ({ date, valeur }))
+      return Object.values(meilleurParTentative)
         .sort((a, b) => new Date(a.date) - new Date(b.date))
     }
 
@@ -678,7 +688,8 @@ export default {
           await api.post(`/series/${serie.id}/logs/`, {
             reps_realisees: log.reps_realisees || null,
             poids_realise: log.poids_realise || null,
-            fait: log.fait
+            fait: log.fait,
+            session_id: sessionSaisieId.value
           })
         }
       } catch (e) {
@@ -772,6 +783,10 @@ export default {
 
     const demarrerSeance = (seance) => {
       seanceActive.value = seance
+      // Identifiant de tentative : permet au backend de distinguer deux
+      // (re)saisies de la même séance le même jour au lieu de les fusionner
+      // (sinon la resaisie écrase l'historique de la tentative précédente).
+      sessionSaisieId.value = crypto.randomUUID()
       // Toujours une saisie vierge : la séance se rejoue à l'identique à
       // chaque ouverture, la dernière performance validée reste consultable
       // via le swipe dans le panneau de saisie, pas pré-remplie ici.
@@ -796,7 +811,8 @@ export default {
           await api.post(`/series/${serie.id}/logs/`, {
             reps_realisees: log.reps_realisees || null,
             poids_realise: log.poids_realise || null,
-            fait: log.fait
+            fait: log.fait,
+            session_id: sessionSaisieId.value
           })
         }
       }
