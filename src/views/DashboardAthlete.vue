@@ -193,10 +193,32 @@
                 @pointerup="onSaisieSwipeEnd"
                 @pointercancel="onSaisieSwipeEnd"
               >
-              <div v-if="voirHistoriqueSaisie" class="saisie-mode-banner">
-                <span><i class="ti ti-history"></i> Dernière performance</span>
-                <button class="saisie-mode-retour" @click="voirHistoriqueSaisie = false">Retour à la saisie</button>
+              <div v-if="saisieVue !== 'saisie'" class="saisie-mode-banner">
+                <span v-if="saisieVue === 'historique'"><i class="ti ti-history"></i> Dernière performance</span>
+                <span v-else><i class="ti ti-chart-line"></i> Courbe de progression</span>
+                <button class="saisie-mode-retour" @click="saisieVue = 'saisie'">Retour à la saisie</button>
               </div>
+
+              <template v-if="saisieVue === 'progression'">
+                <div
+                  v-for="(exo, eidx) in groupe.exercices"
+                  :key="'prog' + exo.id"
+                  class="progression-exo-bloc"
+                >
+                  <div class="progression-exo-titre" v-if="groupe.exercices.length > 1">
+                    <span class="exo-letter-mini">{{ letterFor(eidx) }}</span> {{ exo.nom }}
+                  </div>
+                  <CourbeProgression
+                    v-for="champ in champsGraphique"
+                    :key="champ.champ"
+                    :points="courbeExo(exo, champ.champ)"
+                    :label="champ.label"
+                    :unite="champ.unite"
+                  />
+                </div>
+              </template>
+
+              <template v-else>
               <div
                 v-for="serieIdx in groupe.exercices[0].series.length"
                 :key="serieIdx"
@@ -267,7 +289,7 @@
 
                   <!-- Réalisé : 2 champs, clavier numérique quand la donnée l'est.
                        Swipe droit dans le panneau → dernière performance à la place. -->
-                  <div class="realise-inputs" v-if="!voirHistoriqueSaisie">
+                  <div class="realise-inputs" v-if="saisieVue === 'saisie'">
                     <template v-if="seanceActive.type_seance === 'musculation' || !seanceActive.type_seance">
                       <div class="log-input-wrap">
                         <input
@@ -358,6 +380,7 @@
                   {{ isGroupeDone(groupe, serieIdx - 1) ? 'Fait' : 'Valider la série' }}
                 </button>
               </div>
+              </template>
               </div>
 
               <div class="saisie-foot">
@@ -415,9 +438,10 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useApi } from '../services/api'
 import AppLayout from '../components/AppLayout.vue'
+import CourbeProgression from '../components/athlete/CourbeProgression.vue'
 
 export default {
-  components: { AppLayout },
+  components: { AppLayout, CourbeProgression },
   setup() {
     const programmes = ref([])
     const programmeActif = ref(null)
@@ -529,12 +553,14 @@ export default {
 
     // --- Panneau de saisie par groupe (présentation uniquement) ---
     const groupeSaisie = ref(null)
-    const voirHistoriqueSaisie = ref(false)
-    const ouvrirSaisie = (groupe) => { groupeSaisie.value = groupe; voirHistoriqueSaisie.value = false }
-    const fermerSaisie = () => { groupeSaisie.value = null; voirHistoriqueSaisie.value = false }
+    // 'saisie' (centre) | 'historique' (swipe droit, dernière perf) | 'progression' (swipe gauche, courbe)
+    const saisieVue = ref('saisie')
+    const ouvrirSaisie = (groupe) => { groupeSaisie.value = groupe; saisieVue.value = 'saisie' }
+    const fermerSaisie = () => { groupeSaisie.value = null; saisieVue.value = 'saisie' }
 
-    // Swipe droit/gauche dans le panneau de saisie : bascule entre les champs
-    // de saisie et la dernière performance connue pour cet exercice.
+    // Swipe droit/gauche dans le panneau de saisie : bascule entre la saisie
+    // (centre), la dernière performance connue (droite) et la courbe de
+    // progression complète de l'exercice/superset (gauche).
     // Détection au relâché uniquement (pas de suivi live) pour ne jamais
     // interférer avec le scroll vertical ou les clics sur inputs/boutons.
     const saisieSwipeState = { startX: 0, startY: 0, active: false }
@@ -550,8 +576,8 @@ export default {
       const dx = e.clientX - saisieSwipeState.startX
       const dy = e.clientY - saisieSwipeState.startY
       if (Math.abs(dy) > Math.abs(dx) + 10) return
-      if (dx >= 60) voirHistoriqueSaisie.value = true
-      else if (dx <= -60) voirHistoriqueSaisie.value = false
+      if (dx >= 60) saisieVue.value = saisieVue.value === 'progression' ? 'saisie' : 'historique'
+      else if (dx <= -60) saisieVue.value = saisieVue.value === 'historique' ? 'saisie' : 'progression'
     }
 
     // Dernière performance connue pour cet exercice (hors séries de la séance en cours),
@@ -579,6 +605,38 @@ export default {
       const ecart = Math.round((actuel - precedent) * 100) / 100
       if (ecart === 0) return { texte: '=', classe: 'diff-neutre' }
       return { texte: (ecart > 0 ? '+' : '') + ecart, classe: ecart > 0 ? 'diff-positif' : 'diff-negatif' }
+    }
+
+    // Champs numériques à tracer selon le type de séance, avec leur libellé/unité
+    const champsGraphique = computed(() => {
+      const t = seanceActive.value?.type_seance || 'musculation'
+      if (t === 'natation' || t === 'athletisme') {
+        return [{ champ: 'reps_realisees', label: 'Distance', unite: 'm' }]
+      }
+      if (t === 'pliometrie') {
+        return [{ champ: 'reps_realisees', label: 'Bonds', unite: '' }]
+      }
+      return [
+        { champ: 'poids_realise', label: 'Charge', unite: 'kg' },
+        { champ: 'reps_realisees', label: 'Répétitions', unite: '' }
+      ]
+    })
+
+    // Série chronologique (une valeur par jour, la meilleure série du jour) pour
+    // la courbe de progression d'un exercice — tout l'historique, toutes séries confondues.
+    const courbeExo = (exo, champ) => {
+      const meilleurParJour = {}
+      historique.value
+        .filter(l => l.exo_nom === exo.nom)
+        .forEach(l => {
+          const date = l.date.split('T')[0]
+          const valeur = parseFloat(l[champ])
+          if (isNaN(valeur)) return
+          if (!(date in meilleurParJour) || valeur > meilleurParJour[date]) meilleurParJour[date] = valeur
+        })
+      return Object.entries(meilleurParJour)
+        .map(([date, valeur]) => ({ date, valeur }))
+        .sort((a, b) => new Date(a.date) - new Date(b.date))
     }
 
     // Valeurs prescrites d'une série en une ligne compacte, selon le type de séance
@@ -816,8 +874,9 @@ export default {
       progressionSeance,
       sauvegarderSerie,
       groupeSaisie, ouvrirSaisie, fermerSaisie, valeursSerie, resumeExo,
-      voirHistoriqueSaisie, onSaisieSwipeStart, onSaisieSwipeEnd,
-      historiqueSeriePourExo, formatDateCourt, diffVsHistorique
+      saisieVue, onSaisieSwipeStart, onSaisieSwipeEnd,
+      historiqueSeriePourExo, formatDateCourt, diffVsHistorique,
+      champsGraphique, courbeExo
     }
   }
 }
@@ -1267,6 +1326,22 @@ export default {
   padding: var(--spacing-md) var(--spacing-lg) calc(var(--spacing-md) + env(safe-area-inset-bottom));
   border-top: 1px solid var(--color-border);
   flex-shrink: 0;
+}
+.progression-exo-bloc {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  padding-bottom: var(--spacing-md);
+  border-bottom: 1px solid var(--color-border);
+}
+.progression-exo-bloc:last-child { border-bottom: none; padding-bottom: 0; }
+.progression-exo-titre {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  color: var(--color-text);
 }
 .btn-saisie-ok { width: 100%; min-height: var(--input-h); }
 
