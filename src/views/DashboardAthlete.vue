@@ -1359,10 +1359,13 @@ export default {
   align-items: center;
   justify-content: space-between;
   gap: var(--spacing-sm);
+  margin-top: 4px;
   font-size: 11px;
+  line-height: 1;
   color: var(--color-text-muted);
 }
-.swipe-hint-item { display: inline-flex; align-items: center; gap: 2px; }
+.swipe-hint-item { display: inline-flex; align-items: center; gap: 3px; line-height: 1; }
+.swipe-hint-item .ti { font-size: 13px; line-height: 1; }
 .saisie-body {
   flex: 1;
   overflow-y: auto;
