@@ -4,15 +4,12 @@
       <div class="nav-item" :class="{ active: onglet === 'programme' }" @click="onglet = 'programme'">
         <i class="ti ti-barbell"></i> Séances
       </div>
-      <div class="nav-item" :class="{ active: onglet === 'logs' }" @click="onglet = 'logs'">
-        <i class="ti ti-history"></i> Historique
-      </div>
       <div class="nav-item" :class="{ active: onglet === 'performances' }" @click="onglet = 'performances'">
         <i class="ti ti-trophy"></i> Performances
       </div>
     </template>
 
-    <div class="dashboard-root">
+    <div class="dashboard-root" @pointerdown="onTabSwipeStart" @pointerup="onTabSwipeEnd" @pointercancel="onTabSwipeEnd">
       <div class="empty-state" v-if="programmes.length === 0">
         <i class="ti ti-calendar-off empty-icon"></i>
         <p>Aucun programme assigné pour le moment.</p>
@@ -25,7 +22,7 @@
         <template v-if="!seanceActive">
           <div class="screen">
             <!-- Sélecteur de programme : seulement s'il y a un choix à faire -->
-            <div class="prog-switcher" v-if="programmes.length > 1">
+            <div class="prog-switcher" v-if="programmes.length > 1" @pointerdown.stop>
               <button
                 v-for="p in programmes"
                 :key="p.id"
@@ -42,7 +39,7 @@
               <p v-if="programmeActif.description">{{ programmeActif.description }}</p>
             </div>
 
-            <div class="semaines-scroll" v-if="semainesDisponibles.length > 0">
+            <div class="semaines-scroll" v-if="semainesDisponibles.length > 0" @pointerdown.stop>
               <button
                 v-for="sem in semainesDisponibles"
                 :key="sem"
@@ -173,7 +170,14 @@
           <!-- Panneau de saisie : les cartes série du groupe choisi, en bottom sheet.
                Le v-for sur [groupeSaisie] ne fait qu'aliaser groupeSaisie en `groupe`
                pour que le bloc des cartes série reste identique à l'ancien inline. -->
-          <div v-if="groupeSaisie" class="saisie-overlay" @click.self="fermerSaisie">
+          <div
+            v-if="groupeSaisie"
+            class="saisie-overlay"
+            @click.self="fermerSaisie"
+            @pointerdown.stop
+            @pointerup.stop
+            @pointercancel.stop
+          >
             <div class="saisie-sheet" v-for="groupe in [groupeSaisie]" :key="groupe.key">
               <div class="saisie-head">
                 <span class="exo-num">{{ groupe.ordre }}</span>
@@ -432,23 +436,6 @@
         </template>
       </div>
 
-      <!-- ONGLET LOGS -->
-      <div v-if="onglet === 'logs'" class="logs-page">
-        <div class="section-title">Historique de mes séances</div>
-        <div v-if="historique.length === 0" class="empty">Aucune séance enregistrée pour le moment.</div>
-        <div v-for="(group, date) in historiqueGroupe" :key="date" class="historique-day">
-          <div class="historique-date">{{ formatDate(date) }}</div>
-          <div v-for="log in group" :key="log.id" class="historique-row">
-            <span class="historique-exo">{{ log.exo_nom }}</span>
-            <span class="chip" v-if="log.reps_realisees">{{ log.reps_realisees }}</span>
-            <span class="chip" v-if="log.poids_realise">{{ log.poids_realise }}</span>
-            <span class="chip" :class="log.fait ? 'chip-done' : 'chip-skip'">
-              {{ log.fait ? '✓ fait' : 'non réalisé' }}
-            </span>
-          </div>
-        </div>
-      </div>
-
       <!-- ONGLET PERFORMANCES -->
       <div v-if="onglet === 'performances'" class="performances-page">
         <div class="section-title">Meilleures performances</div>
@@ -472,9 +459,14 @@
             <span class="performance-meta">{{ perf.seance_nom }} · {{ perf.programme_nom }}</span>
           </div>
           <div class="performance-valeur" v-if="perf.meilleure_valeur !== null">
-            <span class="performance-val">{{ perf.meilleure_valeur }}</span>
-            <span class="performance-unite">{{ perf.unite }}</span>
-            <span class="performance-date">{{ formatDateCourt(perf.date) }}</span>
+            <div class="performance-valeur-main">
+              <span class="performance-val">{{ perf.meilleure_valeur }}</span>
+              <span class="performance-unite">{{ perf.unite }}</span>
+            </div>
+            <div class="performance-valeur-sub">
+              <span class="performance-reps" v-if="perf.meilleure_repetition">× {{ perf.meilleure_repetition }} reps</span>
+              <span class="performance-date">{{ formatDateCourt(perf.date) }}</span>
+            </div>
           </div>
           <span class="performance-vide" v-else>Aucune donnée</span>
         </div>
@@ -934,16 +926,6 @@ export default {
       historique.value = logs.map(l => ({ ...l, exo_nom: l.exercice?.nom || '' }))
     }
 
-    const historiqueGroupe = computed(() => {
-      const groups = {}
-      historique.value.forEach(log => {
-        const date = log.date.split('T')[0]
-        if (!groups[date]) groups[date] = []
-        groups[date].push(log)
-      })
-      return groups
-    })
-
     const performances = ref([])
     const fetchPerformances = async () => {
       // suivi vaut toujours true à la réception : l'endpoint ne renvoie que
@@ -980,12 +962,32 @@ export default {
     }
 
     watch(onglet, (v) => {
-      if (v === 'logs') fetchHistorique()
       if (v === 'performances') fetchPerformances()
     })
     watch(seanceActive, (s) => { if (!s) fermerSaisie() })
 
-    const formatDate = (d) => new Date(d).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
+    // Swipe horizontal entre onglets (Séances <-> Performances), sur tout le
+    // contenu du dashboard. Le panneau de saisie a son propre swipe interne
+    // qui stoppe la propagation, donc les deux ne se marchent pas dessus.
+    const ONGLETS = ['programme', 'performances']
+    const tabSwipeState = { startX: 0, startY: 0, active: false }
+    const onTabSwipeStart = (e) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return
+      tabSwipeState.startX = e.clientX
+      tabSwipeState.startY = e.clientY
+      tabSwipeState.active = true
+    }
+    const onTabSwipeEnd = (e) => {
+      if (!tabSwipeState.active) return
+      tabSwipeState.active = false
+      const dx = e.clientX - tabSwipeState.startX
+      const dy = e.clientY - tabSwipeState.startY
+      if (Math.abs(dy) > Math.abs(dx) + 10) return
+      const idx = ONGLETS.indexOf(onglet.value)
+      if (dx <= -60 && idx < ONGLETS.length - 1) onglet.value = ONGLETS[idx + 1]
+      else if (dx >= 60 && idx > 0) onglet.value = ONGLETS[idx - 1]
+    }
+
     const logout = () => { authStore.logout(); router.push('/') }
     const panelListVisible = ref(false)
 
@@ -1018,13 +1020,13 @@ export default {
 
     return {
       programmes, programmeActif, seances, seanceActive, logs, historique,
-      loadingSeances, onglet, historiqueGroupe,
+      loadingSeances, onglet,
       semaineActive, semainesDisponibles, seancesFiltrees,
       groupesOuverts, toggleGroupe, isGroupeOuvert,
       labelType, letterFor, grouperExercices,
       getLogs, isGroupeDone, toggleGroupeDone,
       selectProgramme, demarrerSeance, validerSeance,
-      formatDate, logout, panelListVisible, isGroupeComplete,
+      logout, panelListVisible, isGroupeComplete,
       seancesCompletees, isSeanceComplete, isSemaineComplete,
       logsParSerie, chargerLogsExistants, getLogsAvecHistorique,
       progressionSeance,
@@ -1032,6 +1034,7 @@ export default {
       groupeSaisie, ouvrirSaisie, fermerSaisie, valeursSerie, resumeExo,
       saisieVue, historiqueIndex, nbTentativesGroupe, retourSaisie,
       onSaisieSwipeStart, onSaisieSwipeEnd,
+      onTabSwipeStart, onTabSwipeEnd,
       historiqueSeriePourExo, formatDateCourt, formatDateNumerique, diffVsHistorique,
       champsGraphique, courbeExo,
       performances, toggleSuivi, toggleSuiviPerformance, dateTentativeGroupe
@@ -1454,7 +1457,7 @@ export default {
   align-items: center;
   justify-content: space-between;
   gap: var(--spacing-sm);
-  margin-top: 8px;
+  margin-top: 14px;
   font-size: 11px;
   line-height: 1;
   color: var(--color-text-muted);
@@ -1547,53 +1550,6 @@ export default {
 .valider-progress-label { font-size: var(--font-size-xs); font-weight: 600; color: var(--color-text-secondary); }
 .btn-valider { flex-shrink: 0; min-height: var(--input-h); }
 
-/* --- Historique --- */
-.logs-page {
-  flex: 1;
-  padding: var(--spacing-lg);
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-md);
-  overflow-y: auto;
-  width: 100%;
-  max-width: 720px;
-  margin: 0 auto;
-}
-.historique-day { display: flex; flex-direction: column; gap: 6px; }
-.historique-date {
-  font-size: var(--font-size-sm);
-  font-weight: 600;
-  color: var(--color-superset-text);
-  text-transform: capitalize;
-}
-.historique-row {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-  flex-wrap: wrap;
-  padding: var(--spacing-sm) var(--spacing-md);
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-}
-.historique-exo {
-  font-size: var(--font-size-sm);
-  font-weight: 600;
-  color: var(--color-text-body);
-  flex: 1;
-  min-width: 120px;
-}
-.chip {
-  font-size: var(--font-size-xs);
-  background: var(--color-bg-secondary);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  padding: 3px 8px;
-  color: var(--color-text-secondary);
-}
-.chip-done { background: var(--color-valid-bg); color: var(--color-valid-text-strong); border-color: var(--color-valid-border); }
-.chip-skip { background: var(--color-bg-tertiary); color: var(--color-text-muted); }
-
 /* --- Suivi d'un exercice (étoile dans le panneau de saisie) --- */
 .btn-suivi {
   display: inline-flex;
@@ -1634,15 +1590,18 @@ export default {
 .performance-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .performance-exo { font-size: var(--font-size-sm); font-weight: 600; color: var(--color-text-body); }
 .performance-meta { font-size: var(--font-size-xs); color: var(--color-text-muted); }
-.performance-valeur { display: flex; align-items: baseline; gap: 4px; flex-shrink: 0; }
+.performance-valeur { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; }
+.performance-valeur-main { display: flex; align-items: baseline; gap: 4px; }
+.performance-valeur-sub { display: flex; align-items: center; gap: 6px; }
 .performance-val { font-size: var(--font-size-lg); font-weight: 700; color: var(--color-primary-text); }
 .performance-unite { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
-.performance-date { font-size: var(--font-size-xs); color: var(--color-text-muted); margin-left: 4px; }
+.performance-reps { font-size: var(--font-size-xs); color: var(--color-text-muted); }
+.performance-date { font-size: var(--font-size-xs); color: var(--color-text-muted); }
 .performance-vide { font-size: var(--font-size-xs); color: var(--color-text-muted); font-style: italic; flex-shrink: 0; }
 
 /* --- Desktop : plus d'air, la feuille reste une colonne --- */
 @media (min-width: 769px) {
-  .screen, .logs-page, .performances-page { padding: var(--spacing-2xl); }
+  .screen, .performances-page { padding: var(--spacing-2xl); }
   .valider-bar { padding: var(--spacing-md) var(--spacing-2xl); }
   .valider-bar, .seance-topbar { padding-left: max(var(--spacing-2xl), calc((100% - 720px) / 2)); padding-right: max(var(--spacing-2xl), calc((100% - 720px) / 2)); }
   .realise-inputs { max-width: 360px; }
