@@ -212,7 +212,7 @@
               <div v-if="saisieVue !== 'saisie'" class="saisie-mode-banner">
                 <span v-if="saisieVue === 'historique'">
                   <i class="ti ti-history"></i>
-                  {{ historiqueIndex === 0 ? 'Dernière performance' : `Performance n-${historiqueIndex + 1}` }}
+                  {{ dateTentativeGroupe ? formatDateNumerique(dateTentativeGroupe) : 'Historique' }}
                   <span class="saisie-mode-pager" v-if="nbTentativesGroupe > 1">({{ historiqueIndex + 1 }}/{{ nbTentativesGroupe }})</span>
                 </span>
                 <span v-else><i class="ti ti-chart-line"></i> Courbe de progression</span>
@@ -457,7 +457,18 @@
         </div>
         <div v-for="perf in performances" :key="perf.exercice_id" class="performance-row">
           <div class="performance-info">
-            <span class="performance-exo">{{ perf.exercice_nom }}</span>
+            <span class="performance-exo">
+              {{ perf.exercice_nom }}
+              <button
+                type="button"
+                class="btn-suivi"
+                :class="{ active: perf.suivi }"
+                @click="toggleSuiviPerformance(perf)"
+                aria-label="Ne plus suivre les performances"
+              >
+                <i class="ti ti-star"></i>
+              </button>
+            </span>
             <span class="performance-meta">{{ perf.seance_nom }} · {{ perf.programme_nom }}</span>
           </div>
           <div class="performance-valeur" v-if="perf.meilleure_valeur !== null">
@@ -630,6 +641,18 @@ export default {
       return Math.max(0, ...groupeSaisie.value.exercices.map(exo => tentativesExo(exo).length))
     })
 
+    // Date de la tentative affichée en mode historique (bannière du panneau) :
+    // on prend le premier exercice du groupe qui a bien une tentative à cette
+    // profondeur (un biset peut avoir des historiques de longueurs différentes).
+    const dateTentativeGroupe = computed(() => {
+      if (!groupeSaisie.value) return null
+      for (const exo of groupeSaisie.value.exercices) {
+        const tentative = tentativesExo(exo)[historiqueIndex.value]
+        if (tentative) return tentative[0].date.split('T')[0]
+      }
+      return null
+    })
+
     // Swipe droit/gauche dans le panneau de saisie : bascule entre la saisie
     // (centre), les tentatives passées (droite, paginable) et la courbe de
     // progression complète de l'exercice/superset (gauche).
@@ -678,6 +701,7 @@ export default {
     }
 
     const formatDateCourt = (d) => new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+    const formatDateNumerique = (d) => new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' })
 
     // Écart entre la saisie en cours et la dernière performance connue (n-1
     // toujours, indépendant de la pagination historique), pour un retour
@@ -922,7 +946,12 @@ export default {
 
     const performances = ref([])
     const fetchPerformances = async () => {
-      performances.value = await api.get('/performances/moi')
+      // suivi vaut toujours true à la réception : l'endpoint ne renvoie que
+      // les exercices suivis. Le champ est ensuite basculé localement par
+      // l'étoile de l'onglet, sans re-fetch (la ligne ne disparaît qu'au
+      // prochain chargement de l'onglet, cf. toggleSuiviPerformance).
+      const data = await api.get('/performances/moi')
+      performances.value = data.map(p => ({ ...p, suivi: true }))
     }
 
     // Optimiste : le panneau de saisie reste réactif immédiatement, on
@@ -934,6 +963,19 @@ export default {
         await api.patch(`/exercices/${exo.id}/suivi`, { suivi })
       } catch {
         exo.suivi = !suivi
+      }
+    }
+
+    // Désélection depuis l'onglet Performances : ne retire pas la ligne
+    // immédiatement, seulement l'étoile — la ligne disparaît en quittant et
+    // revenant sur l'onglet (prochain fetchPerformances).
+    const toggleSuiviPerformance = async (perf) => {
+      const suivi = !perf.suivi
+      perf.suivi = suivi
+      try {
+        await api.patch(`/exercices/${perf.exercice_id}/suivi`, { suivi })
+      } catch {
+        perf.suivi = !suivi
       }
     }
 
@@ -990,9 +1032,9 @@ export default {
       groupeSaisie, ouvrirSaisie, fermerSaisie, valeursSerie, resumeExo,
       saisieVue, historiqueIndex, nbTentativesGroupe, retourSaisie,
       onSaisieSwipeStart, onSaisieSwipeEnd,
-      historiqueSeriePourExo, formatDateCourt, diffVsHistorique,
+      historiqueSeriePourExo, formatDateCourt, formatDateNumerique, diffVsHistorique,
       champsGraphique, courbeExo,
-      performances, toggleSuivi
+      performances, toggleSuivi, toggleSuiviPerformance, dateTentativeGroupe
     }
   }
 }
@@ -1412,7 +1454,7 @@ export default {
   align-items: center;
   justify-content: space-between;
   gap: var(--spacing-sm);
-  margin-top: 4px;
+  margin-top: 8px;
   font-size: 11px;
   line-height: 1;
   color: var(--color-text-muted);
