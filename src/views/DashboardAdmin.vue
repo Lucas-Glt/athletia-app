@@ -21,12 +21,11 @@
         </div>
         <div class="modal-body">
           <div class="field">
-            <label>Nom</label>
-            <input v-model="newUser.nom" placeholder="Prénom Nom" />
-          </div>
-          <div class="field">
-            <label>Email</label>
-            <input v-model="newUser.email" type="email" placeholder="email@example.com" />
+            <label>Identifiant</label>
+            <input v-model="newUser.identifiant" placeholder="prenom.nom" />
+            <span class="domain-preview" v-if="newUser.identifiant">
+              → {{ newUser.identifiant }}@{{ newUser.role }}.{{ moi?.organisation?.slug }}
+            </span>
           </div>
           <div class="field">
             <label>Mot de passe</label>
@@ -37,14 +36,13 @@
             <select v-model="newUser.role">
               <option value="athlete">Athlète</option>
               <option value="prepa">Préparateur physique</option>
-              <option value="admin">Administrateur</option>
             </select>
           </div>
           <div v-if="createError" class="error">{{ createError }}</div>
         </div>
         <div class="modal-footer">
           <button class="btn" @click="modalCreation = false">Annuler</button>
-          <button class="btn btn-primary" @click="creerUtilisateur" :disabled="!newUser.nom || !newUser.email || !newUser.password">
+          <button class="btn btn-primary" @click="creerUtilisateur" :disabled="!newUser.identifiant || !newUser.password">
             Créer
           </button>
         </div>
@@ -115,6 +113,7 @@
           <span class="user-email">{{ user.email }}</span>
           <div class="role-cell">
             <select
+              v-if="user.role !== 'admin'"
               :value="user.role"
               @change="changerRole(user, $event.target.value)"
               class="role-select"
@@ -122,25 +121,28 @@
             >
               <option value="athlete">Athlète</option>
               <option value="prepa">Préparateur</option>
-              <option value="admin">Admin</option>
             </select>
+            <span v-else class="role-select role-admin role-readonly">Admin</span>
           </div>
           <div class="actions-cell">
-            <button
-              class="btn btn-sm btn-warning"
-              @click="ouvrirResetPassword(user)"
-              title="Réinitialiser le mot de passe"
-            >
-              <i class="ti ti-lock"></i>
-            </button>
-            <button
-              class="btn btn-sm btn-danger"
-              @click="supprimerUtilisateur(user)"
-              :disabled="user.id === moi?.id"
-              title="Supprimer"
-            >
-              <i class="ti ti-trash"></i>
-            </button>
+            <template v-if="user.role !== 'admin'">
+              <button
+                class="btn btn-sm btn-warning"
+                @click="ouvrirResetPassword(user)"
+                title="Réinitialiser le mot de passe"
+              >
+                <i class="ti ti-lock"></i>
+              </button>
+              <button
+                class="btn btn-sm btn-danger"
+                @click="supprimerUtilisateur(user)"
+                :disabled="user.id === moi?.id"
+                title="Supprimer"
+              >
+                <i class="ti ti-trash"></i>
+              </button>
+            </template>
+            <span v-else-if="user.id === moi?.id" class="badge-moi">Vous</span>
           </div>
         </div>
 
@@ -168,7 +170,7 @@ export default {
     // Création
     const modalCreation = ref(false)
     const createError = ref('')
-    const newUser = ref({ nom: '', email: '', password: '', role: 'athlete' })
+    const newUser = ref({ identifiant: '', password: '', role: 'athlete' })
 
     // Reset password
     const modalResetPassword = ref(false)
@@ -199,7 +201,7 @@ export default {
     }
 
     const ouvrirCreation = () => {
-      newUser.value = { nom: '', email: '', password: '', role: 'athlete' }
+      newUser.value = { identifiant: '', password: '', role: 'athlete' }
       createError.value = ''
       modalCreation.value = true
     }
@@ -207,7 +209,7 @@ export default {
     const creerUtilisateur = async () => {
       createError.value = ''
       try {
-        const data = await api.post('/users/', newUser.value)
+        const data = await api.post('/users/organisation', newUser.value)
         users.value.push(data)
         modalCreation.value = false
       } catch (e) {
@@ -397,6 +399,10 @@ export default {
 .role-select.role-athlete { background: var(--color-success-bg); color: var(--color-success-text); }
 
 .actions-cell { display: flex; justify-content: flex-end; gap: 6px; }
+
+.domain-preview { font-size: var(--font-size-xs); color: var(--color-text-secondary); font-family: monospace; }
+.role-readonly { cursor: default; }
+.badge-moi { font-size: var(--font-size-xs); color: var(--color-text-muted); font-style: italic; }
 
 @media (max-width: 768px) {
   .admin-page { padding: var(--spacing-md) var(--spacing-lg); }
