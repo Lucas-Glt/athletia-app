@@ -584,11 +584,8 @@
                 <label>Poids (kg)</label>
                 <input
                   v-model="poidsSaisi"
-                  type="number"
-                  step="0.1"
-                  min="0"
                   inputmode="decimal"
-                  placeholder="Ex : 72.4"
+                  placeholder="Ex : 72,4"
                 />
               </div>
             </div>
@@ -1309,8 +1306,10 @@ export default {
 
     const entreeExistante = computed(() => dateSaisiePoids.value ? poidsParDate.value[dateSaisiePoids.value] : null)
 
+    const parseNombre = (v) => parseFloat(String(v).replace(',', '.'))
+
     const poidsValide = computed(() => {
-      const v = parseFloat(poidsSaisi.value)
+      const v = parseNombre(poidsSaisi.value)
       return !isNaN(v) && v > 0
     })
 
@@ -1380,7 +1379,7 @@ export default {
     const enregistrerPoids = async () => {
       if (!poidsValide.value) return
       const date = dateSaisiePoids.value
-      const valeur = parseFloat(poidsSaisi.value)
+      const valeur = parseNombre(poidsSaisi.value)
       try {
         const entree = await api.post('/poids/', { date, poids: valeur })
         entriesPoids.value = [...entriesPoids.value.filter(e => e.date !== date), entree]
