@@ -321,6 +321,8 @@
                           :placeholder="exo.series[serieIdx-1]?.nb_reps || 'reps'"
                           inputmode="decimal"
                           class="log-input"
+                          :class="{ 'log-input-locked': isGroupeDone(groupe, serieIdx - 1) }"
+                          :readonly="isGroupeDone(groupe, serieIdx - 1)"
                         />
                         <span
                           v-if="diffVsHistorique(exo, serieIdx, 'reps_realisees')"
@@ -334,6 +336,8 @@
                           :placeholder="exo.series[serieIdx-1]?.poids_cible || 'charge'"
                           inputmode="decimal"
                           class="log-input"
+                          :class="{ 'log-input-locked': isGroupeDone(groupe, serieIdx - 1) }"
+                          :readonly="isGroupeDone(groupe, serieIdx - 1)"
                         />
                         <span
                           v-if="diffVsHistorique(exo, serieIdx, 'poids_realise')"
@@ -348,11 +352,15 @@
                         :placeholder="exo.series[serieIdx-1]?.metres ? `${exo.series[serieIdx-1].metres}m` : 'mètres'"
                         inputmode="decimal"
                         class="log-input"
+                        :class="{ 'log-input-locked': isGroupeDone(groupe, serieIdx - 1) }"
+                        :readonly="isGroupeDone(groupe, serieIdx - 1)"
                       />
                       <input
                         v-model="getLogs(exo.id, serieIdx-1).poids_realise"
                         :placeholder="exo.series[serieIdx-1]?.intensite || 'intensité'"
                         class="log-input"
+                        :class="{ 'log-input-locked': isGroupeDone(groupe, serieIdx - 1) }"
+                        :readonly="isGroupeDone(groupe, serieIdx - 1)"
                       />
                     </template>
                     <template v-else-if="seanceActive.type_seance === 'pliometrie'">
@@ -361,11 +369,15 @@
                         :placeholder="exo.series[serieIdx-1]?.bonds ? `${exo.series[serieIdx-1].bonds} bonds` : 'bonds'"
                         inputmode="decimal"
                         class="log-input"
+                        :class="{ 'log-input-locked': isGroupeDone(groupe, serieIdx - 1) }"
+                        :readonly="isGroupeDone(groupe, serieIdx - 1)"
                       />
                       <input
                         v-model="getLogs(exo.id, serieIdx-1).poids_realise"
                         :placeholder="exo.series[serieIdx-1]?.intensite || 'intensité'"
                         class="log-input"
+                        :class="{ 'log-input-locked': isGroupeDone(groupe, serieIdx - 1) }"
+                        :readonly="isGroupeDone(groupe, serieIdx - 1)"
                       />
                     </template>
                   </div>
@@ -395,14 +407,25 @@
                   </div>
                 </div>
 
-                <button
-                  class="btn-serie"
-                  :class="isGroupeDone(groupe, serieIdx - 1) ? 'btn-done' : 'btn-todo'"
-                  @click="toggleGroupeDone(groupe, serieIdx - 1)"
-                >
-                  <i :class="isGroupeDone(groupe, serieIdx - 1) ? 'ti ti-check' : 'ti ti-circle'"></i>
-                  {{ isGroupeDone(groupe, serieIdx - 1) ? 'Fait' : 'Valider la série' }}
-                </button>
+                <div class="serie-actions">
+                  <button
+                    class="btn-serie"
+                    :class="isGroupeDone(groupe, serieIdx - 1) ? 'btn-done' : 'btn-todo'"
+                    @click="toggleGroupeDone(groupe, serieIdx - 1)"
+                  >
+                    <i :class="isGroupeDone(groupe, serieIdx - 1) ? 'ti ti-check' : 'ti ti-circle'"></i>
+                    {{ isGroupeDone(groupe, serieIdx - 1) ? 'Fait' : 'Valider la série' }}
+                  </button>
+                  <button
+                    v-if="isGroupeDone(groupe, serieIdx - 1)"
+                    type="button"
+                    class="btn-supprimer-serie"
+                    @click="supprimerSerie(groupe, serieIdx - 1)"
+                    aria-label="Supprimer ce résultat"
+                  >
+                    <i class="ti ti-trash"></i>
+                  </button>
+                </div>
               </div>
               </template>
               </div>
@@ -570,8 +593,16 @@ export default {
 
     const toggleGroupeDone = (groupe, serieIdx) => {
       const isDone = isGroupeDone(groupe, serieIdx)
+      const devientFait = !isDone
       groupe.exercices.forEach(exo => {
-        getLogs(exo.id, serieIdx).fait = !isDone
+        const log = getLogs(exo.id, serieIdx)
+        // Rien saisi à la validation : on retient la valeur demandée par le
+        // prépa (le placeholder grisé) plutôt qu'un champ vide.
+        if (devientFait) {
+          if (!log.reps_realisees) log.reps_realisees = valeurParDefaut(exo, serieIdx, 'reps_realisees')
+          if (!log.poids_realise) log.poids_realise = valeurParDefaut(exo, serieIdx, 'poids_realise')
+        }
+        log.fait = devientFait
       })
 
       // Sauvegarde immédiate : plus de perte si l'athlète ferme l'app
@@ -779,16 +810,51 @@ export default {
           const serie = exo.series[serieIdx]
           if (!serie) continue
           const log = getLogs(exo.id, serieIdx)
-          await api.post(`/series/${serie.id}/logs/`, {
+          const saved = await api.post(`/series/${serie.id}/logs/`, {
             reps_realisees: log.reps_realisees || null,
             poids_realise: log.poids_realise || null,
             fait: log.fait,
             session_id: sessionSaisieId.value
           })
+          // Id du log en base, nécessaire pour pouvoir le supprimer ensuite
+          log.id = saved.id
         }
       } catch (e) {
         // Pas bloquant : la validation finale re-synchronise tout
         console.error('Erreur sauvegarde série:', e)
+      }
+    }
+
+    // Valeur par défaut d'un champ réalisé quand l'athlète valide sans
+    // rien saisir : la valeur prescrite par le prépa (celle affichée en
+    // placeholder grisé dans le champ), selon le type de séance.
+    const valeurParDefaut = (exo, serieIdx, champ) => {
+      const s = exo.series[serieIdx]
+      if (!s) return ''
+      const t = seanceActive.value?.type_seance || 'musculation'
+      if (champ === 'reps_realisees') {
+        if (t === 'natation' || t === 'athletisme') return s.metres || ''
+        if (t === 'pliometrie') return s.bonds || ''
+        return s.nb_reps || ''
+      }
+      if (t === 'natation' || t === 'athletisme' || t === 'pliometrie') return s.intensite || ''
+      return s.poids_cible || ''
+    }
+
+    // Suppression d'un résultat déjà validé : efface le log en base et vide
+    // la saisie locale, qui redevient modifiable.
+    const supprimerSerie = async (groupe, serieIdx) => {
+      if (!confirm('Supprimer ce résultat ?')) return
+      for (const exo of groupe.exercices) {
+        const serie = exo.series[serieIdx]
+        if (!serie) continue
+        const log = getLogs(exo.id, serieIdx)
+        try {
+          if (log.id) await api.del(`/series/${serie.id}/logs/${log.id}`)
+        } catch (e) {
+          console.error('Erreur suppression série:', e)
+        }
+        logs.value[exo.id][serieIdx] = { reps_realisees: '', poids_realise: '', fait: false }
       }
     }
 
@@ -806,6 +872,7 @@ export default {
         logs.forEach(log => {
           if (!logsParSerie.value[log.serie.id]) {
             logsParSerie.value[log.serie.id] = {
+              id: log.id,
               reps_realisees: log.reps_realisees || '',
               poids_realise: log.poids_realise || '',
               fait: log.fait
@@ -813,14 +880,32 @@ export default {
           }
         })
 
-        // Détermine quelles séances sont complètes
-        // Une séance est complète si toutes ses séries ont un log avec fait: true
+        // Détermine quelles séances sont complètes. Une séance est complète
+        // seulement si UNE MÊME tentative (session_id, ou jour à défaut) a vu
+        // toutes ses séries marquées faites : agréger le dernier état connu
+        // de chaque série indépendamment (ancien code) mélangeait des séries
+        // faites lors de tentatives différentes et jamais terminées ensemble,
+        // ce qui marquait à tort la séance comme validée (ex. après un
+        // changement de programme ou une fermeture de l'appli en cours de
+        // saisie).
         if (seances.value.length > 0) {
+          const logsParTentative = {}
+          logs.forEach(log => {
+            const cle = log.session_id || log.date.split('T')[0]
+            if (!logsParTentative[cle]) logsParTentative[cle] = []
+            logsParTentative[cle].push(log)
+          })
+
           seances.value.forEach(seance => {
-            const toutesLesSeries = seance.exercices?.flatMap(e => e.series) || []
-            if (toutesLesSeries.length === 0) return
-            const toutesFaites = toutesLesSeries.every(s => logsParSerie.value[s.id]?.fait)
-            if (toutesFaites) completees.add(seance.id)
+            const idsSeries = new Set((seance.exercices?.flatMap(e => e.series) || []).map(s => s.id))
+            if (idsSeries.size === 0) return
+            const complete = Object.values(logsParTentative).some(tentative => {
+              const faitesDansTentative = new Set(
+                tentative.filter(l => l.fait && idsSeries.has(l.serie.id)).map(l => l.serie.id)
+              )
+              return faitesDansTentative.size === idsSeries.size
+            })
+            if (complete) completees.add(seance.id)
           })
         }
 
@@ -898,16 +983,22 @@ export default {
     }
 
     const validerSeance = async () => {
-      for (const exo of seanceActive.value.exercices) {
-        for (let i = 0; i < exo.series.length; i++) {
-          const serie = exo.series[i]
-          const log = getLogs(exo.id, i)
-          await api.post(`/series/${serie.id}/logs/`, {
-            reps_realisees: log.reps_realisees || null,
-            poids_realise: log.poids_realise || null,
-            fait: log.fait,
-            session_id: sessionSaisieId.value
+      // Valider la séance force toutes les séries à "fait" (avec les valeurs
+      // prescrites par défaut si l'athlète n'a rien saisi) : sans ça, le
+      // bouton ne changeait concrètement rien pour les séries non cochées
+      // une par une, et la séance ne se retrouvait pas validée dans
+      // l'historique après coup.
+      const groupes = grouperExercices(seanceActive.value.exercices)
+      for (const groupe of groupes) {
+        const nbSeries = groupe.exercices[0].series.length
+        for (let i = 0; i < nbSeries; i++) {
+          groupe.exercices.forEach(exo => {
+            const log = getLogs(exo.id, i)
+            if (!log.reps_realisees) log.reps_realisees = valeurParDefaut(exo, i, 'reps_realisees')
+            if (!log.poids_realise) log.poids_realise = valeurParDefaut(exo, i, 'poids_realise')
+            log.fait = true
           })
+          await sauvegarderSerie(groupe, i)
         }
       }
 
@@ -1024,7 +1115,7 @@ export default {
       semaineActive, semainesDisponibles, seancesFiltrees,
       groupesOuverts, toggleGroupe, isGroupeOuvert,
       labelType, letterFor, grouperExercices,
-      getLogs, isGroupeDone, toggleGroupeDone,
+      getLogs, isGroupeDone, toggleGroupeDone, supprimerSerie,
       selectProgramme, demarrerSeance, validerSeance,
       logout, panelListVisible, isGroupeComplete,
       seancesCompletees, isSeanceComplete, isSemaineComplete,
@@ -1378,6 +1469,23 @@ export default {
 .btn-todo:hover { color: var(--color-primary-dark); border-color: var(--color-primary); }
 .btn-done { background: var(--color-primary); color: var(--color-on-primary); border-color: var(--color-primary-dark); }
 .btn-done:hover { background: var(--color-primary-dark); }
+
+.serie-actions { display: flex; gap: var(--spacing-sm); }
+.serie-actions .btn-serie { flex: 1; }
+.btn-supprimer-serie {
+  flex-shrink: 0;
+  width: 32px;
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  color: var(--color-danger-text);
+  cursor: pointer;
+}
+.btn-supprimer-serie:hover { background: var(--color-danger-bg); border-color: var(--color-danger-border); }
 
 .empty-series { font-size: var(--font-size-sm); color: var(--color-text-muted); font-style: italic; }
 
