@@ -7,6 +7,9 @@
       <div class="nav-item" :class="{ active: onglet === 'performances' }" @click="onglet = 'performances'">
         <i class="ti ti-trophy"></i> Performances
       </div>
+      <div class="nav-item" :class="{ active: onglet === 'poids' }" @click="onglet = 'poids'">
+        <i class="ti ti-scale"></i> Poids
+      </div>
     </template>
 
     <div class="dashboard-root" @pointerdown="onTabSwipeStart" @pointerup="onTabSwipeEnd" @pointercancel="onTabSwipeEnd">
@@ -502,6 +505,102 @@
             </div>
           </div>
           <span class="performance-vide" v-else>Aucune donnée</span>
+        </div>
+      </div>
+
+      <!-- ONGLET POIDS -->
+      <div v-if="onglet === 'poids'" class="poids-page">
+        <div class="poids-note">
+          <i class="ti ti-info-circle"></i>
+          Conseil : pesez-vous le matin, à jeun, pour un suivi fiable.
+        </div>
+
+        <div class="prog-switcher">
+          <button
+            class="prog-chip"
+            :class="{ active: sousOngletPoids === 'calendrier' }"
+            @click="sousOngletPoids = 'calendrier'"
+          >
+            <i class="ti ti-calendar"></i> Calendrier
+          </button>
+          <button
+            class="prog-chip"
+            :class="{ active: sousOngletPoids === 'courbe' }"
+            @click="sousOngletPoids = 'courbe'"
+          >
+            <i class="ti ti-chart-line"></i> Courbe
+          </button>
+        </div>
+
+        <template v-if="sousOngletPoids === 'calendrier'">
+          <div class="poids-calendrier-head">
+            <button class="btn btn-icon" @click="moisPrecedent" aria-label="Mois précédent">
+              <i class="ti ti-chevron-left"></i>
+            </button>
+            <span class="poids-mois-label">{{ labelMois }}</span>
+            <button class="btn btn-icon" @click="moisSuivant" aria-label="Mois suivant">
+              <i class="ti ti-chevron-right"></i>
+            </button>
+          </div>
+
+          <div class="poids-calendrier-grille">
+            <span v-for="(j, idx) in ['L', 'M', 'M', 'J', 'V', 'S', 'D']" :key="'lbl' + idx" class="poids-jour-label">{{ j }}</span>
+            <button
+              v-for="(jour, idx) in joursGrille"
+              :key="idx"
+              type="button"
+              class="poids-jour-case"
+              :class="{
+                vide: !jour,
+                'a-une-valeur': jour && poidsPourDate(jour.date),
+                'est-aujourdhui': jour && jour.estAujourdhui
+              }"
+              :disabled="!jour || jour.estFutur"
+              @click="jour && ouvrirSaisiePoids(jour.date)"
+            >
+              <template v-if="jour">
+                <span class="poids-jour-num">{{ jour.numero }}</span>
+                <span v-if="poidsPourDate(jour.date)" class="poids-jour-val">{{ poidsPourDate(jour.date) }}</span>
+              </template>
+            </button>
+          </div>
+        </template>
+
+        <template v-else>
+          <CourbeProgression :points="courbePoids" label="Poids" unite="kg" />
+        </template>
+
+        <!-- Modale de saisie du poids d'un jour -->
+        <div v-if="dateSaisiePoids" class="modal-overlay" @click.self="fermerSaisiePoids">
+          <div class="modal">
+            <div class="modal-header">
+              <h3>{{ formatDateLongue(dateSaisiePoids) }}</h3>
+              <button class="modal-close" @click="fermerSaisiePoids" aria-label="Fermer">
+                <i class="ti ti-x"></i>
+              </button>
+            </div>
+            <div class="modal-body">
+              <div class="field">
+                <label>Poids (kg)</label>
+                <input
+                  v-model="poidsSaisi"
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  inputmode="decimal"
+                  placeholder="Ex : 72.4"
+                />
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button v-if="entreeExistante" class="btn btn-danger" @click="supprimerPoids">
+                <i class="ti ti-trash"></i> Supprimer
+              </button>
+              <button class="btn btn-primary" @click="enregistrerPoids" :disabled="!poidsValide">
+                <i class="ti ti-check"></i> Enregistrer
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -1189,15 +1288,131 @@ export default {
       }
     }
 
+    // --- Suivi de poids ---
+    const entriesPoids = ref([]) // [{ id, date: 'YYYY-MM-DD', poids }]
+    const sousOngletPoids = ref('calendrier')
+    const moisAffiche = ref(new Date(new Date().getFullYear(), new Date().getMonth(), 1))
+    const dateSaisiePoids = ref(null)
+    const poidsSaisi = ref('')
+
+    const pad2 = (n) => String(n).padStart(2, '0')
+    const formatDateISO = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
+    const aujourdhuiISO = () => formatDateISO(new Date())
+
+    const poidsParDate = computed(() => {
+      const map = {}
+      entriesPoids.value.forEach(e => { map[e.date] = e })
+      return map
+    })
+
+    const poidsPourDate = (date) => poidsParDate.value[date]?.poids ?? null
+
+    const entreeExistante = computed(() => dateSaisiePoids.value ? poidsParDate.value[dateSaisiePoids.value] : null)
+
+    const poidsValide = computed(() => {
+      const v = parseFloat(poidsSaisi.value)
+      return !isNaN(v) && v > 0
+    })
+
+    const labelMois = computed(() => {
+      const texte = moisAffiche.value.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
+      return texte.charAt(0).toUpperCase() + texte.slice(1)
+    })
+
+    // Grille lundi -> dimanche, complétée par des cases vides pour aligner
+    // le premier jour du mois et compléter la dernière semaine.
+    const joursGrille = computed(() => {
+      const annee = moisAffiche.value.getFullYear()
+      const mois = moisAffiche.value.getMonth()
+      const premierJour = new Date(annee, mois, 1)
+      const nbJours = new Date(annee, mois + 1, 0).getDate()
+      const decalage = (premierJour.getDay() + 6) % 7 // 0 = lundi
+      const today = aujourdhuiISO()
+
+      const jours = []
+      for (let i = 0; i < decalage; i++) jours.push(null)
+      for (let n = 1; n <= nbJours; n++) {
+        const iso = `${annee}-${pad2(mois + 1)}-${pad2(n)}`
+        jours.push({
+          date: iso,
+          numero: n,
+          estAujourdhui: iso === today,
+          estFutur: iso > today
+        })
+      }
+      while (jours.length % 7 !== 0) jours.push(null)
+      return jours
+    })
+
+    const courbePoids = computed(() =>
+      [...entriesPoids.value]
+        .sort((a, b) => new Date(a.date) - new Date(b.date))
+        .map(e => ({ date: e.date, valeur: e.poids }))
+    )
+
+    const moisPrecedent = () => {
+      moisAffiche.value = new Date(moisAffiche.value.getFullYear(), moisAffiche.value.getMonth() - 1, 1)
+    }
+    const moisSuivant = () => {
+      moisAffiche.value = new Date(moisAffiche.value.getFullYear(), moisAffiche.value.getMonth() + 1, 1)
+    }
+
+    const formatDateLongue = (iso) =>
+      new Date(iso).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
+
+    const ouvrirSaisiePoids = (date) => {
+      dateSaisiePoids.value = date
+      poidsSaisi.value = poidsParDate.value[date]?.poids ?? ''
+    }
+    const fermerSaisiePoids = () => {
+      dateSaisiePoids.value = null
+      poidsSaisi.value = ''
+    }
+
+    const chargerPoids = async () => {
+      try {
+        entriesPoids.value = await api.get('/poids/moi')
+      } catch (e) {
+        console.error('Erreur chargement poids:', e)
+      }
+    }
+
+    const enregistrerPoids = async () => {
+      if (!poidsValide.value) return
+      const date = dateSaisiePoids.value
+      const valeur = parseFloat(poidsSaisi.value)
+      try {
+        const entree = await api.post('/poids/', { date, poids: valeur })
+        entriesPoids.value = [...entriesPoids.value.filter(e => e.date !== date), entree]
+        fermerSaisiePoids()
+      } catch (e) {
+        console.error('Erreur enregistrement poids:', e)
+      }
+    }
+
+    const supprimerPoids = async () => {
+      const entree = entreeExistante.value
+      if (!entree) return
+      if (!confirm('Supprimer cette pesée ?')) return
+      try {
+        await api.del(`/poids/${entree.id}`)
+        entriesPoids.value = entriesPoids.value.filter(e => e.id !== entree.id)
+        fermerSaisiePoids()
+      } catch (e) {
+        console.error('Erreur suppression poids:', e)
+      }
+    }
+
     watch(onglet, (v) => {
       if (v === 'performances') fetchPerformances()
+      if (v === 'poids') chargerPoids()
     })
     watch(seanceActive, (s) => { if (!s) fermerSaisie() })
 
-    // Swipe horizontal entre onglets (Séances <-> Performances), sur tout le
-    // contenu du dashboard. Le panneau de saisie a son propre swipe interne
-    // qui stoppe la propagation, donc les deux ne se marchent pas dessus.
-    const ONGLETS = ['programme', 'performances']
+    // Swipe horizontal entre onglets (Séances <-> Performances <-> Poids), sur
+    // tout le contenu du dashboard. Le panneau de saisie a son propre swipe
+    // interne qui stoppe la propagation, donc les deux ne se marchent pas dessus.
+    const ONGLETS = ['programme', 'performances', 'poids']
     const tabSwipeState = { startX: 0, startY: 0, active: false }
     const onTabSwipeStart = (e) => {
       if (e.pointerType === 'mouse' && e.button !== 0) return
@@ -1267,7 +1482,10 @@ export default {
       onTabSwipeStart, onTabSwipeEnd,
       historiqueSeriePourExo, formatDateCourt, formatDateNumerique, diffVsHistorique,
       champsGraphique, courbeExo,
-      performances, toggleSuivi, toggleSuiviPerformance, dateTentativeGroupe
+      performances, toggleSuivi, toggleSuiviPerformance, dateTentativeGroupe,
+      sousOngletPoids, dateSaisiePoids, poidsSaisi, poidsPourDate, entreeExistante, poidsValide,
+      labelMois, joursGrille, courbePoids, moisPrecedent, moisSuivant, formatDateLongue,
+      ouvrirSaisiePoids, fermerSaisiePoids, enregistrerPoids, supprimerPoids
     }
   }
 }
@@ -1876,4 +2094,63 @@ export default {
   .valider-bar, .seance-topbar { padding-left: max(var(--spacing-2xl), calc((100% - 720px) / 2)); padding-right: max(var(--spacing-2xl), calc((100% - 720px) / 2)); }
   .realise-inputs { max-width: 360px; }
 }
+
+/* --- Suivi de poids --- */
+.poids-page {
+  flex: 1;
+  padding: var(--spacing-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+  overflow-y: auto;
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+  touch-action: pan-y;
+}
+.poids-note {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--color-primary-text);
+  background: var(--color-primary-light);
+  padding: var(--spacing-md);
+  border-radius: var(--radius-md);
+}
+.poids-note .ti { font-size: var(--font-size-lg); flex-shrink: 0; }
+
+.poids-calendrier-head { display: flex; align-items: center; justify-content: space-between; }
+.poids-mois-label { font-size: var(--font-size-base); font-weight: 700; text-transform: capitalize; }
+
+.poids-calendrier-grille { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.poids-jour-label {
+  text-align: center;
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--color-text-muted);
+  padding-bottom: 4px;
+}
+.poids-jour-case {
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  cursor: pointer;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-body);
+  padding: 2px;
+}
+.poids-jour-case.vide { visibility: hidden; cursor: default; border: none; }
+.poids-jour-case.est-aujourdhui { border-color: var(--color-primary); border-width: 2px; }
+.poids-jour-case.a-une-valeur { background: var(--color-valid-bg-soft); border-color: var(--color-valid-border); }
+.poids-jour-case:disabled { opacity: 0.35; cursor: not-allowed; }
+.poids-jour-num { font-weight: 600; }
+.poids-jour-val { font-size: 10px; font-weight: 700; color: var(--color-valid-text-strong); }
 </style>
