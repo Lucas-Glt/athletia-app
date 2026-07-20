@@ -23,6 +23,11 @@ const router = createRouter({
       path: '/admin',
       name: 'admin',
       component: () => import('../views/DashboardAdmin.vue')
+    },
+    {
+      path: '/super-admin',
+      name: 'super-admin',
+      component: () => import('../views/DashboardSuperAdmin.vue')
     }
   ]
 })

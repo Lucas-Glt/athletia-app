@@ -87,8 +87,9 @@ export default {
         authStore.setAuth(data.access_token, payload.role, user)
 
         if (payload.role === 'athlete') router.push('/athlete')
-        else if (payload.role === 'prepa') router.push('/prepa')
+        else if (payload.role === 'prepa' || payload.role === 'super_prepa') router.push('/prepa')
         else if (payload.role === 'admin') router.push('/admin')
+        else if (payload.role === 'super_admin') router.push('/super-admin')
 
       } catch (e) {
         error.value = e.message

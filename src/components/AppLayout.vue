@@ -142,18 +142,25 @@ export default {
     const form = ref({ ancien: '', nouveau: '', confirmation: '' })
 
     const roleLabel = computed(() => {
-      const labels = { prepa: 'Préparateur physique', athlete: 'Athlète', admin: 'Administrateur' }
+      const labels = {
+        prepa: 'Préparateur physique',
+        athlete: 'Athlète',
+        admin: 'Administrateur',
+        super_prepa: 'Préparateur physique (sans organisation)',
+        super_admin: 'Administrateur plateforme'
+      }
       return labels[authStore.role] || ''
     })
 
     const brandLetter = computed(() => {
-      if (authStore.role === 'prepa') return 'P'
-      if (authStore.role === 'admin') return 'A'
+      if (authStore.role === 'prepa' || authStore.role === 'super_prepa') return 'P'
+      if (authStore.role === 'admin' || authStore.role === 'super_admin') return 'A'
       return 'A'
     })
 
     const brandColor = computed(() => {
-      if (authStore.role === 'prepa') return 'linear-gradient(135deg, #7F77DD, #534AB7)'
+      if (authStore.role === 'prepa' || authStore.role === 'super_prepa') return 'linear-gradient(135deg, #7F77DD, #534AB7)'
+      if (authStore.role === 'super_admin') return 'linear-gradient(135deg, #534AB7, #17153A)'
       if (authStore.role === 'admin') return 'linear-gradient(135deg, #dc2626, #b91c1c)'
       return 'linear-gradient(135deg, #16a34a, #15803d)'
     })
