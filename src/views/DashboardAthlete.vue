@@ -524,6 +524,10 @@ export default {
     const seances = ref([])
     const seanceActive = ref(null)
     const sessionSaisieId = ref(null)
+    // Id de la séance dont la saisie locale (logs.value) est en cours mais pas
+    // encore validée — permet de la reprendre telle quelle en repassant par la
+    // liste et en rouvrant la même séance, sans perdre ce qui a été rempli.
+    const seanceEnCoursId = ref(null)
     const logs = ref({})
     const historique = ref([])
     const loadingSeances = ref(false)
@@ -615,9 +619,10 @@ export default {
         log.fait = devientFait
       })
 
-      // Sauvegarde immédiate : plus de perte si l'athlète ferme l'app
-      // avant le bouton final (le backend upserte par jour, pas de doublons)
-      sauvegarderSerie(groupe, serieIdx)
+      // Pas de sauvegarde ici : la saisie reste locale (verte, en attente)
+      // tant que l'athlète n'a pas cliqué sur « Valider la séance » — sinon
+      // des séries isolées se retrouvaient poussées dans l'historique avant
+      // que la séance entière soit terminée.
 
       // Après validation, vérifie si toutes les séries du groupe sont complètes
       if (!isDone) {
@@ -833,14 +838,12 @@ export default {
           const serie = exo.series[serieIdx]
           if (!serie) continue
           const log = getLogs(exo.id, serieIdx)
-          const saved = await api.post(`/series/${serie.id}/logs/`, {
+          await api.post(`/series/${serie.id}/logs/`, {
             reps_realisees: log.reps_realisees || null,
             poids_realise: log.poids_realise || null,
             fait: log.fait,
             session_id: sessionSaisieId.value
           })
-          // Id du log en base, nécessaire pour pouvoir le supprimer ensuite
-          log.id = saved.id
         }
       } catch (e) {
         // Pas bloquant : la validation finale re-synchronise tout
@@ -1095,16 +1098,20 @@ export default {
 
     const demarrerSeance = (seance) => {
       seanceActive.value = seance
-      // Identifiant de tentative : permet au backend de distinguer deux
-      // (re)saisies de la même séance le même jour au lieu de les fusionner
-      // (sinon la resaisie écrase l'historique de la tentative précédente).
-      sessionSaisieId.value = crypto.randomUUID()
-      // Toujours une saisie vierge : la séance se rejoue à l'identique à
-      // chaque ouverture, la dernière performance validée reste consultable
-      // via le swipe dans le panneau de saisie, pas pré-remplie ici.
-      logs.value = {}
-      groupesOuverts.value = {}
 
+      // Ressaisie de la séance déjà en cours (retour à la liste puis
+      // réouverture sans avoir validé) : on reprend logs.value tel quel,
+      // rien n'a encore été poussé au backend. Sinon (nouvelle séance, ou
+      // même séance rejouée après une validation précédente), saisie vierge
+      // avec un nouvel identifiant de tentative — la dernière performance
+      // validée reste consultable via le swipe, pas pré-remplie ici.
+      if (seanceEnCoursId.value !== seance.id) {
+        sessionSaisieId.value = crypto.randomUUID()
+        logs.value = {}
+        seanceEnCoursId.value = seance.id
+      }
+
+      groupesOuverts.value = {}
       grouperExercices(seance.exercices).forEach(g => {
         groupesOuverts.value[g.key] = false
       })
@@ -1131,6 +1138,8 @@ export default {
       }
 
       seancesCompletees.value.add(seanceActive.value.id)
+      seanceEnCoursId.value = null
+      logs.value = {}
       seanceActive.value = null
       // La progression d'une semaine à l'autre est décidée par le prépa dans
       // le programme, plus par l'athlète en validant ses séances.
