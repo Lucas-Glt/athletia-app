@@ -382,28 +382,50 @@
                     </template>
                   </div>
                   <div class="historique-inline" v-else>
-                    <template v-if="historiqueSeriePourExo(exo, serieIdx)">
-                      <span class="historique-inline-date">
-                        <i class="ti ti-lock"></i> {{ formatDateCourt(historiqueSeriePourExo(exo, serieIdx).date) }}
-                      </span>
-                      <div class="realise-inputs">
-                        <input
-                          class="log-input log-input-locked"
-                          :class="{ done: historiqueSeriePourExo(exo, serieIdx).log.fait }"
-                          readonly
-                          tabindex="-1"
-                          :value="historiqueSeriePourExo(exo, serieIdx).log.reps_realisees || '—'"
-                        />
-                        <input
-                          class="log-input log-input-locked"
-                          :class="{ done: historiqueSeriePourExo(exo, serieIdx).log.fait }"
-                          readonly
-                          tabindex="-1"
-                          :value="historiqueSeriePourExo(exo, serieIdx).log.poids_realise || '—'"
-                        />
-                      </div>
+                    <template v-for="entree in [historiqueSeriePourExo(exo, serieIdx)]" :key="entree?.log?.id ?? 'vide'">
+                      <template v-if="entree">
+                        <div class="historique-inline-head">
+                          <span class="historique-inline-date">
+                            <i class="ti ti-lock" v-if="!estEnEdition(entree.log)"></i>
+                            {{ formatDateCourt(entree.date) }}
+                          </span>
+                          <div class="historique-inline-actions">
+                            <button
+                              type="button"
+                              class="historique-inline-etat"
+                              :class="{ 'etat-non-fait': !entree.log.fait, 'etat-edition': estEnEdition(entree.log) }"
+                              @click="estEnEdition(entree.log) ? validerEditionHistorique(entree, exo, serieIdx) : ouvrirEditionHistorique(entree.log)"
+                            >
+                              <i :class="estEnEdition(entree.log) ? 'ti ti-check' : 'ti ti-pencil'"></i>
+                              {{ estEnEdition(entree.log) ? 'Valider' : (entree.log.fait ? 'Fait' : 'Non fait') }}
+                            </button>
+                            <button
+                              type="button"
+                              class="btn-supprimer-serie"
+                              @click="supprimerHistorique(entree.log)"
+                              aria-label="Supprimer cet historique"
+                            >
+                              <i class="ti ti-trash"></i>
+                            </button>
+                          </div>
+                        </div>
+                        <div class="realise-inputs">
+                          <input
+                            class="log-input"
+                            :class="{ 'log-input-locked': !estEnEdition(entree.log), done: entree.log.fait && !estEnEdition(entree.log) }"
+                            :readonly="!estEnEdition(entree.log)"
+                            v-model="entree.log.reps_realisees"
+                          />
+                          <input
+                            class="log-input"
+                            :class="{ 'log-input-locked': !estEnEdition(entree.log), done: entree.log.fait && !estEnEdition(entree.log) }"
+                            :readonly="!estEnEdition(entree.log)"
+                            v-model="entree.log.poids_realise"
+                          />
+                        </div>
+                      </template>
+                      <span v-else class="historique-inline-vide">Pas d'historique pour cet exercice</span>
                     </template>
-                    <span v-else class="historique-inline-vide">Pas d'historique pour cet exercice</span>
                   </div>
                 </div>
 
@@ -841,20 +863,61 @@ export default {
       return s.poids_cible || ''
     }
 
-    // Suppression d'un résultat déjà validé : efface le log en base et vide
-    // la saisie locale, qui redevient modifiable.
+    const supprimerLog = async (serieId, logId) => {
+      try {
+        await api.del(`/series/${serieId}/logs/${logId}`)
+      } catch (e) {
+        console.error('Erreur suppression log:', e)
+      }
+    }
+
+    // Suppression d'un résultat déjà validé (saisie en cours) : efface le log
+    // en base et vide la saisie locale, qui redevient modifiable.
     const supprimerSerie = async (groupe, serieIdx) => {
       if (!confirm('Supprimer ce résultat ?')) return
       for (const exo of groupe.exercices) {
         const serie = exo.series[serieIdx]
         if (!serie) continue
         const log = getLogs(exo.id, serieIdx)
-        try {
-          if (log.id) await api.del(`/series/${serie.id}/logs/${log.id}`)
-        } catch (e) {
-          console.error('Erreur suppression série:', e)
-        }
+        if (log.id) await supprimerLog(serie.id, log.id)
         logs.value[exo.id][serieIdx] = { reps_realisees: '', poids_realise: '', fait: false }
+      }
+    }
+
+    // --- Édition / suppression d'un résultat déjà dans l'historique (vue
+    // historique du panneau de saisie, tentatives passées) ---
+    const historiqueEnEdition = ref(new Set())
+    const estEnEdition = (log) => historiqueEnEdition.value.has(log.id)
+    const ouvrirEditionHistorique = (log) => { historiqueEnEdition.value.add(log.id) }
+
+    const validerEditionHistorique = async (entree, exo, serieIdx) => {
+      const log = entree.log
+      if (!log.reps_realisees) log.reps_realisees = valeurParDefaut(exo, serieIdx - 1, 'reps_realisees')
+      if (!log.poids_realise) log.poids_realise = valeurParDefaut(exo, serieIdx - 1, 'poids_realise')
+      log.fait = true
+      try {
+        await api.post(`/series/${log.serie.id}/logs/`, {
+          reps_realisees: log.reps_realisees || null,
+          poids_realise: log.poids_realise || null,
+          fait: true,
+          session_id: log.session_id
+        })
+      } catch (e) {
+        console.error('Erreur modification historique:', e)
+      }
+      historiqueEnEdition.value.delete(log.id)
+      await chargerLogsExistants(programmeActif.value.id)
+      await fetchHistorique()
+    }
+
+    const supprimerHistorique = async (log) => {
+      if (!confirm('Supprimer cet historique ?')) return
+      await supprimerLog(log.serie.id, log.id)
+      historiqueEnEdition.value.delete(log.id)
+      await chargerLogsExistants(programmeActif.value.id)
+      await fetchHistorique()
+      if (historiqueIndex.value > 0 && historiqueIndex.value >= nbTentativesGroupe.value) {
+        historiqueIndex.value = Math.max(0, nbTentativesGroupe.value - 1)
       }
     }
 
@@ -880,14 +943,18 @@ export default {
           }
         })
 
-        // Détermine quelles séances sont complètes. Une séance est complète
-        // seulement si UNE MÊME tentative (session_id, ou jour à défaut) a vu
-        // toutes ses séries marquées faites : agréger le dernier état connu
-        // de chaque série indépendamment (ancien code) mélangeait des séries
-        // faites lors de tentatives différentes et jamais terminées ensemble,
-        // ce qui marquait à tort la séance comme validée (ex. après un
-        // changement de programme ou une fermeture de l'appli en cours de
-        // saisie).
+        // Détermine quelles séances sont validées dans l'historique. Une
+        // séance l'est si UNE MÊME tentative (session_id, ou jour à défaut) a
+        // une entrée pour toutes ses séries — qu'elles soient faites ou non :
+        // "Valider la séance" enregistre explicitement l'état réel de chaque
+        // série (fait ou non fait), donc la séance devient validée dès que ce
+        // bouton est pressé, sans forcer les séries non faites à "fait".
+        // Agréger le dernier état connu de chaque série indépendamment
+        // (ancien code) mélangeait des séries faites lors de tentatives
+        // différentes et jamais terminées ensemble, ce qui marquait à tort la
+        // séance comme validée (ex. après un changement de programme ou une
+        // fermeture de l'appli en cours de saisie) : on raisonne maintenant
+        // par tentative.
         if (seances.value.length > 0) {
           const logsParTentative = {}
           logs.forEach(log => {
@@ -900,10 +967,10 @@ export default {
             const idsSeries = new Set((seance.exercices?.flatMap(e => e.series) || []).map(s => s.id))
             if (idsSeries.size === 0) return
             const complete = Object.values(logsParTentative).some(tentative => {
-              const faitesDansTentative = new Set(
-                tentative.filter(l => l.fait && idsSeries.has(l.serie.id)).map(l => l.serie.id)
+              const couvertesDansTentative = new Set(
+                tentative.filter(l => idsSeries.has(l.serie.id)).map(l => l.serie.id)
               )
-              return faitesDansTentative.size === idsSeries.size
+              return couvertesDansTentative.size === idsSeries.size
             })
             if (complete) completees.add(seance.id)
           })
@@ -983,21 +1050,16 @@ export default {
     }
 
     const validerSeance = async () => {
-      // Valider la séance force toutes les séries à "fait" (avec les valeurs
-      // prescrites par défaut si l'athlète n'a rien saisi) : sans ça, le
-      // bouton ne changeait concrètement rien pour les séries non cochées
-      // une par une, et la séance ne se retrouvait pas validée dans
-      // l'historique après coup.
+      // Valider la séance pousse l'état RÉEL de chaque série dans
+      // l'historique — les séries déjà validées une par une gardent leurs
+      // valeurs réelles (défauts déjà appliqués par toggleGroupeDone), les
+      // séries jamais validées sont enregistrées explicitement "non fait"
+      // (aucun remplissage automatique) : le bouton fige ce qui a été fait,
+      // il ne complète pas ce qui ne l'a pas été.
       const groupes = grouperExercices(seanceActive.value.exercices)
       for (const groupe of groupes) {
         const nbSeries = groupe.exercices[0].series.length
         for (let i = 0; i < nbSeries; i++) {
-          groupe.exercices.forEach(exo => {
-            const log = getLogs(exo.id, i)
-            if (!log.reps_realisees) log.reps_realisees = valeurParDefaut(exo, i, 'reps_realisees')
-            if (!log.poids_realise) log.poids_realise = valeurParDefaut(exo, i, 'poids_realise')
-            log.fait = true
-          })
           await sauvegarderSerie(groupe, i)
         }
       }
@@ -1116,6 +1178,7 @@ export default {
       groupesOuverts, toggleGroupe, isGroupeOuvert,
       labelType, letterFor, grouperExercices,
       getLogs, isGroupeDone, toggleGroupeDone, supprimerSerie,
+      estEnEdition, ouvrirEditionHistorique, validerEditionHistorique, supprimerHistorique,
       selectProgramme, demarrerSeance, validerSeance,
       logout, panelListVisible, isGroupeComplete,
       seancesCompletees, isSeanceComplete, isSemaineComplete,
@@ -1408,6 +1471,31 @@ export default {
   text-transform: capitalize;
 }
 .historique-inline-vide { font-size: var(--font-size-xs); color: var(--color-text-muted); font-style: italic; }
+.historique-inline-head { display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-sm); }
+.historique-inline-actions { display: flex; align-items: center; gap: 6px; }
+.historique-inline-etat {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-valid-border);
+  background: var(--color-valid-bg);
+  color: var(--color-valid-text-strong);
+  cursor: pointer;
+}
+.historique-inline-etat.etat-non-fait {
+  background: var(--color-bg-tertiary);
+  border-color: var(--color-border);
+  color: var(--color-text-secondary);
+}
+.historique-inline-etat.etat-edition {
+  background: var(--color-primary-light);
+  border-color: var(--color-primary);
+  color: var(--color-primary-text);
+}
 .log-input-wrap { position: relative; flex: 1; min-width: 0; }
 .log-input {
   height: 32px;
