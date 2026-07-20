@@ -220,6 +220,15 @@
                   <span class="saisie-mode-pager" v-if="nbTentativesGroupe > 1">({{ historiqueIndex + 1 }}/{{ nbTentativesGroupe }})</span>
                 </span>
                 <span v-else><i class="ti ti-chart-line"></i> Courbe de progression</span>
+                <button
+                  v-if="saisieVue === 'historique' && dateTentativeGroupe"
+                  type="button"
+                  class="btn-supprimer-seance-historique"
+                  @click="supprimerSeanceHistorique"
+                  aria-label="Supprimer cette séance de l'historique"
+                >
+                  <i class="ti ti-trash"></i>
+                </button>
                 <button class="saisie-mode-retour" @click="retourSaisie">Retour à la saisie</button>
               </div>
 
@@ -389,25 +398,13 @@
                             <i class="ti ti-lock" v-if="!estEnEdition(entree.log)"></i>
                             {{ formatDateCourt(entree.date) }}
                           </span>
-                          <div class="historique-inline-actions">
-                            <button
-                              type="button"
-                              class="historique-inline-etat"
-                              :class="{ 'etat-non-fait': !entree.log.fait, 'etat-edition': estEnEdition(entree.log) }"
-                              @click="estEnEdition(entree.log) ? validerEditionHistorique(entree, exo, serieIdx) : ouvrirEditionHistorique(entree.log)"
-                            >
-                              <i :class="estEnEdition(entree.log) ? 'ti ti-check' : 'ti ti-pencil'"></i>
-                              {{ estEnEdition(entree.log) ? 'Valider' : (entree.log.fait ? 'Fait' : 'Non fait') }}
-                            </button>
-                            <button
-                              type="button"
-                              class="btn-supprimer-serie"
-                              @click="supprimerHistorique(entree.log)"
-                              aria-label="Supprimer cet historique"
-                            >
-                              <i class="ti ti-trash"></i>
-                            </button>
-                          </div>
+                          <span
+                            class="historique-inline-etat"
+                            :class="{ 'etat-non-fait': !entree.log.fait }"
+                            v-if="!estEnEdition(entree.log)"
+                          >
+                            {{ entree.log.fait ? 'Fait' : 'Non fait' }}
+                          </span>
                         </div>
                         <div class="realise-inputs">
                           <input
@@ -429,23 +426,14 @@
                   </div>
                 </div>
 
-                <div class="serie-actions">
+                <div class="serie-actions" v-if="saisieVue === 'saisie' || historiqueGroupeExiste(groupe, serieIdx)">
                   <button
                     class="btn-serie"
-                    :class="isGroupeDone(groupe, serieIdx - 1) ? 'btn-done' : 'btn-todo'"
-                    @click="toggleGroupeDone(groupe, serieIdx - 1)"
+                    :class="etatBoutonSerie(groupe, serieIdx).classe"
+                    @click="toggleSerie(groupe, serieIdx)"
                   >
-                    <i :class="isGroupeDone(groupe, serieIdx - 1) ? 'ti ti-check' : 'ti ti-circle'"></i>
-                    {{ isGroupeDone(groupe, serieIdx - 1) ? 'Fait' : 'Valider la série' }}
-                  </button>
-                  <button
-                    v-if="isGroupeDone(groupe, serieIdx - 1)"
-                    type="button"
-                    class="btn-supprimer-serie"
-                    @click="supprimerSerie(groupe, serieIdx - 1)"
-                    aria-label="Supprimer ce résultat"
-                  >
-                    <i class="ti ti-trash"></i>
+                    <i :class="'ti ' + etatBoutonSerie(groupe, serieIdx).icone"></i>
+                    {{ etatBoutonSerie(groupe, serieIdx).label }}
                   </button>
                 </div>
               </div>
@@ -698,6 +686,19 @@ export default {
       return null
     })
 
+    // Clé (session_id, ou date à défaut) de la tentative affichée en vue
+    // historique : sert à retrouver tous les logs de cette séance-là, tous
+    // exercices confondus (pas seulement ceux du groupe ouvert), pour la
+    // suppression au niveau de la séance entière.
+    const cleTentativeGroupe = computed(() => {
+      if (!groupeSaisie.value) return null
+      for (const exo of groupeSaisie.value.exercices) {
+        const tentative = tentativesExo(exo)[historiqueIndex.value]
+        if (tentative) return cleTentative(tentative[0])
+      }
+      return null
+    })
+
     // Swipe droit/gauche dans le panneau de saisie : bascule entre la saisie
     // (centre), les tentatives passées (droite, paginable) et la courbe de
     // progression complète de l'exercice/superset (gauche).
@@ -871,21 +872,10 @@ export default {
       }
     }
 
-    // Suppression d'un résultat déjà validé (saisie en cours) : efface le log
-    // en base et vide la saisie locale, qui redevient modifiable.
-    const supprimerSerie = async (groupe, serieIdx) => {
-      if (!confirm('Supprimer ce résultat ?')) return
-      for (const exo of groupe.exercices) {
-        const serie = exo.series[serieIdx]
-        if (!serie) continue
-        const log = getLogs(exo.id, serieIdx)
-        if (log.id) await supprimerLog(serie.id, log.id)
-        logs.value[exo.id][serieIdx] = { reps_realisees: '', poids_realise: '', fait: false }
-      }
-    }
-
-    // --- Édition / suppression d'un résultat déjà dans l'historique (vue
-    // historique du panneau de saisie, tentatives passées) ---
+    // --- Édition d'un résultat déjà dans l'historique (vue historique du
+    // panneau de saisie, tentatives passées) : le verrouillage se pilote au
+    // niveau de la série entière (tous les exercices du groupe), jamais par
+    // exercice isolé — cf. toggleGroupeHistoriqueEdition plus bas. ---
     const historiqueEnEdition = ref(new Set())
     const estEnEdition = (log) => historiqueEnEdition.value.has(log.id)
     const ouvrirEditionHistorique = (log) => { historiqueEnEdition.value.add(log.id) }
@@ -906,17 +896,93 @@ export default {
         console.error('Erreur modification historique:', e)
       }
       historiqueEnEdition.value.delete(log.id)
-      await chargerLogsExistants(programmeActif.value.id)
-      await fetchHistorique()
     }
 
-    const supprimerHistorique = async (log) => {
-      if (!confirm('Supprimer cet historique ?')) return
-      await supprimerLog(log.serie.id, log.id)
-      historiqueEnEdition.value.delete(log.id)
+    // Un seul bouton par série (cf. gabarit) pilote le verrouillage de tous
+    // les exercices du groupe pour cette série, en saisie comme en historique.
+    const isGroupeHistoriqueEnEdition = (groupe, serieIdx) => {
+      return groupe.exercices.some(exo => {
+        const entree = historiqueSeriePourExo(exo, serieIdx)
+        return entree && estEnEdition(entree.log)
+      })
+    }
+
+    const historiqueGroupeFait = (groupe, serieIdx) => {
+      return groupe.exercices.every(exo => {
+        const entree = historiqueSeriePourExo(exo, serieIdx)
+        return entree ? entree.log.fait : true
+      })
+    }
+
+    const historiqueGroupeExiste = (groupe, serieIdx) => {
+      return groupe.exercices.some(exo => historiqueSeriePourExo(exo, serieIdx))
+    }
+
+    const toggleGroupeHistoriqueEdition = async (groupe, serieIdx) => {
+      const enEdition = isGroupeHistoriqueEnEdition(groupe, serieIdx)
+      for (const exo of groupe.exercices) {
+        const entree = historiqueSeriePourExo(exo, serieIdx)
+        if (!entree) continue
+        if (enEdition) await validerEditionHistorique(entree, exo, serieIdx)
+        else ouvrirEditionHistorique(entree.log)
+      }
+      if (enEdition) {
+        await chargerLogsExistants(programmeActif.value.id)
+        await fetchHistorique()
+      }
+    }
+
+    // État affiché du bouton unique de la série : verrouillé/déverrouillé,
+    // selon qu'on consulte la saisie du jour ou une tentative passée.
+    const etatBoutonSerie = (groupe, serieIdx) => {
+      if (saisieVue.value === 'historique') {
+        if (isGroupeHistoriqueEnEdition(groupe, serieIdx)) {
+          return { classe: 'btn-todo', icone: 'ti-check', label: 'Valider' }
+        }
+        return historiqueGroupeFait(groupe, serieIdx)
+          ? { classe: 'btn-done', icone: 'ti-check', label: 'Fait' }
+          : { classe: 'btn-todo', icone: 'ti-pencil', label: 'Non fait' }
+      }
+      return isGroupeDone(groupe, serieIdx - 1)
+        ? { classe: 'btn-done', icone: 'ti-check', label: 'Fait' }
+        : { classe: 'btn-todo', icone: 'ti-circle', label: 'Valider la série' }
+    }
+
+    const toggleSerie = (groupe, serieIdx) => {
+      if (saisieVue.value === 'historique') { toggleGroupeHistoriqueEdition(groupe, serieIdx); return }
+      toggleGroupeDone(groupe, serieIdx - 1)
+    }
+
+    // Seule suppression possible dans l'historique : la séance entière (tous
+    // ses exercices/groupes, pas seulement celui ouvert dans le panneau),
+    // pour la tentative actuellement consultée.
+    const supprimerSeanceHistorique = async () => {
+      const cle = cleTentativeGroupe.value
+      if (!cle || !seanceActive.value) return
+      if (!confirm('Supprimer cette séance de l\'historique ?')) return
+
+      const idsSeries = new Set(
+        (seanceActive.value.exercices || []).flatMap(e => e.series).map(s => s.id)
+      )
+      const logsASupprimer = historique.value.filter(
+        l => idsSeries.has(l.serie.id) && cleTentative(l) === cle
+      )
+      for (const log of logsASupprimer) {
+        await supprimerLog(log.serie.id, log.id)
+        historiqueEnEdition.value.delete(log.id)
+      }
+
+      // La saisie du jour en mémoire peut correspondre à la tentative
+      // supprimée (même session_id) : on la vide pour rester cohérent.
+      if (cle === sessionSaisieId.value) {
+        seanceActive.value.exercices.forEach(exo => { logs.value[exo.id] = {} })
+      }
+
       await chargerLogsExistants(programmeActif.value.id)
       await fetchHistorique()
-      if (historiqueIndex.value > 0 && historiqueIndex.value >= nbTentativesGroupe.value) {
+
+      if (nbTentativesGroupe.value === 0) retourSaisie()
+      else if (historiqueIndex.value >= nbTentativesGroupe.value) {
         historiqueIndex.value = Math.max(0, nbTentativesGroupe.value - 1)
       }
     }
@@ -1177,8 +1243,9 @@ export default {
       semaineActive, semainesDisponibles, seancesFiltrees,
       groupesOuverts, toggleGroupe, isGroupeOuvert,
       labelType, letterFor, grouperExercices,
-      getLogs, isGroupeDone, toggleGroupeDone, supprimerSerie,
-      estEnEdition, ouvrirEditionHistorique, validerEditionHistorique, supprimerHistorique,
+      getLogs, isGroupeDone, toggleGroupeDone,
+      estEnEdition,
+      etatBoutonSerie, toggleSerie, historiqueGroupeExiste, supprimerSeanceHistorique,
       selectProgramme, demarrerSeance, validerSeance,
       logout, panelListVisible, isGroupeComplete,
       seancesCompletees, isSeanceComplete, isSemaineComplete,
@@ -1472,7 +1539,6 @@ export default {
 }
 .historique-inline-vide { font-size: var(--font-size-xs); color: var(--color-text-muted); font-style: italic; }
 .historique-inline-head { display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-sm); }
-.historique-inline-actions { display: flex; align-items: center; gap: 6px; }
 .historique-inline-etat {
   display: inline-flex;
   align-items: center;
@@ -1484,17 +1550,11 @@ export default {
   border: 1px solid var(--color-valid-border);
   background: var(--color-valid-bg);
   color: var(--color-valid-text-strong);
-  cursor: pointer;
 }
 .historique-inline-etat.etat-non-fait {
   background: var(--color-bg-tertiary);
   border-color: var(--color-border);
   color: var(--color-text-secondary);
-}
-.historique-inline-etat.etat-edition {
-  background: var(--color-primary-light);
-  border-color: var(--color-primary);
-  color: var(--color-primary-text);
 }
 .log-input-wrap { position: relative; flex: 1; min-width: 0; }
 .log-input {
@@ -1560,20 +1620,22 @@ export default {
 
 .serie-actions { display: flex; gap: var(--spacing-sm); }
 .serie-actions .btn-serie { flex: 1; }
-.btn-supprimer-serie {
+
+/* Suppression de la séance d'historique entière, à côté de sa date */
+.btn-supprimer-seance-historique {
   flex-shrink: 0;
-  width: 32px;
-  min-height: 32px;
+  width: 28px;
+  height: 28px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--color-border-strong);
+  border: 1px solid transparent;
   border-radius: var(--radius-md);
-  background: var(--color-bg);
-  color: var(--color-danger-text);
+  background: transparent;
+  color: inherit;
   cursor: pointer;
 }
-.btn-supprimer-serie:hover { background: var(--color-danger-bg); border-color: var(--color-danger-border); }
+.btn-supprimer-seance-historique:hover { background: var(--color-danger-bg); color: var(--color-danger-text); }
 
 .empty-series { font-size: var(--font-size-sm); color: var(--color-text-muted); font-style: italic; }
 
