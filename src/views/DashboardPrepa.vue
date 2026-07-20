@@ -464,7 +464,12 @@
         <div v-for="a in monCercle" :key="a.id" class="athlete-row">
           <div class="mini-av-lg">{{ initiales(a.nom) }}</div>
           <div class="athlete-info">
-            <div class="athlete-nom">{{ a.nom }}</div>
+            <div class="athlete-nom">
+              {{ a.nom }}
+              <span class="badge badge-gray org-badge" v-if="authStore.role === 'super_prepa'">
+                {{ a.organisation?.nom || 'Indépendant' }}
+              </span>
+            </div>
             <div class="athlete-email">{{ a.email }}</div>
           </div>
           <button class="btn btn-sm btn-danger" @click="retirerDuCercle(a)">Retirer</button>
@@ -872,7 +877,8 @@ export default {
       onClickTabLogs, voirLogsAthlete, formatDate,
       getStatutClasse, getStatutIcon,
       retirerDuCercle, rechercherAthlète, ajouterAuCercle,
-      mobileDetail, mettreAJourSeance, mettreAJourExercice
+      mobileDetail, mettreAJourSeance, mettreAJourExercice,
+      authStore
     }
   }
 }
@@ -1333,6 +1339,7 @@ export default {
 }
 .athlete-info { flex: 1; min-width: 0; }
 .athlete-nom { font-size: var(--font-size-sm); font-weight: 600; }
+.athlete-nom .org-badge { margin-left: 6px; font-weight: 500; }
 .athlete-email { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
 .add-athlete-row { display: flex; gap: var(--spacing-sm); margin-top: var(--spacing-sm); flex-wrap: wrap; }
 .add-athlete-row input {
