@@ -588,6 +588,7 @@
                   placeholder="Ex : 72,4"
                 />
               </div>
+              <p v-if="erreurPoids" class="error">{{ erreurPoids }}</p>
             </div>
             <div class="modal-footer">
               <button v-if="entreeExistante" class="btn btn-danger" @click="supprimerPoids">
@@ -1291,6 +1292,7 @@ export default {
     const moisAffiche = ref(new Date(new Date().getFullYear(), new Date().getMonth(), 1))
     const dateSaisiePoids = ref(null)
     const poidsSaisi = ref('')
+    const erreurPoids = ref('')
 
     const pad2 = (n) => String(n).padStart(2, '0')
     const formatDateISO = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
@@ -1362,10 +1364,12 @@ export default {
     const ouvrirSaisiePoids = (date) => {
       dateSaisiePoids.value = date
       poidsSaisi.value = poidsParDate.value[date]?.poids ?? ''
+      erreurPoids.value = ''
     }
     const fermerSaisiePoids = () => {
       dateSaisiePoids.value = null
       poidsSaisi.value = ''
+      erreurPoids.value = ''
     }
 
     const chargerPoids = async () => {
@@ -1385,7 +1389,7 @@ export default {
         entriesPoids.value = [...entriesPoids.value.filter(e => e.date !== date), entree]
         fermerSaisiePoids()
       } catch (e) {
-        console.error('Erreur enregistrement poids:', e)
+        erreurPoids.value = e.message || "Erreur lors de l'enregistrement"
       }
     }
 
@@ -1398,7 +1402,7 @@ export default {
         entriesPoids.value = entriesPoids.value.filter(e => e.id !== entree.id)
         fermerSaisiePoids()
       } catch (e) {
-        console.error('Erreur suppression poids:', e)
+        erreurPoids.value = e.message || 'Erreur lors de la suppression'
       }
     }
 
@@ -1482,7 +1486,7 @@ export default {
       historiqueSeriePourExo, formatDateCourt, formatDateNumerique, diffVsHistorique,
       champsGraphique, courbeExo,
       performances, toggleSuivi, toggleSuiviPerformance, dateTentativeGroupe,
-      sousOngletPoids, dateSaisiePoids, poidsSaisi, poidsPourDate, entreeExistante, poidsValide,
+      sousOngletPoids, dateSaisiePoids, poidsSaisi, erreurPoids, poidsPourDate, entreeExistante, poidsValide,
       labelMois, joursGrille, courbePoids, moisPrecedent, moisSuivant, formatDateLongue,
       ouvrirSaisiePoids, fermerSaisiePoids, enregistrerPoids, supprimerPoids
     }
