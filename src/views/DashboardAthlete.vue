@@ -21,7 +21,7 @@
 
       <!-- ONGLET PROGRAMME -->
       <div v-if="onglet === 'programme' && programmes.length > 0" class="content-body">
-        <!-- ÉCRAN 1 : liste des séances de la semaine -->
+        <!-- ÉCRAN 1 : liste des séances (une par créneau, semaine courante) -->
         <template v-if="!seanceActive">
           <div class="screen">
             <!-- Sélecteur de programme : seulement s'il y a un choix à faire -->
@@ -42,23 +42,10 @@
               <p v-if="programmeActif.description">{{ programmeActif.description }}</p>
             </div>
 
-            <div class="semaines-scroll" v-if="semainesDisponibles.length > 0" @pointerdown.stop>
-              <button
-                v-for="sem in semainesDisponibles"
-                :key="sem"
-                class="semaine-chip"
-                :class="{ active: semaineActive === sem, 'semaine-complete': isSemaineComplete(sem) }"
-                @click="semaineActive = sem"
-              >
-                <i v-if="isSemaineComplete(sem)" class="ti ti-check"></i>
-                S{{ sem }}
-              </button>
-            </div>
-
             <div v-if="loadingSeances" class="empty">Chargement...</div>
 
             <button
-              v-for="seance in seancesFiltrees"
+              v-for="seance in seancesAffichees"
               :key="seance.id"
               class="seance-card"
               @click="demarrerSeance(seance)"
@@ -73,10 +60,7 @@
                   <span class="seance-card-count">{{ seance.exercices?.length || 0 }} exercices</span>
                 </div>
               </div>
-              <span v-if="seancesCompletees.has(seance.id)" class="badge-complete">
-                <i class="ti ti-check"></i> Faite
-              </span>
-              <i v-else class="ti ti-chevron-right seance-card-chevron"></i>
+              <i class="ti ti-chevron-right seance-card-chevron"></i>
             </button>
           </div>
         </template>
@@ -94,7 +78,6 @@
                   {{ labelType(seanceActive.type_seance) }}
                 </span>
                 <span class="badge badge-purple" v-if="seanceActive.jour">{{ seanceActive.jour }}</span>
-                <span class="badge badge-gray">S{{ seanceActive.semaine || 1 }}</span>
               </div>
             </div>
           </div>
@@ -629,7 +612,6 @@ export default {
     const historique = ref([])
     const loadingSeances = ref(false)
     const onglet = ref('programme')
-    const semaineActive = ref(1)
     const groupesOuverts = ref({})
     const router = useRouter()
     const authStore = useAuthStore()
@@ -659,12 +641,6 @@ export default {
         }
       })
       return groupes
-    }
-
-    const isSemaineComplete = (numSemaine) => {
-      const seancesDeLaSemaine = seances.value.filter(s => (s.semaine || 1) === numSemaine)
-      if (seancesDeLaSemaine.length === 0) return false
-      return seancesDeLaSemaine.every(s => seancesCompletees.value.has(s.id))
     }
 
     const toggleGroupe = (key) => {
@@ -1154,16 +1130,28 @@ export default {
       return groupes.every(groupe => isGroupeComplete(groupe))
     }
 
-    const semainesDisponibles = computed(() => {
-      const set = new Set(seances.value.map(s => s.semaine || 1))
-      return Array.from(set).sort((a, b) => a - b)
-    })
-
     const jourOrdre = { lundi: 1, mardi: 2, mercredi: 3, jeudi: 4, vendredi: 5, samedi: 6, dimanche: 7 }
 
-    const seancesFiltrees = computed(() => {
-      return seances.value
-        .filter(s => (s.semaine || 1) === semaineActive.value)
+    // Un programme multi-semaines duplique un même créneau (nom + jour +
+    // ordre identiques, cf. POST /seances/dupliquer-semaine côté prépa) une
+    // fois par semaine, avec une progression différente à chaque fois.
+    // L'athlète ne choisit jamais la semaine : pour chaque créneau, on ne
+    // montre que sa version courante — la première semaine pas encore
+    // validée, ou la dernière si tout est fait (la séance boucle alors sur
+    // cette dernière semaine indéfiniment, comme une programmation sans
+    // progression).
+    const seancesAffichees = computed(() => {
+      const creneaux = {}
+      seances.value.forEach(s => {
+        const cle = `${s.nom}||${s.jour}||${s.ordre}`
+        if (!creneaux[cle]) creneaux[cle] = []
+        creneaux[cle].push(s)
+      })
+      return Object.values(creneaux)
+        .map(versions => {
+          const triees = [...versions].sort((a, b) => (a.semaine || 1) - (b.semaine || 1))
+          return triees.find(s => !seancesCompletees.value.has(s.id)) || triees[triees.length - 1]
+        })
         .sort((a, b) => {
           const jourA = jourOrdre[a.jour] || 8
           const jourB = jourOrdre[b.jour] || 8
@@ -1182,8 +1170,6 @@ export default {
       seanceActive.value = null
       loadingSeances.value = true
       seances.value = await api.get(`/programmes/${p.id}/seances/`)
-      const semaines = [...new Set(seances.value.map(s => s.semaine || 1))]
-      semaineActive.value = semaines[0] || 1
       loadingSeances.value = false
 
       // Charge les logs existants après les séances
@@ -1238,8 +1224,9 @@ export default {
       seanceEnCoursId.value = null
       logs.value = {}
       seanceActive.value = null
-      // La progression d'une semaine à l'autre est décidée par le prépa dans
-      // le programme, plus par l'athlète en validant ses séances.
+      // seancesAffichees recalcule alors automatiquement : ce créneau montrera
+      // la semaine suivante programmée par le prépa (ou reboucle sur la
+      // dernière si la programmation s'arrête là).
     }
 
     const fetchHistorique = async () => {
@@ -1467,7 +1454,7 @@ export default {
     return {
       programmes, programmeActif, seances, seanceActive, logs, historique,
       loadingSeances, onglet,
-      semaineActive, semainesDisponibles, seancesFiltrees,
+      seancesAffichees,
       groupesOuverts, toggleGroupe, isGroupeOuvert,
       labelType, letterFor, grouperExercices,
       getLogs, isGroupeDone, toggleGroupeDone,
@@ -1475,7 +1462,7 @@ export default {
       etatBoutonSerie, toggleSerie, historiqueGroupeExiste, supprimerSeanceHistorique,
       selectProgramme, demarrerSeance, validerSeance,
       logout, panelListVisible, isGroupeComplete,
-      seancesCompletees, isSeanceComplete, isSemaineComplete,
+      isSeanceComplete,
       logsParSerie, chargerLogsExistants, getLogsAvecHistorique,
       progressionSeance,
       sauvegarderSerie,
@@ -1552,40 +1539,6 @@ export default {
   font-weight: 600;
 }
 
-/* --- Semaines --- */
-.semaines-scroll { display: flex; gap: var(--spacing-sm); overflow-x: auto; flex-shrink: 0; padding-bottom: 2px; }
-.semaine-chip {
-  min-height: var(--tap-min);
-  min-width: var(--tap-min);
-  padding: 0 var(--spacing-lg);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  font-size: var(--font-size-sm);
-  font-weight: 600;
-  cursor: pointer;
-  background: var(--color-bg);
-  color: var(--color-text-secondary);
-  flex-shrink: 0;
-}
-.semaine-chip.active {
-  background: var(--color-primary-light);
-  border-color: var(--color-primary);
-  color: var(--color-primary-text);
-}
-.semaine-chip.semaine-complete {
-  background: var(--color-valid-bg);
-  border-color: var(--color-valid-border);
-  color: var(--color-valid-text-strong);
-}
-.semaine-chip.semaine-complete.active {
-  background: var(--color-valid-bg-strong);
-  border-color: var(--color-valid-border-strong);
-}
-
 /* --- Cartes séance --- */
 .seance-card {
   display: flex;
@@ -1607,20 +1560,6 @@ export default {
 .seance-card-meta { display: flex; align-items: center; gap: var(--spacing-sm); flex-wrap: wrap; }
 .seance-card-count { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
 .seance-card-chevron { color: var(--color-text-muted); font-size: var(--font-size-lg); flex-shrink: 0; }
-
-.badge-complete {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: var(--font-size-xs);
-  font-weight: 500;
-  color: var(--color-text-secondary);
-  background: var(--color-bg-tertiary);
-  border: 1px solid var(--color-border);
-  padding: 3px 10px;
-  border-radius: var(--radius-full);
-  flex-shrink: 0;
-}
 
 /* --- Barre haute de séance --- */
 .seance-topbar {
