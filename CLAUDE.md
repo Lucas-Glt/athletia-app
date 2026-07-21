@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project overview
 
-Athletia is a Vue 3 SPA frontend for a sports-coaching platform ("Plateforme de suivi sportif"). It's a PWA (installable, offline-cached via Workbox) that talks to a separate backend API (not in this repo) over REST/JSON. There are three user roles — `athlete`, `prepa` (physical trainer), `admin` — each with its own dashboard and JWT-encoded role claim.
+Athletia is a Vue 3 SPA frontend for a sports-coaching platform ("Plateforme de suivi sportif"). It's a PWA (installable, offline-cached via Workbox) that talks to a separate backend API (not in this repo) over REST/JSON. There are five user roles — `athlete`, `prepa` (physical trainer), `admin` (organisation admin), `super_prepa` (prepa without organisation walls), `super_admin` (manages organisations and accounts platform-wide) — each with its own dashboard and JWT-encoded role claim. Users belong to an `organisation` (or none, informally "Indépendant") via `organisation_id`.
 
 ## Commands
 
@@ -21,13 +21,15 @@ There is no test suite/runner configured in this repo.
 
 ## Architecture
 
-**Auth flow**: `LoginView.vue` POSTs form-encoded credentials directly via `fetch` (not the `useApi` helper, since no token exists yet) to `/auth/login`, decodes the JWT payload client-side to read `role`, fetches `/users/me`, then calls `authStore.setAuth(token, role, user)` and redirects to `/athlete`, `/prepa`, or `/admin` based on role. `stores/auth.js` (Pinia) persists `token`/`role`/`user` to `localStorage` and rehydrates from it on load. There is no route-guard middleware in `router/index.js` — access control is purely: users land on the dashboard matching their JWT role.
+**Auth flow**: `LoginView.vue` POSTs form-encoded credentials directly via `fetch` (not the `useApi` helper, since no token exists yet) to `/auth/login`, decodes the JWT payload client-side to read `role`, fetches `/users/me`, then calls `authStore.setAuth(token, role, user)` and redirects to `/athlete`, `/prepa` (also `super_prepa`), `/admin`, or `/super-admin` based on role. `stores/auth.js` (Pinia) persists `token`/`role`/`user` to `localStorage` and rehydrates from it on load. There is no route-guard middleware in `router/index.js` — access control is purely: users land on the dashboard matching their JWT role.
 
 **API layer**: `services/api.js` exports `useApi()`, a composable returning `{ get, post, patch, del }`. It injects the `Authorization: Bearer <token>` header from the auth store, and on any `401` response it force-logs-out and redirects to `/` (login). `BASE_URL` comes from `VITE_API_URL` (`.env.local` → `http://localhost:8000`, `.env.production` → `https://athletia.espacenum.fr/api`). Every view/component that needs data calls `useApi()` itself — there's no central data-fetching/store layer beyond `auth.js`.
 
-**Routing**: Four flat routes in `router/index.js` (`/`, `/athlete`, `/prepa`, `/admin`), each mapping 1:1 to a top-level view in `src/views/`. Non-login routes are lazy-loaded.
+**Routing**: Flat routes in `router/index.js` (`/`, `/athlete`, `/prepa`, `/admin`, `/super-admin`), each mapping 1:1 to a top-level view in `src/views/`. Non-login routes are lazy-loaded.
 
-**View/component structure**: Each role dashboard (`DashboardAthlete.vue`, `DashboardPrepa.vue`, `DashboardAdmin.vue`) wraps its content in `components/AppLayout.vue`, which provides the header, mobile hamburger drawer, avatar/profile dropdown (with password-change modal), and PWA install banners (Android/Chrome `beforeinstallprompt` + iOS manual-instructions banner). Layout exposes `#nav` and `#actions` slots for role-specific navigation/buttons. Role-specific sub-components live in subfolders under `src/components/` (e.g. `components/prepa/ProgrammeForm.vue`, `components/prepa/AssignerAthleteModal.vue`) — follow this folder-per-role convention when adding new components.
+**View/component structure**: Each role dashboard (`DashboardAthlete.vue`, `DashboardPrepa.vue`, `DashboardAdmin.vue`, `DashboardSuperAdmin.vue`; `super_prepa` reuses `DashboardPrepa.vue`) wraps its content in `components/AppLayout.vue`, which provides the header, mobile hamburger drawer, avatar/profile dropdown (with password-change modal), and PWA install banners (Android/Chrome `beforeinstallprompt` + iOS manual-instructions banner). Layout exposes `#nav` and `#actions` slots for role-specific navigation/buttons. Role-specific sub-components live in subfolders under `src/components/` (e.g. `components/prepa/ProgrammeForm.vue`, `components/prepa/AssignerAthleteModal.vue`, `components/superadmin/OrganisationTree.vue`) — follow this folder-per-role convention when adding new components.
+
+**Organisations (super_admin)**: `DashboardSuperAdmin.vue` browses all organisations (plus a synthetic client-side "Indépendant" bucket for `organisation_id = null` users) via `GET /organisations/` + `GET /users/`. `POST /organisations/` creates an organisation and its admin together (admin is mandatory, single transaction). `POST /users/comptes` creates any account (admin/prepa/athlete) in a given organisation or independent — email domain is `identifiant@role.slug` when attached to an org, `identifiant@role.fr` when independent. `PATCH /users/{id}/organisation` reassigns admin/prepa/athlete between organisations (or to independent via `organisation_id: null`).
 
 Dashboards use the Options API `setup()` pattern throughout (not `<script setup>`) — all refs/computed/methods are declared in `setup()` and explicitly returned in a big object at the end. Match this style rather than converting to `<script setup>`.
 
@@ -42,3 +44,56 @@ Dashboards use the Options API `setup()` pattern throughout (not `<script setup>
 ## Deployment
 
 `.github/workflows/deploy.yml` deploys on every push to `main`: SSHes into a VPS, `git pull`s, runs `npm run build`, and reloads nginx. There is no CI test/lint gate before deploy — verify locally before pushing to `main`.
+
+# Claude Code Instructions
+
+Tu es un développeur senior travaillant sur ce projet.
+
+## Règles générales
+
+- Analyse toujours le code existant avant de modifier.
+- Réutilise l'architecture et les conventions déjà présentes.
+- Ne crée pas de fichiers ou de structures inutiles.
+- Fais des modifications minimales et propres.
+- Priorise simplicité, maintenabilité et robustesse.
+
+## Workflow obligatoire
+
+Pour chaque demande :
+
+1. Comprendre l'objectif.
+2. Inspecter les fichiers concernés.
+3. Identifier les impacts potentiels.
+4. Implémenter la solution.
+5. Vérifier les erreurs évidentes.
+6. Corriger les problèmes trouvés.
+
+## Code
+
+- Écris du code production-ready.
+- Évite le code dupliqué.
+- Respecte les bonnes pratiques du langage utilisé.
+- Gère les cas limites importants.
+- Ne surcharge pas la solution.
+
+## Modifications
+
+Avant une modification importante :
+- explique brièvement le plan.
+
+Après modification :
+- indique uniquement :
+  - fichiers modifiés
+  - résumé court
+  - éventuels points à tester
+
+## Communication
+
+- Sois concis.
+- Pas d'explications longues sauf demande.
+- Ne génère pas de documentation inutile.
+- Ne répète pas le contexte déjà connu.
+
+## Priorité
+
+La qualité du code et la cohérence du projet passent avant la vitesse d'exécution.
