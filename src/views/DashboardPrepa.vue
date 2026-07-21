@@ -20,6 +20,7 @@
         v-if="modalAssigner"
         :programme="programmeActif"
         :monCercle="monCercle"
+        :groupes="groupes"
         @fermer="modalAssigner = false"
         @modifie="onModifie"
       />
@@ -459,9 +460,43 @@
 
       <!-- ONGLET ATHLETES -->
       <div v-if="onglet === 'athletes'" class="onglet-wrapper athletes-page">
-        <div class="section-title">Mon cercle d'athlètes</div>
-        <div v-if="monCercle.length === 0" class="empty">Aucun athlète dans votre cercle.</div>
-        <div v-for="a in monCercle" :key="a.id" class="athlete-row">
+        <GroupesManagerModal
+          v-if="modalGroupes"
+          :groupes="groupes"
+          :monCercle="monCercle"
+          :athleteFocus="athleteFocusGroupes"
+          @fermer="modalGroupes = false"
+          @modifie="fetchGroupes"
+        />
+
+        <div class="athletes-header">
+          <div class="section-title">Mon cercle d'athlètes</div>
+          <button class="btn btn-sm" @click="ouvrirGestionGroupes()"><i class="ti ti-tags"></i> Gérer mes groupes</button>
+        </div>
+
+        <div class="filtres-row" v-if="groupes.length > 0 || authStore.role === 'super_prepa'">
+          <div class="groupe-filtre-chips" v-if="groupes.length > 0">
+            <button class="chip-filtre" :class="{ active: groupeFiltre === 'tous' }" @click="groupeFiltre = 'tous'">Tous</button>
+            <button
+              v-for="g in groupes"
+              :key="g.id"
+              class="chip-filtre"
+              :class="{ active: groupeFiltre === g.id }"
+              @click="groupeFiltre = groupeFiltre === g.id ? 'tous' : g.id"
+            >
+              <span class="groupe-dot" :style="{ background: g.couleur || 'var(--color-primary)' }"></span>
+              {{ g.nom }}
+            </button>
+          </div>
+          <select v-if="authStore.role === 'super_prepa'" v-model="organisationFiltre" class="select-org-filtre">
+            <option value="toutes">Toutes organisations</option>
+            <option value="independant">Indépendant</option>
+            <option v-for="org in organisationsCercle" :key="org.id" :value="org.id">{{ org.nom }}</option>
+          </select>
+        </div>
+
+        <div v-if="cercleFiltre.length === 0" class="empty">Aucun athlète pour ce filtre.</div>
+        <div v-for="a in cercleFiltre" :key="a.id" class="athlete-row">
           <div class="mini-av-lg">{{ initiales(a.nom) }}</div>
           <div class="athlete-info">
             <div class="athlete-nom">
@@ -471,7 +506,16 @@
               </span>
             </div>
             <div class="athlete-email">{{ a.email }}</div>
+            <div class="groupes-badges" v-if="groupesDe(a).length > 0">
+              <span
+                class="groupe-badge"
+                v-for="g in groupesDe(a)"
+                :key="g.id"
+                :style="{ background: (g.couleur || '#7F77DD') + '22', color: g.couleur || 'var(--color-primary-dark)' }"
+              >{{ g.nom }}</span>
+            </div>
           </div>
+          <button class="btn-icon-tiny" title="Voir/modifier ses groupes" @click="ouvrirGestionGroupes(a)"><i class="ti ti-tags"></i></button>
           <button class="btn btn-sm btn-danger" @click="retirerDuCercle(a)">Retirer</button>
         </div>
         <div class="add-athlete-row">
@@ -501,14 +545,20 @@ import { useApi } from '../services/api'
 import AppLayout from '../components/AppLayout.vue'
 import ProgrammeForm from '../components/prepa/ProgrammeForm.vue'
 import AssignerAthleteModal from '../components/prepa/AssignerAthleteModal.vue'
+import GroupesManagerModal from '../components/prepa/GroupesManagerModal.vue'
 
 export default {
-  components: { AppLayout, ProgrammeForm, AssignerAthleteModal },
+  components: { AppLayout, ProgrammeForm, AssignerAthleteModal, GroupesManagerModal },
   setup() {
     const programmes = ref([])
     const programmeActif = ref(null)
     const seances = ref([])
     const monCercle = ref([])
+    const groupes = ref([])
+    const groupeFiltre = ref('tous')
+    const organisationFiltre = ref('toutes')
+    const modalGroupes = ref(false)
+    const athleteFocusGroupes = ref(null)
     const loadingSeances = ref(false)
     const modalAssigner = ref(false)
     const vue = ref('liste')
@@ -679,6 +729,32 @@ export default {
       monCercle.value = me.athletes || []
     }
 
+    const fetchGroupes = async () => {
+      groupes.value = await api.get('/groupes/')
+    }
+
+    const groupesDe = (athlete) => groupes.value.filter(g => g.athletes.find(a => a.id === athlete.id))
+
+    const organisationsCercle = computed(() => {
+      const map = {}
+      monCercle.value.forEach(a => { if (a.organisation) map[a.organisation.id] = a.organisation })
+      return Object.values(map).sort((a, b) => a.nom.localeCompare(b.nom))
+    })
+
+    const cercleFiltre = computed(() => {
+      return monCercle.value.filter(a => {
+        if (groupeFiltre.value !== 'tous' && !groupesDe(a).find(g => g.id === groupeFiltre.value)) return false
+        if (organisationFiltre.value === 'independant' && a.organisation_id) return false
+        if (organisationFiltre.value !== 'toutes' && organisationFiltre.value !== 'independant' && a.organisation_id !== organisationFiltre.value) return false
+        return true
+      })
+    })
+
+    const ouvrirGestionGroupes = (athlete = null) => {
+      athleteFocusGroupes.value = athlete
+      modalGroupes.value = true
+    }
+
     const selectProgramme = (p) => {
       if (editMode.value) {
         if (!confirm('Annuler les modifications en cours ?')) return
@@ -805,12 +881,14 @@ export default {
     const onModifie = async () => {
       await fetchProgrammes()
       await fetchMonCercle()
+      await fetchGroupes()
       if (programmeActif.value) programmeActif.value = programmes.value.find(p => p.id === programmeActif.value.id)
     }
 
     const retirerDuCercle = async (athlete) => {
       await api.del(`/users/mes-athletes/${athlete.id}`)
       monCercle.value = monCercle.value.filter(a => a.id !== athlete.id)
+      await fetchGroupes()
     }
 
     const rechercherAthlète = async () => {
@@ -837,6 +915,7 @@ export default {
     onMounted(async () => {
       await fetchProgrammes()
       await fetchMonCercle()
+      await fetchGroupes()
     })
 
     const mettreAJourExercice = async (exo) => {
@@ -859,6 +938,8 @@ export default {
     }
     return {
       programmes, programmeActif, seances, monCercle,
+      groupes, groupeFiltre, organisationFiltre, organisationsCercle, cercleFiltre,
+      modalGroupes, athleteFocusGroupes, fetchGroupes, groupesDe, ouvrirGestionGroupes,
       loadingSeances, modalAssigner, vue, onglet, vueLabel,
       tabDetail, athleteLogs, logs, loadingLogs, logsGroupes,
       editMode, editNom, editDesc,
@@ -1314,6 +1395,41 @@ export default {
 
 /* --- Athlètes --- */
 .athletes-page { padding: var(--spacing-xl) var(--spacing-2xl); display: flex; flex-direction: column; gap: var(--spacing-sm); overflow-y: auto; }
+.athletes-header { display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-md); flex-wrap: wrap; }
+.filtres-row { display: flex; align-items: center; gap: var(--spacing-md); flex-wrap: wrap; padding-bottom: var(--spacing-xs); }
+.groupe-filtre-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip-filtre {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 var(--spacing-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-sm);
+  background: var(--color-bg);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+.chip-filtre:hover { border-color: var(--color-primary); }
+.chip-filtre.active { background: var(--color-primary-light); border-color: var(--color-primary); color: var(--color-primary-text); font-weight: 600; }
+.groupe-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.select-org-filtre {
+  min-height: 36px;
+  padding: 0 var(--spacing-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  background: var(--color-bg);
+  color: var(--color-text-body);
+}
+.groupes-badges { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
+.groupe-badge {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+}
 .athlete-row {
   display: flex;
   align-items: center;

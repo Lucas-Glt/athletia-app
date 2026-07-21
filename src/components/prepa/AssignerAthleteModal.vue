@@ -26,6 +26,19 @@
         <!-- Athlètes du cercle non assignés -->
         <div class="bloc">
           <div class="section-title">Mon cercle</div>
+          <div class="groupe-filtre-chips" v-if="groupes.length > 0">
+            <button class="chip-filtre" :class="{ active: filtreGroupeId === 'tous' }" @click="filtreGroupeId = 'tous'">Tous</button>
+            <button
+              v-for="g in groupes"
+              :key="g.id"
+              class="chip-filtre"
+              :class="{ active: filtreGroupeId === g.id }"
+              @click="filtreGroupeId = filtreGroupeId === g.id ? 'tous' : g.id"
+            >
+              <span class="groupe-dot" :style="{ background: g.couleur || 'var(--color-primary)' }"></span>
+              {{ g.nom }}
+            </button>
+          </div>
           <div class="athletes-list" v-if="athletesDisponibles.length > 0">
             <div class="athlete-row" v-for="a in athletesDisponibles" :key="a.id">
               <div class="mini-av">{{ initiales(a.nom) }}</div>
@@ -37,6 +50,27 @@
             </div>
           </div>
           <div class="empty-inline" v-else>Tous vos athlètes sont déjà assignés</div>
+        </div>
+
+        <!-- Assigner à un groupe entier -->
+        <div class="bloc" v-if="groupes.length > 0">
+          <div class="section-title">Assigner à un groupe entier</div>
+          <div class="groupe-assign-row">
+            <select v-model="groupeAssignId" class="select-groupe">
+              <option :value="null" disabled>Choisir un groupe</option>
+              <option v-for="g in groupes" :key="g.id" :value="g.id">{{ g.nom }} ({{ g.athletes.length }})</option>
+            </select>
+          </div>
+          <div class="recap-groupe" v-if="groupeAssignChoisi">
+            <p v-if="groupeAssignChoisi.athletes.length === 0" class="empty-inline">Ce groupe ne contient aucun athlète.</p>
+            <template v-else>
+              <p>Assigner <strong>{{ programme.nom }}</strong> aux {{ groupeAssignChoisi.athletes.length }} athlète{{ groupeAssignChoisi.athletes.length > 1 ? 's' : '' }} du groupe <strong>{{ groupeAssignChoisi.nom }}</strong> ?</p>
+              <ul class="recap-liste">
+                <li v-for="a in groupeAssignChoisi.athletes" :key="a.id">{{ a.nom }}</li>
+              </ul>
+              <button class="btn btn-sm btn-primary" @click="assignerGroupe">Confirmer l'assignation</button>
+            </template>
+          </div>
         </div>
 
         <!-- Ajouter un nouvel athlète au cercle -->
@@ -69,19 +103,37 @@ export default {
   emits: ['fermer', 'modifie'],
   props: {
     programme: { type: Object, required: true },
-    monCercle: { type: Array, default: () => [] }
+    monCercle: { type: Array, default: () => [] },
+    groupes: { type: Array, default: () => [] }
   },
   setup(props, { emit }) {
     const api = useApi()
     const searchEmail = ref('')
     const athleteTrouve = ref(null)
     const searchError = ref('')
+    const filtreGroupeId = ref('tous')
+    const groupeAssignId = ref(null)
 
     const athletesAssignes = ref([...props.programme.athletes])
 
     const athletesDisponibles = computed(() =>
-      props.monCercle.filter(a => !athletesAssignes.value.find(x => x.id === a.id))
+      props.monCercle.filter(a => {
+        if (athletesAssignes.value.find(x => x.id === a.id)) return false
+        if (filtreGroupeId.value === 'tous') return true
+        const groupe = props.groupes.find(g => g.id === filtreGroupeId.value)
+        return !!groupe?.athletes.find(x => x.id === a.id)
+      })
     )
+
+    const groupeAssignChoisi = computed(() => props.groupes.find(g => g.id === groupeAssignId.value) || null)
+
+    const assignerGroupe = async () => {
+      if (!groupeAssignChoisi.value) return
+      const data = await api.post(`/programmes/${props.programme.id}/assigner-groupe/${groupeAssignChoisi.value.id}`)
+      athletesAssignes.value = data.athletes
+      groupeAssignId.value = null
+      emit('modifie')
+    }
 
     const initiales = (nom) => nom.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
 
@@ -120,6 +172,7 @@ export default {
     return {
       searchEmail, athleteTrouve, searchError,
       athletesAssignes, athletesDisponibles,
+      filtreGroupeId, groupeAssignId, groupeAssignChoisi, assignerGroupe,
       initiales, assigner, retirer, rechercherAthlète, ajouterAuCercle
     }
   }
@@ -174,4 +227,45 @@ export default {
 }
 .search-row input:focus { outline: none; border-color: var(--color-primary); }
 .empty-inline { font-size: var(--font-size-sm); color: var(--color-text-muted); padding: var(--spacing-sm) 0; }
+
+.groupe-filtre-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: var(--spacing-xs); }
+.chip-filtre {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-xs);
+  background: var(--color-bg);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+.chip-filtre:hover { border-color: var(--color-primary); }
+.chip-filtre.active { background: var(--color-primary-light); border-color: var(--color-primary); color: var(--color-primary-text); font-weight: 600; }
+.groupe-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+.groupe-assign-row { display: flex; }
+.select-groupe {
+  flex: 1;
+  min-height: var(--tap-min);
+  padding: 0 var(--spacing-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-base);
+  background: var(--color-bg);
+}
+.recap-groupe {
+  padding: var(--spacing-md);
+  background: var(--color-primary-light);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+.recap-groupe p { margin: 0; color: var(--color-primary-text); }
+.recap-liste { margin: 0; padding-left: var(--spacing-lg); max-height: 120px; overflow-y: auto; }
+.recap-liste li { font-size: var(--font-size-sm); }
 </style>
