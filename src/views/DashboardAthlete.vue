@@ -10,7 +10,30 @@
       <div class="nav-item" :class="{ active: onglet === 'poids' }" @click="onglet = 'poids'">
         <i class="ti ti-scale"></i> Poids
       </div>
+      <div class="nav-item" :class="{ active: onglet === 'mes-stats' }" @click="onglet = 'mes-stats'">
+        <i class="ti ti-chart-bar"></i> Mes stats
+      </div>
     </template>
+
+    <PopupBanniere
+      v-if="popupRessenti"
+      icone="ti-mood-smile"
+      titre="Noter son ressenti de séance ?"
+      texte-oui="Oui"
+      texte-non="Non merci"
+      @oui="repondreRessenti"
+      @non="popupRessenti = false"
+    />
+    <PopupBanniere
+      v-if="popupWellness"
+      icone="ti-heart-rate-monitor"
+      titre="Remplir mon wellness du jour ?"
+      sous-titre="4 questions, moins de 20 secondes"
+      texte-oui="Oui"
+      texte-non="Non merci"
+      @oui="repondreWellness"
+      @non="popupWellness = false"
+    />
 
     <div class="dashboard-root" @pointerdown="onTabSwipeStart" @pointerup="onTabSwipeEnd" @pointercancel="onTabSwipeEnd">
       <div class="empty-state" v-if="programmes.length === 0">
@@ -584,6 +607,14 @@
           </div>
         </div>
       </div>
+
+      <!-- ONGLET MES STATS -->
+      <MesStats
+        v-if="onglet === 'mes-stats'"
+        :focus-ressenti="focusRessenti"
+        :focus-wellness="focusWellness"
+        @focus-consomme="onFocusConsomme"
+      />
     </div>
   </AppLayout>
 </template>
@@ -595,9 +626,11 @@ import { useAuthStore } from '../stores/auth'
 import { useApi } from '../services/api'
 import AppLayout from '../components/AppLayout.vue'
 import CourbeProgression from '../components/athlete/CourbeProgression.vue'
+import MesStats from '../components/athlete/MesStats.vue'
+import PopupBanniere from '../components/athlete/PopupBanniere.vue'
 
 export default {
-  components: { AppLayout, CourbeProgression },
+  components: { AppLayout, CourbeProgression, MesStats, PopupBanniere },
   setup() {
     const programmes = ref([])
     const programmeActif = ref(null)
@@ -612,6 +645,25 @@ export default {
     const historique = ref([])
     const loadingSeances = ref(false)
     const onglet = ref('programme')
+    const popupRessenti = ref(false)
+    const popupWellness = ref(false)
+    const focusRessenti = ref(false)
+    const focusWellness = ref(false)
+
+    const repondreRessenti = () => {
+      popupRessenti.value = false
+      onglet.value = 'mes-stats'
+      focusRessenti.value = true
+    }
+    const repondreWellness = () => {
+      popupWellness.value = false
+      onglet.value = 'mes-stats'
+      focusWellness.value = true
+    }
+    const onFocusConsomme = (quoi) => {
+      if (quoi === 'ressenti') focusRessenti.value = false
+      if (quoi === 'wellness') focusWellness.value = false
+    }
     const groupesOuverts = ref({})
     const router = useRouter()
     const authStore = useAuthStore()
@@ -1220,10 +1272,20 @@ export default {
         }
       }
 
+      // Trace la complétion tout de suite (méthode de Foster, monitoring) —
+      // sans rpe/durée : la séance se valide quand même, le ressenti reste
+      // saisissable après coup (cf. MesStats.vue), jamais bloquant ici.
+      try {
+        await api.post(`/seances/${seanceActive.value.id}/charge`, { session_id: sessionSaisieId.value })
+      } catch (e) {
+        console.error('Erreur enregistrement complétion séance:', e)
+      }
+
       seancesCompletees.value.add(seanceActive.value.id)
       seanceEnCoursId.value = null
       logs.value = {}
       seanceActive.value = null
+      popupRessenti.value = true
       // seancesAffichees recalcule alors automatiquement : ce créneau montrera
       // la semaine suivante programmée par le prépa (ou reboucle sur la
       // dernière si la programmation s'arrête là).
@@ -1375,6 +1437,11 @@ export default {
         const entree = await api.post('/poids/', { date, poids: valeur })
         entriesPoids.value = [...entriesPoids.value.filter(e => e.date !== date), entree]
         fermerSaisiePoids()
+
+        if (date === aujourdhuiISO()) {
+          const wellnessJour = await api.get('/wellness/aujourdhui')
+          if (!wellnessJour) popupWellness.value = true
+        }
       } catch (e) {
         erreurPoids.value = e.message || "Erreur lors de l'enregistrement"
       }
@@ -1402,7 +1469,7 @@ export default {
     // Swipe horizontal entre onglets (Séances <-> Performances <-> Poids), sur
     // tout le contenu du dashboard. Le panneau de saisie a son propre swipe
     // interne qui stoppe la propagation, donc les deux ne se marchent pas dessus.
-    const ONGLETS = ['programme', 'performances', 'poids']
+    const ONGLETS = ['programme', 'performances', 'poids', 'mes-stats']
     const tabSwipeState = { startX: 0, startY: 0, active: false }
     const onTabSwipeStart = (e) => {
       if (e.pointerType === 'mouse' && e.button !== 0) return
@@ -1475,7 +1542,9 @@ export default {
       performances, toggleSuivi, toggleSuiviPerformance, dateTentativeGroupe,
       sousOngletPoids, dateSaisiePoids, poidsSaisi, erreurPoids, poidsPourDate, entreeExistante, poidsValide,
       labelMois, joursGrille, courbePoids, moisPrecedent, moisSuivant, formatDateLongue,
-      ouvrirSaisiePoids, fermerSaisiePoids, enregistrerPoids, supprimerPoids
+      ouvrirSaisiePoids, fermerSaisiePoids, enregistrerPoids, supprimerPoids,
+      popupRessenti, popupWellness, focusRessenti, focusWellness,
+      repondreRessenti, repondreWellness, onFocusConsomme
     }
   }
 }

@@ -30,7 +30,13 @@
       </div>
 
       <div class="courbe-axe-x">
-        <span v-for="(p, i) in points" :key="i">S{{ i + 1 }}</span>
+        <template v-if="axeX === 'dates'">
+          <span>{{ formatDateAxe(points[0].date) }}</span>
+          <span>{{ formatDateAxe(points[points.length - 1].date) }}</span>
+        </template>
+        <template v-else>
+          <span v-for="(p, i) in points" :key="i">S{{ i + 1 }}</span>
+        </template>
       </div>
 
       <div class="courbe-legende">
@@ -55,7 +61,11 @@ export default {
     // un point par tentative (S1 = la plus ancienne, Sn = la plus récente)
     points: { type: Array, default: () => [] },
     label: { type: String, required: true },
-    unite: { type: String, default: '' }
+    unite: { type: String, default: '' },
+    // 'tentatives' (défaut, "S1"/"S2"/...) ou 'dates' (bornes début/fin
+    // formatées) — utile pour les séries longues (charge quotidienne sur
+    // plusieurs mois) où un label par point déborderait.
+    axeX: { type: String, default: 'tentatives' }
   },
   setup(props) {
     const minY = computed(() => Math.min(...props.points.map(p => p.valeur)))
@@ -102,8 +112,9 @@ export default {
     }
 
     const formatValeur = (v) => `${v}${props.unite}`
+    const formatDateAxe = (d) => new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
 
-    return { coords, lignePoints, delta, minY, maxY, couleurPoint, formatValeur }
+    return { coords, lignePoints, delta, minY, maxY, couleurPoint, formatValeur, formatDateAxe }
   }
 }
 </script>

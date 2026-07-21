@@ -7,6 +7,9 @@
       <div class="nav-item" :class="{ active: onglet === 'athletes' }" @click="onglet = 'athletes'">
         <i class="ti ti-users"></i> Mes athlètes
       </div>
+      <div class="nav-item" :class="{ active: onglet === 'monitoring' }" @click="onglet = 'monitoring'">
+        <i class="ti ti-activity-heartbeat"></i> Monitoring
+      </div>
     </template>
 
     <template #actions>
@@ -533,6 +536,14 @@
         <div v-if="searchError" class="error">{{ searchError }}</div>
       </div>
 
+      <!-- ONGLET MONITORING -->
+      <MonitoringPanel
+        v-if="onglet === 'monitoring'"
+        :monCercle="monCercle"
+        :groupes="groupes"
+        :actif="onglet === 'monitoring'"
+      />
+
     </div>
   </AppLayout>
 </template>
@@ -546,9 +557,10 @@ import AppLayout from '../components/AppLayout.vue'
 import ProgrammeForm from '../components/prepa/ProgrammeForm.vue'
 import AssignerAthleteModal from '../components/prepa/AssignerAthleteModal.vue'
 import GroupesManagerModal from '../components/prepa/GroupesManagerModal.vue'
+import MonitoringPanel from '../components/prepa/MonitoringPanel.vue'
 
 export default {
-  components: { AppLayout, ProgrammeForm, AssignerAthleteModal, GroupesManagerModal },
+  components: { AppLayout, ProgrammeForm, AssignerAthleteModal, GroupesManagerModal, MonitoringPanel },
   setup() {
     const programmes = ref([])
     const programmeActif = ref(null)
@@ -584,7 +596,11 @@ export default {
     const api = useApi()
 
     const jours = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche']
-    const vueLabel = computed(() => onglet.value === 'athletes' ? 'Mes athlètes' : 'Programmes')
+    const vueLabel = computed(() => {
+      if (onglet.value === 'athletes') return 'Mes athlètes'
+      if (onglet.value === 'monitoring') return 'Monitoring'
+      return 'Programmes'
+    })
 
     const labelType = (t) => {
       const map = { musculation: 'Musculation', natation: 'Natation', athletisme: 'Athlétisme', pliometrie: 'Pliométrie' }
