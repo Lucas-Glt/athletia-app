@@ -36,6 +36,19 @@
     />
 
     <div class="admin-page">
+      <!-- Dupliqué du slot #actions (masqué en mobile par AppLayout, cf.
+           ".header-right :deep(.btn) { display: none }") : les actions
+           doivent aussi vivre dans le contenu pour rester joignables sur
+           petit écran, comme "+ Nouveau" dans DashboardPrepa.vue. -->
+      <div class="mobile-actions">
+        <button class="btn" @click="ouvrirCreationCompte()">
+          <i class="ti ti-user-plus"></i> Créer un compte
+        </button>
+        <button class="btn btn-primary" @click="modalOrganisation = true">
+          <i class="ti ti-plus"></i> Nouvelle organisation
+        </button>
+      </div>
+
       <div class="search-row">
         <i class="ti ti-search"></i>
         <input v-model="searchQuery" placeholder="Rechercher un athlète (nom ou email)" />
@@ -162,6 +175,8 @@ export default {
   overflow-y: auto;
 }
 
+.mobile-actions { display: none; gap: var(--spacing-sm); flex-wrap: wrap; }
+
 .search-row {
   display: flex;
   align-items: center;
@@ -185,5 +200,6 @@ export default {
 @media (max-width: 768px) {
   .admin-page { padding: var(--spacing-md) var(--spacing-lg); }
   .search-row { max-width: none; }
+  .mobile-actions { display: flex; }
 }
 </style>
