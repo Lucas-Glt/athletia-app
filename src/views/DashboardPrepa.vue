@@ -156,6 +156,7 @@
                   <select
                     v-if="editMode"
                     v-model="seance.jour"
+                    @focus="onFocusSeanceChamp(seance)"
                     @change="mettreAJourSeance(seance)"
                     @click.stop
                     class="select-jour"
@@ -166,6 +167,7 @@
                   <input
                     v-if="editMode"
                     v-model="seance.nom"
+                    @focus="onFocusSeanceChamp(seance)"
                     @change="mettreAJourSeance(seance)"
                     @click.stop
                     class="input-inline"
@@ -426,22 +428,42 @@
                           <div class="comparatif-header">
                             <span>#</span><span>Prescrit</span><span>Réalisé</span><span></span>
                           </div>
-                          <div v-for="(log, i) in exo.logs" :key="log.id" class="comparatif-row" :class="getStatutClasse(log)">
+                          <div v-for="(log, i) in exo.logs" :key="log.id" class="comparatif-row" :class="getStatutClasse(log, session.typeSeance)">
                             <span class="serie-num">{{ i + 1 }}</span>
                             <div class="prescrit-cell">
-                              <span v-if="log.serie.nb_reps">{{ log.serie.nb_reps }} reps</span>
-                              <span v-if="log.serie.poids_cible"> · {{ log.serie.poids_cible }}</span>
-                              <span v-if="log.serie.rm"> · {{ log.serie.rm }}</span>
+                              <template v-if="session.typeSeance === 'natation' || session.typeSeance === 'athletisme'">
+                                <span v-if="log.serie.metres">{{ log.serie.metres }} m</span>
+                                <span v-if="log.serie.intensite"> · {{ log.serie.intensite }}</span>
+                              </template>
+                              <template v-else-if="session.typeSeance === 'pliometrie'">
+                                <span v-if="log.serie.bonds">{{ log.serie.bonds }} bonds</span>
+                                <span v-if="log.serie.intensite"> · {{ log.serie.intensite }}</span>
+                              </template>
+                              <template v-else>
+                                <span v-if="log.serie.nb_reps">{{ log.serie.nb_reps }} reps</span>
+                                <span v-if="log.serie.poids_cible"> · {{ log.serie.poids_cible }}</span>
+                                <span v-if="log.serie.rm"> · {{ log.serie.rm }}</span>
+                              </template>
                             </div>
                             <div class="realise-cell">
                               <template v-if="log.fait">
-                                <span v-if="log.reps_realisees">{{ log.reps_realisees }} reps</span>
-                                <span v-if="log.poids_realise"> · {{ log.poids_realise }}</span>
+                                <template v-if="session.typeSeance === 'natation' || session.typeSeance === 'athletisme'">
+                                  <span v-if="log.reps_realisees">{{ log.reps_realisees }} m</span>
+                                  <span v-if="log.poids_realise"> · {{ log.poids_realise }}</span>
+                                </template>
+                                <template v-else-if="session.typeSeance === 'pliometrie'">
+                                  <span v-if="log.reps_realisees">{{ log.reps_realisees }} bonds</span>
+                                  <span v-if="log.poids_realise"> · {{ log.poids_realise }}</span>
+                                </template>
+                                <template v-else>
+                                  <span v-if="log.reps_realisees">{{ log.reps_realisees }} reps</span>
+                                  <span v-if="log.poids_realise"> · {{ log.poids_realise }}</span>
+                                </template>
                                 <span v-if="!log.reps_realisees && !log.poids_realise">—</span>
                               </template>
                               <span v-else class="non-fait">non réalisé</span>
                             </div>
-                            <span class="statut-icon"><i :class="getStatutIcon(log)"></i></span>
+                            <span class="statut-icon"><i :class="getStatutIcon(log, session.typeSeance)"></i></span>
                           </div>
                         </div>
                       </div>
@@ -587,6 +609,7 @@ export default {
     const loadingLogs = ref(false)
     const nouvelleSeance = ref({ nom: '', jour: '', type_seance: 'musculation' })
     const semaineActive = ref(1)
+    const seanceEnEdition = ref(null)
     const groupeForms = ref({})
     const seancesOuvertes = ref({})
     const groupesSeriesOuverts = ref({})
@@ -713,7 +736,7 @@ export default {
       logs.value.forEach(log => {
         const dateStr = log.date.split('T')[0]
         const key = `${dateStr}__${log.seance.id}`
-        if (!sessions[key]) sessions[key] = { key, date: dateStr, seanceNom: log.seance.nom, jour: log.seance.jour, exercices: {} }
+        if (!sessions[key]) sessions[key] = { key, date: dateStr, seanceNom: log.seance.nom, jour: log.seance.jour, typeSeance: log.seance.type_seance, exercices: {} }
         if (!sessions[key].exercices[log.exercice.id]) sessions[key].exercices[log.exercice.id] = { id: log.exercice.id, nom: log.exercice.nom, ordre: log.exercice.ordre, logs: [] }
         sessions[key].exercices[log.exercice.id].logs.push(log)
       })
@@ -878,18 +901,23 @@ export default {
 
     const formatDate = (d) => new Date(d).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
 
-    const getStatutClasse = (log) => {
+    const getStatutClasse = (log, typeSeance) => {
       if (!log.fait) return 'statut-skip'
       if (!log.reps_realisees && !log.poids_realise) return 'statut-warn'
-      const prescR = parseFloat(log.serie.nb_reps)
+      const prescrit = typeSeance === 'natation' || typeSeance === 'athletisme'
+        ? log.serie.metres
+        : typeSeance === 'pliometrie'
+          ? log.serie.bonds
+          : log.serie.nb_reps
+      const prescR = parseFloat(prescrit)
       const realR = parseFloat(log.reps_realisees)
       if (!isNaN(prescR) && !isNaN(realR) && realR < prescR) return 'statut-warn'
       return 'statut-done'
     }
 
-    const getStatutIcon = (log) => {
+    const getStatutIcon = (log, typeSeance) => {
       if (!log.fait) return 'ti ti-x'
-      return getStatutClasse(log) === 'statut-warn' ? 'ti ti-alert-triangle' : 'ti ti-check'
+      return getStatutClasse(log, typeSeance) === 'statut-warn' ? 'ti ti-alert-triangle' : 'ti ti-check'
     }
 
     const onTermine = () => { vue.value = 'liste'; fetchProgrammes() }
@@ -943,7 +971,19 @@ export default {
       })
     }
 
+    const onFocusSeanceChamp = (seance) => {
+      seanceEnEdition.value = { id: seance.id, nom: seance.nom, jour: seance.jour, ordre: seance.ordre }
+    }
+
+    // Un même créneau (nom + jour + ordre) est dupliqué une fois par semaine
+    // (cf. dupliquerSemaine) et l'athlète le reconstitue via cette identité
+    // (voir seancesAffichees côté DashboardAthlete.vue). Si le prépa renomme
+    // ou change le jour d'une seule occurrence, la clé diverge des autres
+    // semaines et l'athlète voit apparaître un créneau fantôme en double :
+    // on propage donc le changement aux séances sœurs des autres semaines.
     const mettreAJourSeance = async (seance) => {
+      const avant = seanceEnEdition.value && seanceEnEdition.value.id === seance.id ? seanceEnEdition.value : null
+
       await api.patch(`/seances/${seance.id}`, {
         nom: seance.nom,
         ordre: seance.ordre,
@@ -951,6 +991,28 @@ export default {
         semaine: seance.semaine,
         type_seance: seance.type_seance
       })
+
+      if (avant && (avant.nom !== seance.nom || avant.jour !== seance.jour)) {
+        const soeurs = seances.value.filter(s =>
+          s.id !== seance.id &&
+          s.ordre === avant.ordre &&
+          s.nom === avant.nom &&
+          s.jour === avant.jour
+        )
+        for (const soeur of soeurs) {
+          soeur.nom = seance.nom
+          soeur.jour = seance.jour
+          await api.patch(`/seances/${soeur.id}`, {
+            nom: soeur.nom,
+            ordre: soeur.ordre,
+            jour: soeur.jour || null,
+            semaine: soeur.semaine,
+            type_seance: soeur.type_seance
+          })
+        }
+      }
+
+      seanceEnEdition.value = null
     }
     return {
       programmes, programmeActif, seances, monCercle,
@@ -974,7 +1036,7 @@ export default {
       onClickTabLogs, voirLogsAthlete, formatDate,
       getStatutClasse, getStatutIcon,
       retirerDuCercle, rechercherAthlète, ajouterAuCercle,
-      mobileDetail, mettreAJourSeance, mettreAJourExercice,
+      mobileDetail, mettreAJourSeance, mettreAJourExercice, onFocusSeanceChamp,
       authStore
     }
   }

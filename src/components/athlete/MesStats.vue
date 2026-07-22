@@ -192,7 +192,7 @@ export default {
       const champ = champPourType(exerciceChoisi.value.type_seance)
       const parTentative = {}
       historiqueExercice.value
-        .filter(l => l.exercice.id === exerciceChoisi.value.exercice_id)
+        .filter(l => l.exercice.nom === exerciceChoisi.value.exercice_nom)
         .forEach(l => {
           const valeur = parseFloat(l[champ])
           if (isNaN(valeur)) return
