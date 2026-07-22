@@ -51,7 +51,13 @@ export default defineConfig({
             options: {
               cacheName: 'api-cache',
               networkTimeoutSeconds: 10,
-              cacheableResponse: { statuses: [0, 200] }
+              cacheableResponse: { statuses: [0, 200] },
+              // Sans ça, le fetch réseau de NetworkFirst peut être
+              // silencieusement satisfait par le cache HTTP du navigateur
+              // au lieu d'atteindre le serveur : le prépa modifie une
+              // donnée, l'athlète recharge la page et voit quand même
+              // l'ancienne valeur, sans aucune erreur visible.
+              fetchOptions: { cache: 'no-store' }
             }
           }
         ]
