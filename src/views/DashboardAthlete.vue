@@ -329,6 +329,29 @@
                     </template>
                   </div>
 
+                  <!-- N-1 : dernière performance connue sur cette série, visible
+                       dès la saisie sans avoir à swiper vers l'historique. -->
+                  <template v-for="n1 in [n1SeriePourExo(exo, serieIdx)]" :key="n1?.id ?? 'vide'">
+                    <div
+                      class="n1-bloc"
+                      v-if="saisieVue === 'saisie' && n1 && (n1.reps_realisees || n1.poids_realise)"
+                    >
+                      <span class="n1-tag">N-1</span>
+                      <template v-if="seanceActive.type_seance === 'musculation' || !seanceActive.type_seance">
+                        <span class="n1-val" v-if="n1.reps_realisees">{{ n1.reps_realisees }}<span class="n1-unit">reps</span></span>
+                        <span class="n1-val" v-if="n1.poids_realise">{{ n1.poids_realise }}<span class="n1-unit">kg</span></span>
+                      </template>
+                      <template v-else-if="seanceActive.type_seance === 'natation' || seanceActive.type_seance === 'athletisme'">
+                        <span class="n1-val" v-if="n1.reps_realisees">{{ n1.reps_realisees }}<span class="n1-unit">m</span></span>
+                        <span class="n1-val" v-if="n1.poids_realise">{{ n1.poids_realise }}</span>
+                      </template>
+                      <template v-else-if="seanceActive.type_seance === 'pliometrie'">
+                        <span class="n1-val" v-if="n1.reps_realisees">{{ n1.reps_realisees }}<span class="n1-unit">bonds</span></span>
+                        <span class="n1-val" v-if="n1.poids_realise">{{ n1.poids_realise }}</span>
+                      </template>
+                    </div>
+                  </template>
+
                   <!-- Réalisé : 2 champs, clavier numérique quand la donnée l'est.
                        Swipe droit dans le panneau → dernière performance à la place. -->
                   <div class="realise-inputs" v-if="saisieVue === 'saisie'">
@@ -874,6 +897,15 @@ export default {
       const tentative = tentativesExo(exo)[historiqueIndex.value]
       if (!tentative) return null
       return { date: tentative[0].date.split('T')[0], log: logTentativePourSerie(tentative, exo, serieIdx) }
+    }
+
+    // Dernière performance connue (n-1, toujours la plus récente, indépendante
+    // de la pagination historique) pour cette série — affichée en clair à côté
+    // du prescrit pendant la saisie, sans avoir à swiper vers l'historique.
+    const n1SeriePourExo = (exo, serieIdx) => {
+      const tentative = tentativesExo(exo)[0]
+      if (!tentative) return null
+      return logTentativePourSerie(tentative, exo, serieIdx)
     }
 
     const formatDateCourt = (d) => new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
@@ -1537,7 +1569,7 @@ export default {
       saisieVue, historiqueIndex, nbTentativesGroupe, retourSaisie,
       onSaisieSwipeStart, onSaisieSwipeEnd,
       onTabSwipeStart, onTabSwipeEnd,
-      historiqueSeriePourExo, formatDateCourt, formatDateNumerique, diffVsHistorique,
+      historiqueSeriePourExo, n1SeriePourExo, formatDateCourt, formatDateNumerique, diffVsHistorique,
       champsGraphique, courbeExo,
       performances, toggleSuivi, toggleSuiviPerformance, dateTentativeGroupe,
       sousOngletPoids, dateSaisiePoids, poidsSaisi, erreurPoids, poidsPourDate, entreeExistante, poidsValide,
@@ -1761,6 +1793,20 @@ export default {
   text-transform: uppercase;
   letter-spacing: 0.3px;
 }
+
+/* N-1 : dernière performance connue, discrète sous le prescrit */
+.n1-bloc { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; }
+.n1-tag {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  background: var(--color-bg-tertiary);
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  letter-spacing: 0.3px;
+}
+.n1-val { font-size: var(--font-size-xs); font-weight: 600; color: var(--color-text-muted); }
+.n1-unit { font-size: 10px; font-weight: 500; margin-left: 2px; }
 
 /* Réalisé */
 .realise-inputs { display: flex; gap: var(--spacing-sm); }
