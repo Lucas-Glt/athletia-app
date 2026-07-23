@@ -67,9 +67,9 @@
     </div>
 
     <!-- Stats descriptives, aucune interprétation -->
-    <div class="stat-card" v-if="stats?.tonnage_hebdomadaire?.length > 0">
-      <div class="stat-card-titre"><i class="ti ti-weight"></i> Tonnage hebdo (musculation)</div>
-      <CourbeProgression :points="stats.tonnage_hebdomadaire" label="Tonnage" unite="kg" axe-x="dates" />
+    <div class="stat-card" v-if="courbePoids.length > 0">
+      <div class="stat-card-titre"><i class="ti ti-scale"></i> Poids</div>
+      <CourbeProgression :points="courbePoids" label="Poids" unite="kg" axe-x="dates" />
     </div>
 
     <div class="stat-card" v-if="stats">
@@ -80,11 +80,12 @@
           v-for="j in derniersJours"
           :key="j.date"
           class="regularite-case"
-          :class="{ actif: j.nb > 0, 'est-aujourdhui': j.estAujourdhui }"
+          :class="{ 'est-aujourdhui': j.estAujourdhui }"
+          :style="styleJour(j)"
           :title="j.date"
         ></div>
       </div>
-      <p class="stat-card-note">Les 35 derniers jours — une case pleine = au moins une séance complétée.</p>
+      <p class="stat-card-note">Les 35 derniers jours — couleur = type de séance complétée (rouge musculation, bleu natation, vert athlétisme, orange pliométrie).</p>
     </div>
 
     <div class="stat-card" v-if="stats && stats.repartition_types.length > 0">
@@ -120,6 +121,13 @@ import CourbeProgression from './CourbeProgression.vue'
 import GraphiqueBarres from '../monitoring/GraphiqueBarres.vue'
 
 const LABELS_TYPE = { musculation: 'Musculation', natation: 'Natation', athletisme: 'Athlétisme', pliometrie: 'Pliométrie' }
+
+const COULEUR_TYPE = {
+  musculation: 'var(--color-type-musculation-text)',
+  natation: 'var(--color-type-natation-text)',
+  athletisme: 'var(--color-type-athletisme-text)',
+  pliometrie: 'var(--color-type-pliometrie-text)'
+}
 
 const LABELS_RPE = {
   0: 'Repos', 1: 'Très très facile', 2: 'Facile', 3: 'Modéré', 4: 'Assez dur',
@@ -168,6 +176,20 @@ export default {
       const entree = await api.get('/wellness/aujourdhui')
       wellnessFait.value = !!entree
     }
+
+    const entriesPoids = ref([])
+    const fetchPoids = async () => {
+      try {
+        entriesPoids.value = await api.get('/poids/moi')
+      } catch (e) {
+        console.error('Erreur chargement poids:', e)
+      }
+    }
+    const courbePoids = computed(() =>
+      [...entriesPoids.value]
+        .sort((a, b) => new Date(a.date) - new Date(b.date))
+        .map(e => ({ date: e.date, valeur: e.poids }))
+    )
 
     const fetchPerformances = async () => {
       performances.value = await api.get('/performances/moi')
@@ -233,17 +255,29 @@ export default {
 
     const derniersJours = computed(() => {
       const parJour = {}
-      ;(stats.value?.jours_avec_seance || []).forEach(j => { parJour[j.date] = j.nb_seances })
+      ;(stats.value?.jours_avec_seance || []).forEach(j => { parJour[j.date] = j })
       const today = new Date()
       const jours = []
       for (let i = 34; i >= 0; i--) {
         const d = new Date(today)
         d.setDate(d.getDate() - i)
         const iso = d.toISOString().split('T')[0]
-        jours.push({ date: iso, nb: parJour[iso] || 0, estAujourdhui: i === 0 })
+        const info = parJour[iso]
+        jours.push({ date: iso, nb: info?.nb_seances || 0, types: info?.types || [], estAujourdhui: i === 0 })
       }
       return jours
     })
+
+    // Une couleur par type ; plusieurs types le même jour => dégradé partagé
+    // à parts égales entre chaque couleur.
+    const styleJour = (j) => {
+      if (j.types.length === 0) return {}
+      const couleurs = j.types.map(t => COULEUR_TYPE[t] || 'var(--color-valid-text-strong)')
+      if (couleurs.length === 1) return { background: couleurs[0] }
+      const pas = 100 / couleurs.length
+      const stops = couleurs.map((c, i) => `${c} ${i * pas}%, ${c} ${(i + 1) * pas}%`).join(', ')
+      return { background: `linear-gradient(90deg, ${stops})` }
+    }
 
     const scrollVers = async (el) => {
       await nextTick()
@@ -264,7 +298,7 @@ export default {
     })
 
     onMounted(async () => {
-      await Promise.all([fetchStats(), fetchRessenti(), fetchWellness(), fetchPerformances()])
+      await Promise.all([fetchStats(), fetchRessenti(), fetchWellness(), fetchPerformances(), fetchPoids()])
       await fetchHistoriqueExercice()
       if (props.focusRessenti) { await scrollVers(ressentiEl.value); emit('focus-consomme', 'ressenti') }
       if (props.focusWellness) { await scrollVers(wellnessEl.value); emit('focus-consomme', 'wellness') }
@@ -274,7 +308,7 @@ export default {
       stats, ressenti, rpeForm, dureeForm, labelRpe, envoyerRessenti,
       wellnessFait, wellnessForm, itemsWellness, wellnessComplet, envoyerWellness,
       performances, exerciceChoisiId, exerciceChoisi, courbeExerciceChoisi,
-      repartitionBarres, derniersJours,
+      repartitionBarres, derniersJours, styleJour, courbePoids,
       ressentiEl, wellnessEl
     }
   }
@@ -342,7 +376,6 @@ export default {
 
 .regularite-grille { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
 .regularite-case { aspect-ratio: 1; border-radius: 4px; background: var(--color-bg-tertiary); }
-.regularite-case.actif { background: var(--color-valid-text-strong); }
 .regularite-case.est-aujourdhui { outline: 2px solid var(--color-primary); outline-offset: 1px; }
 
 .select-exercice {
