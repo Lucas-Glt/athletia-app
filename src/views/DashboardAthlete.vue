@@ -334,10 +334,11 @@
                   <template v-for="n1 in [n1SeriePourExo(exo, serieIdx)]" :key="n1?.id ?? 'vide'">
                     <div
                       class="n1-bloc"
-                      v-if="saisieVue === 'saisie' && n1 && (n1.reps_realisees || n1.poids_realise)"
+                      v-if="saisieVue === 'saisie' && n1 && (!n1.fait || n1.reps_realisees || n1.poids_realise)"
                     >
                       <span class="n1-tag">N-1</span>
-                      <template v-if="seanceActive.type_seance === 'musculation' || !seanceActive.type_seance">
+                      <span class="n1-val n1-nf" v-if="!n1.fait">NF</span>
+                      <template v-else-if="seanceActive.type_seance === 'musculation' || !seanceActive.type_seance">
                         <span class="n1-val" v-if="n1.reps_realisees">{{ n1.reps_realisees }}<span class="n1-unit">reps</span></span>
                         <span class="n1-val" v-if="n1.poids_realise">{{ n1.poids_realise }}<span class="n1-unit">kg</span></span>
                       </template>
@@ -1807,6 +1808,7 @@ export default {
 }
 .n1-val { font-size: var(--font-size-xs); font-weight: 600; color: var(--color-text-muted); }
 .n1-unit { font-size: 10px; font-weight: 500; margin-left: 2px; }
+.n1-val.n1-nf { color: var(--color-danger-text); }
 
 /* Réalisé */
 .realise-inputs { display: flex; gap: var(--spacing-sm); }
