@@ -1,67 +1,99 @@
 <template>
   <div class="tests-panel">
-    <div class="tests-panel-header">
-      <h2 class="tests-panel-titre">Tests</h2>
-      <button class="btn btn-primary" @click="modalOuverte = true"><i class="ti ti-plus"></i> Nouveau test</button>
-    </div>
-
-    <div class="filtres-row">
-      <div class="groupe-filtre-chips">
-        <button class="chip-filtre" :class="{ active: categorieFiltre === 'tous' }" @click="categorieFiltre = 'tous'">Tous</button>
-        <button
-          v-for="c in CATEGORIES_TEST"
-          :key="c.id"
-          class="chip-filtre"
-          :class="{ active: categorieFiltre === c.id }"
-          @click="categorieFiltre = categorieFiltre === c.id ? 'tous' : c.id"
-        >
-          <i class="ti" :class="c.icone"></i> {{ c.label }}
-        </button>
+    <!-- LISTE DES TESTS (une page par test créé) -->
+    <template v-if="!testSelectionne">
+      <div class="tests-panel-header">
+        <h2 class="tests-panel-titre">Tests</h2>
+        <button class="btn btn-primary" @click="modalNouveauTest = true"><i class="ti ti-plus"></i> Nouveau test</button>
       </div>
-      <select v-model="testFiltre" class="select-filtre">
-        <option value="tous">Tous les tests</option>
-        <option v-for="t in optionsTestFiltre" :key="t.id" :value="t.id">{{ t.label }}</option>
-      </select>
-    </div>
 
-    <div class="filtres-row">
-      <input v-model="rechercheNom" class="input-recherche" placeholder="Rechercher un athlète" />
-      <select v-model="tri" class="select-filtre">
-        <option value="recent">Plus récent</option>
-        <option value="nom">Athlète A → Z</option>
-        <option value="perf_asc">Performance croissante</option>
-        <option value="perf_desc">Performance décroissante</option>
-      </select>
-    </div>
-
-    <div v-if="loading" class="empty">Chargement...</div>
-    <div v-else-if="testsFiltres.length === 0" class="empty">Aucun test enregistré pour ce filtre.</div>
-
-    <div class="tests-list" v-else>
-      <div class="test-row" v-for="t in testsFiltres" :key="t.id">
-        <div class="mini-av-lg">{{ initiales(t.athlete.nom) }}</div>
-        <div class="test-info">
-          <div class="test-athlete-nom">
-            {{ t.athlete.nom }}
-            <span class="badge badge-gray org-badge" v-if="estSuperPrepa">{{ t.athlete.organisation?.nom || 'Indépendant' }}</span>
-          </div>
-          <div class="test-meta">
-            <span class="badge badge-purple">{{ labelCategorie(t.categorie) }}</span>
-            <span class="test-nom">{{ labelTest(t.type_test) }}</span>
-            <span class="test-date">{{ formatDate(t.date) }}</span>
-          </div>
-          <div class="test-notes" v-if="t.notes">{{ t.notes }}</div>
+      <div class="filtres-row">
+        <div class="groupe-filtre-chips">
+          <button class="chip-filtre" :class="{ active: categorieFiltre === 'tous' }" @click="categorieFiltre = 'tous'">Tous</button>
+          <button
+            v-for="c in CATEGORIES_TEST"
+            :key="c.id"
+            class="chip-filtre"
+            :class="{ active: categorieFiltre === c.id }"
+            @click="categorieFiltre = categorieFiltre === c.id ? 'tous' : c.id"
+          >
+            <i class="ti" :class="c.icone"></i> {{ c.label }}
+          </button>
         </div>
-        <div class="test-valeur">{{ t.valeur }}<span class="test-unite">{{ t.unite }}</span></div>
-        <button class="btn-icon-tiny" title="Supprimer" @click="supprimer(t)"><i class="ti ti-trash"></i></button>
+        <input v-model="rechercheTest" class="input-recherche" placeholder="Rechercher un test" />
       </div>
-    </div>
+
+      <div v-if="loading" class="empty">Chargement...</div>
+      <div v-else-if="testsFiltres.length === 0" class="empty">Aucun test créé pour ce filtre.</div>
+
+      <div class="tests-grid" v-else>
+        <div class="test-card" v-for="t in testsFiltres" :key="t.id" @click="ouvrirTest(t)">
+          <div class="test-card-head">
+            <span class="badge badge-purple">{{ labelCategorie(t.categorie) }}</span>
+            <button class="btn-icon-tiny" title="Supprimer ce test" @click.stop="supprimerTest(t)"><i class="ti ti-trash"></i></button>
+          </div>
+          <div class="test-card-nom">{{ t.type_test }}</div>
+          <div class="test-card-meta">{{ t.nb_resultats }} résultat{{ t.nb_resultats > 1 ? 's' : '' }} · {{ t.unite }}</div>
+        </div>
+      </div>
+    </template>
+
+    <!-- DÉTAIL D'UN TEST : résultats par athlète -->
+    <template v-else>
+      <div class="tests-panel-header">
+        <button class="btn btn-sm" @click="fermerTest"><i class="ti ti-arrow-left"></i> Retour</button>
+        <button class="btn btn-primary" @click="modalAjouterResultat = true"><i class="ti ti-plus"></i> Ajouter un résultat</button>
+      </div>
+
+      <div class="test-detail-titre">
+        <span class="badge badge-purple">{{ labelCategorie(testSelectionne.categorie) }}</span>
+        <h2>{{ testSelectionne.type_test }}</h2>
+        <span class="test-detail-unite">{{ testSelectionne.unite }}</span>
+      </div>
+
+      <div class="filtres-row">
+        <input v-model="rechercheNom" class="input-recherche" placeholder="Rechercher un athlète" />
+        <select v-model="tri" class="select-filtre">
+          <option value="recent">Plus récent</option>
+          <option value="nom">Athlète A → Z</option>
+          <option value="perf_asc">Performance croissante</option>
+          <option value="perf_desc">Performance décroissante</option>
+        </select>
+      </div>
+
+      <div v-if="loadingResultats" class="empty">Chargement...</div>
+      <div v-else-if="resultatsFiltres.length === 0" class="empty">Aucun résultat enregistré pour ce filtre.</div>
+
+      <div class="tests-list" v-else>
+        <div class="test-row" v-for="r in resultatsFiltres" :key="r.id">
+          <div class="mini-av-lg">{{ initiales(r.athlete.nom) }}</div>
+          <div class="test-info">
+            <div class="test-athlete-nom">
+              {{ r.athlete.nom }}
+              <span class="badge badge-gray org-badge" v-if="estSuperPrepa">{{ r.athlete.organisation?.nom || 'Indépendant' }}</span>
+            </div>
+            <div class="test-meta">
+              <span class="test-date">{{ formatDate(r.date) }}</span>
+            </div>
+            <div class="test-notes" v-if="r.notes">{{ r.notes }}</div>
+          </div>
+          <div class="test-valeur">{{ r.valeur }}<span class="test-unite">{{ testSelectionne.unite }}</span></div>
+          <button class="btn-icon-tiny" title="Supprimer" @click="supprimerResultat(r)"><i class="ti ti-trash"></i></button>
+        </div>
+      </div>
+    </template>
 
     <NouveauTestModal
-      v-if="modalOuverte"
+      v-if="modalNouveauTest"
+      @fermer="modalNouveauTest = false"
+      @cree="onTestCree"
+    />
+    <AjouterResultatModal
+      v-if="modalAjouterResultat"
+      :test="testSelectionne"
       :monCercle="monCercle"
-      @fermer="modalOuverte = false"
-      @cree="fetchTests"
+      @fermer="modalAjouterResultat = false"
+      @cree="onResultatCree"
     />
   </div>
 </template>
@@ -70,11 +102,12 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { useApi } from '../../services/api'
 import { useAuthStore } from '../../stores/auth'
-import { CATEGORIES_TEST, categorieDe, testDe } from '../../data/catalogueTests'
+import { CATEGORIES_TEST, categorieDe } from '../../data/catalogueTests'
 import NouveauTestModal from './NouveauTestModal.vue'
+import AjouterResultatModal from './AjouterResultatModal.vue'
 
 export default {
-  components: { NouveauTestModal },
+  components: { NouveauTestModal, AjouterResultatModal },
   props: {
     monCercle: { type: Array, default: () => [] },
     actif: { type: Boolean, default: false }
@@ -86,54 +119,82 @@ export default {
 
     const tests = ref([])
     const loading = ref(false)
-    const modalOuverte = ref(false)
-
+    const modalNouveauTest = ref(false)
     const categorieFiltre = ref('tous')
-    const testFiltre = ref('tous')
-    const rechercheNom = ref('')
-    const tri = ref('recent')
-
-    // Ne propose que les tests ayant au moins un enregistrement — pas tout
-    // le catalogue, pour ne pas noyer le filtre de types jamais utilisés.
-    const optionsTestFiltre = computed(() => {
-      const presents = new Set(
-        tests.value
-          .filter((t) => categorieFiltre.value === 'tous' || t.categorie === categorieFiltre.value)
-          .map((t) => t.type_test)
-      )
-      return Array.from(presents)
-        .map((id) => ({ id, label: labelTest(id) }))
-        .sort((a, b) => a.label.localeCompare(b.label))
-    })
-    watch(categorieFiltre, () => { testFiltre.value = 'tous' })
+    const rechercheTest = ref('')
 
     const fetchTests = async () => {
       loading.value = true
-      tests.value = await api.get('/tests/cercle')
+      tests.value = await api.get('/tests/')
       loading.value = false
     }
 
-    const testsFiltres = computed(() => {
-      const liste = tests.value.filter((t) => {
+    const testsFiltres = computed(() =>
+      tests.value.filter((t) => {
         if (categorieFiltre.value !== 'tous' && t.categorie !== categorieFiltre.value) return false
-        if (testFiltre.value !== 'tous' && t.type_test !== testFiltre.value) return false
-        if (rechercheNom.value && !t.athlete.nom.toLowerCase().includes(rechercheNom.value.toLowerCase())) return false
+        if (rechercheTest.value && !t.type_test.toLowerCase().includes(rechercheTest.value.toLowerCase())) return false
         return true
       })
+    )
+
+    const onTestCree = (nouveauTest) => {
+      tests.value.push({ ...nouveauTest, nb_resultats: 0 })
+    }
+
+    const supprimerTest = async (t) => {
+      if (!confirm(`Supprimer le test "${t.type_test}" et tous ses résultats ?`)) return
+      await api.del(`/tests/${t.id}`)
+      tests.value = tests.value.filter((x) => x.id !== t.id)
+    }
+
+    // --- Détail d'un test : résultats par athlète (recherche + tri vivent ici) ---
+    const testSelectionne = ref(null)
+    const resultats = ref([])
+    const loadingResultats = ref(false)
+    const modalAjouterResultat = ref(false)
+    const rechercheNom = ref('')
+    const tri = ref('recent')
+
+    const fetchResultats = async (testId) => {
+      loadingResultats.value = true
+      resultats.value = await api.get(`/tests/${testId}/resultats`)
+      loadingResultats.value = false
+    }
+
+    const ouvrirTest = (t) => {
+      testSelectionne.value = t
+      rechercheNom.value = ''
+      tri.value = 'recent'
+      fetchResultats(t.id)
+    }
+
+    const fermerTest = () => { testSelectionne.value = null }
+
+    const resultatsFiltres = computed(() => {
+      const liste = resultats.value.filter(
+        (r) => !rechercheNom.value || r.athlete.nom.toLowerCase().includes(rechercheNom.value.toLowerCase())
+      )
       if (tri.value === 'nom') return [...liste].sort((a, b) => a.athlete.nom.localeCompare(b.athlete.nom))
       if (tri.value === 'perf_asc') return [...liste].sort((a, b) => a.valeur - b.valeur)
       if (tri.value === 'perf_desc') return [...liste].sort((a, b) => b.valeur - a.valeur)
       return [...liste].sort((a, b) => b.date.localeCompare(a.date))
     })
 
-    const supprimer = async (t) => {
-      if (!confirm(`Supprimer ce test (${labelTest(t.type_test)} — ${t.athlete.nom}) ?`)) return
-      await api.del(`/tests/${t.id}`)
-      tests.value = tests.value.filter((x) => x.id !== t.id)
+    const onResultatCree = () => {
+      const t = tests.value.find((x) => x.id === testSelectionne.value.id)
+      if (t) t.nb_resultats++
+      fetchResultats(testSelectionne.value.id)
+    }
+
+    const supprimerResultat = async (r) => {
+      if (!confirm(`Supprimer ce résultat (${r.athlete.nom}) ?`)) return
+      await api.del(`/tests/${testSelectionne.value.id}/resultats/${r.id}`)
+      resultats.value = resultats.value.filter((x) => x.id !== r.id)
+      const t = tests.value.find((x) => x.id === testSelectionne.value.id)
+      if (t) t.nb_resultats--
     }
 
     const labelCategorie = (id) => categorieDe(id)?.label || id
-    const labelTest = (id) => testDe(id)?.label || id
     const initiales = (nom) => nom.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
     const formatDate = (d) => new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })
 
@@ -141,10 +202,11 @@ export default {
     onMounted(() => { if (props.actif) fetchTests() })
 
     return {
-      CATEGORIES_TEST, tests, loading, modalOuverte,
-      categorieFiltre, testFiltre, optionsTestFiltre, rechercheNom, tri,
-      testsFiltres, fetchTests, supprimer,
-      labelCategorie, labelTest, initiales, formatDate, estSuperPrepa
+      CATEGORIES_TEST, tests, loading, modalNouveauTest, categorieFiltre, rechercheTest, testsFiltres,
+      onTestCree, supprimerTest,
+      testSelectionne, resultats, loadingResultats, modalAjouterResultat, ouvrirTest, fermerTest,
+      rechercheNom, tri, resultatsFiltres, onResultatCree, supprimerResultat,
+      labelCategorie, initiales, formatDate, estSuperPrepa
     }
   }
 }
@@ -181,6 +243,24 @@ export default {
   flex: 1;
 }
 
+/* --- Liste des tests (cartes) --- */
+.tests-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--spacing-md); }
+.test-card {
+  display: flex; flex-direction: column; gap: var(--spacing-xs);
+  padding: var(--spacing-md) var(--spacing-lg);
+  border: 1px solid var(--color-border); border-radius: var(--radius-lg);
+  background: var(--color-bg); cursor: pointer;
+}
+.test-card:hover { border-color: var(--color-primary); background: var(--color-bg-secondary); }
+.test-card-head { display: flex; align-items: center; justify-content: space-between; }
+.test-card-nom { font-size: var(--font-size-base); font-weight: 600; }
+.test-card-meta { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+
+/* --- Détail d'un test --- */
+.test-detail-titre { display: flex; align-items: baseline; gap: var(--spacing-sm); flex-wrap: wrap; }
+.test-detail-titre h2 { margin: 0; font-size: var(--font-size-xl); font-weight: 700; }
+.test-detail-unite { font-size: var(--font-size-sm); color: var(--color-text-secondary); }
+
 .tests-list { display: flex; flex-direction: column; gap: var(--spacing-sm); }
 .test-row {
   display: flex; align-items: center; gap: var(--spacing-md);
@@ -199,7 +279,6 @@ export default {
 .test-athlete-nom { font-size: var(--font-size-sm); font-weight: 600; }
 .test-athlete-nom .org-badge { margin-left: 6px; font-weight: 500; }
 .test-meta { display: flex; align-items: center; gap: var(--spacing-sm); font-size: var(--font-size-xs); color: var(--color-text-secondary); flex-wrap: wrap; }
-.test-nom { font-weight: 500; }
 .test-date { color: var(--color-text-muted); }
 .test-notes { font-size: var(--font-size-xs); color: var(--color-text-muted); font-style: italic; }
 .test-valeur { font-size: var(--font-size-lg); font-weight: 700; color: var(--color-primary-dark); white-space: nowrap; flex-shrink: 0; }
@@ -216,5 +295,6 @@ export default {
 @media (max-width: 768px) {
   .tests-panel { padding: var(--spacing-md) var(--spacing-lg); }
   .test-row { flex-wrap: wrap; }
+  .tests-grid { grid-template-columns: 1fr 1fr; }
 }
 </style>
