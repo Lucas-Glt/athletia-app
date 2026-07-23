@@ -65,8 +65,8 @@
       <div v-else-if="athletesFiltres.length === 0" class="empty">Aucun athlète pour ce filtre.</div>
 
       <div class="athlete-monitoring-list">
-        <div class="athlete-monitoring-card" v-for="a in athletesFiltres" :key="a.id">
-          <button class="amc-clic" @click="ouvrirFiche(a)">
+        <div class="athlete-monitoring-card" v-for="a in athletesFiltres" :key="a.id" @click="ouvrirFiche(a)">
+          <div class="amc-clic">
             <div class="amc-head">
               <div class="mini-av-lg">{{ initiales(a.nom) }}</div>
               <div class="amc-info">
@@ -81,6 +81,11 @@
                     <i class="ti" :class="a.resume.wellness_repondu_aujourdhui ? 'ti-circle-check' : 'ti-circle-dashed'"></i>
                     wellness
                   </span>
+                </div>
+                <div class="amc-infos-recentes" v-if="a.resume">
+                  <span><i class="ti ti-run"></i> Dernière séance : <strong>{{ formatDateRecente(a.resume.derniere_seance) }}</strong></span>
+                  <span><i class="ti ti-mood-check"></i> Wellness : <strong>{{ formatDateRecente(a.resume.dernier_wellness) }}</strong></span>
+                  <span><i class="ti ti-weight"></i> Poids : <strong>{{ a.resume.dernier_poids ? `${a.resume.dernier_poids.poids}kg (${formatDateRecente(a.resume.dernier_poids.date)})` : '—' }}</strong></span>
                 </div>
                 <div class="groupes-badges" v-if="groupesDe(a.id).length > 0">
                   <span
@@ -100,10 +105,10 @@
                 <i class="ti ti-alert-triangle"></i> {{ s }}
               </span>
             </div>
-          </button>
+          </div>
           <div class="amc-actions">
-            <button class="btn-icon-tiny" title="Voir/modifier ses groupes" @click="ouvrirGestionGroupes(a)"><i class="ti ti-tags"></i></button>
-            <button class="btn btn-sm btn-danger" @click="retirerDuCercle(a)">Retirer</button>
+            <button class="btn-icon-tiny" title="Voir/modifier ses groupes" @click.stop="ouvrirGestionGroupes(a)"><i class="ti ti-tags"></i></button>
+            <button class="btn btn-sm btn-danger" @click.stop="retirerDuCercle(a)">Retirer</button>
           </div>
         </div>
       </div>
@@ -310,6 +315,7 @@ export default {
 
     const iconeTendance = (t) => ({ hausse: 'ti-trending-up', baisse: 'ti-trending-down', stable: 'ti-minus' }[t] || 'ti-minus')
     const initiales = (nom) => nom.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+    const formatDateRecente = (d) => d ? new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : '—'
 
     watch(() => props.actif, (actif) => { if (actif && resumes.value.length === 0 && !loading.value) fetchResumes() })
     onMounted(() => { if (props.actif) fetchResumes() })
@@ -319,7 +325,7 @@ export default {
       estSuperPrepa, athleteSelectionneId, athleteSelectionne, ouvrirFiche, aideOuverte, resumeCercle,
       modalGroupes, athleteFocusGroupes, ouvrirGestionGroupes, groupesDe,
       searchEmail, athleteTrouve, searchError, rechercherAthlète, ajouterAuCercle, retirerDuCercle,
-      onModifie, iconeTendance, initiales
+      onModifie, iconeTendance, initiales, formatDateRecente
     }
   }
 }
@@ -400,13 +406,20 @@ export default {
   padding: var(--spacing-md) var(--spacing-lg);
   border: 1px solid var(--color-border); border-radius: var(--radius-lg);
   background: var(--color-bg);
+  cursor: pointer;
 }
 .athlete-monitoring-card:hover { border-color: var(--color-primary); background: var(--color-bg-secondary); }
 .amc-clic {
   display: flex; flex-direction: column; gap: var(--spacing-sm);
-  background: none; border: none; padding: 0; margin: 0;
-  text-align: left; cursor: pointer; width: 100%; font-family: inherit;
+  width: 100%;
 }
+.amc-infos-recentes {
+  display: flex; align-items: center; gap: var(--spacing-md);
+  font-size: var(--font-size-xs); color: var(--color-text-secondary);
+  flex-wrap: wrap; margin-top: 2px;
+}
+.amc-infos-recentes .ti { margin-right: 2px; }
+.amc-infos-recentes strong { color: var(--color-text); font-weight: 600; }
 .amc-head { display: flex; align-items: center; gap: var(--spacing-md); }
 .mini-av-lg {
   width: var(--avatar-md); height: var(--avatar-md); border-radius: 50%;

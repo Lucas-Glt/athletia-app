@@ -1,8 +1,14 @@
 <template>
-  <div class="fiche-athlete">
-    <button class="btn btn-sm retour-fiche" @click="$emit('fermer')">
-      <i class="ti ti-arrow-left"></i> Retour
-    </button>
+  <div class="fiche-athlete" @pointerdown="onSwipeStart" @pointerup="onSwipeEnd" @pointercancel="onSwipeEnd">
+    <div class="fiche-topbar">
+      <button class="btn btn-sm retour-fiche" @click="$emit('fermer')">
+        <i class="ti ti-arrow-left"></i> Retour
+      </button>
+      <div class="fiche-topbar-actions">
+        <button class="btn btn-sm" @click="modalGroupes = true"><i class="ti ti-tags"></i> Groupes</button>
+        <button class="btn btn-sm btn-danger" @click="retirerDuCercle"><i class="ti ti-user-minus"></i> Retirer</button>
+      </div>
+    </div>
 
     <div class="fiche-header">
       <div class="mini-av-lg">{{ initiales(athlete.nom) }}</div>
@@ -21,10 +27,6 @@
           >{{ g.nom }}</span>
         </div>
       </div>
-      <div class="fiche-header-actions">
-        <button class="btn btn-sm" @click="modalGroupes = true"><i class="ti ti-tags"></i> Groupes</button>
-        <button class="btn btn-sm btn-danger" @click="retirerDuCercle"><i class="ti ti-user-minus"></i> Retirer</button>
-      </div>
     </div>
 
     <GroupesManagerModal
@@ -37,10 +39,10 @@
     />
 
     <div class="tabs">
-      <div class="tab" :class="{ active: sousOnglet === 'apercu' }" @click="sousOnglet = 'apercu'">Aperçu</div>
-      <div class="tab" :class="{ active: sousOnglet === 'programme' }" @click="sousOnglet = 'programme'">Programme</div>
-      <div class="tab" :class="{ active: sousOnglet === 'seances' }" @click="ouvrirSeances">Séances</div>
-      <div class="tab" :class="{ active: sousOnglet === 'poids' }" @click="ouvrirPoids">Poids</div>
+      <div class="tab" :class="{ active: sousOnglet === 'apercu' }" @click="allerA('apercu')">Aperçu</div>
+      <div class="tab" :class="{ active: sousOnglet === 'programme' }" @click="allerA('programme')">Programme</div>
+      <div class="tab" :class="{ active: sousOnglet === 'seances' }" @click="allerA('seances')">Séances</div>
+      <div class="tab" :class="{ active: sousOnglet === 'poids' }" @click="allerA('poids')">Poids</div>
     </div>
 
     <!-- APERÇU : monitoring (charge, ACWR, wellness) -->
@@ -344,6 +346,35 @@ export default {
       if (!poidsCharge.value) fetchPoids()
     }
 
+    // --- Navigation par onglet (clic ou swipe) ---
+    const ONGLETS_FICHE = ['apercu', 'programme', 'seances', 'poids']
+    const allerA = (tab) => {
+      if (tab === 'seances') ouvrirSeances()
+      else if (tab === 'poids') ouvrirPoids()
+      else sousOnglet.value = tab
+    }
+
+    // Swipe gauche/droite pour changer d'onglet, même logique que le swipe
+    // de tabs du dashboard athlète (détection au relâché uniquement, pour
+    // ne jamais interférer avec le scroll vertical ou les clics).
+    const swipeState = { startX: 0, startY: 0, active: false }
+    const onSwipeStart = (e) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return
+      swipeState.startX = e.clientX
+      swipeState.startY = e.clientY
+      swipeState.active = true
+    }
+    const onSwipeEnd = (e) => {
+      if (!swipeState.active) return
+      swipeState.active = false
+      const dx = e.clientX - swipeState.startX
+      const dy = e.clientY - swipeState.startY
+      if (Math.abs(dy) > Math.abs(dx) + 10) return
+      const idx = ONGLETS_FICHE.indexOf(sousOnglet.value)
+      if (dx <= -60 && idx < ONGLETS_FICHE.length - 1) allerA(ONGLETS_FICHE[idx + 1])
+      else if (dx >= 60 && idx > 0) allerA(ONGLETS_FICHE[idx - 1])
+    }
+
     onMounted(fetchApercu)
 
     return {
@@ -353,7 +384,8 @@ export default {
       enCours, estAssigne, assignerProgramme, retirerProgramme,
       programmesAssignes, programmeLogsId, loadingLogs, logsGroupes, ouvrirSeances,
       formatDate, getStatutClasse, getStatutIcon,
-      loadingPoids, courbePoids, ouvrirPoids
+      loadingPoids, courbePoids, ouvrirPoids,
+      allerA, onSwipeStart, onSwipeEnd
     }
   }
 }
@@ -361,13 +393,15 @@ export default {
 
 <style scoped>
 .fiche-athlete { display: flex; flex-direction: column; gap: var(--spacing-lg); padding: var(--spacing-xl) var(--spacing-2xl); overflow-y: auto; flex: 1; }
-.retour-fiche { align-self: flex-start; }
+
+.fiche-topbar { display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-md); flex-wrap: wrap; }
+.retour-fiche { flex-shrink: 0; }
+.fiche-topbar-actions { display: flex; gap: var(--spacing-sm); flex-shrink: 0; flex-wrap: wrap; }
 
 .fiche-header { display: flex; align-items: center; gap: var(--spacing-md); flex-wrap: wrap; }
 .fiche-header-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .fiche-header-info h3 { margin: 0; font-size: var(--font-size-xl); font-weight: 700; }
 .fiche-header-info h3 .org-badge { margin-left: 6px; font-weight: 500; vertical-align: middle; }
-.fiche-header-actions { display: flex; gap: var(--spacing-sm); flex-shrink: 0; }
 .mini-av-lg {
   width: var(--avatar-md);
   height: var(--avatar-md);

@@ -180,6 +180,16 @@
                     class="exo-group"
                     :class="{ 'is-superset': groupe.exercices.length > 1 }"
                   >
+                    <div v-if="editMode" class="exo-group-toolbar">
+                      <button class="btn-icon-tiny" title="Monter" :disabled="estPremierGroupe(seance, groupe)" @click="deplacerGroupe(seance, groupe, -1)">
+                        <i class="ti ti-arrow-up"></i>
+                      </button>
+                      <button class="btn-icon-tiny" title="Descendre" :disabled="estDernierGroupe(seance, groupe)" @click="deplacerGroupe(seance, groupe, 1)">
+                        <i class="ti ti-arrow-down"></i>
+                      </button>
+                      <span class="exo-group-toolbar-label">Réordonner</span>
+                    </div>
+
                     <div v-if="groupe.exercices.length > 1" class="superset-banner">
                       <i class="ti ti-link"></i>
                       <span>Superset/Biset · {{ groupe.exercices.length }} exercices</span>
@@ -295,7 +305,14 @@
                               </template>
                             </div>
                           </div>
+                          <button v-if="editMode" class="btn-icon-tiny serie-delete-btn" title="Supprimer cette série" @click="supprimerSerieIndex(groupe, serieIdx - 1)">
+                            <i class="ti ti-trash"></i>
+                          </button>
                         </div>
+
+                        <button v-if="editMode" class="btn btn-sm btn-secondary btn-ajouter-serie" @click="ajouterSerieGroupe(groupe, seance)">
+                          <i class="ti ti-plus"></i> Ajouter une série
+                        </button>
                       </div>
                     </div>
 
@@ -476,21 +493,76 @@ export default {
       return form
     }
 
+    // Payload d'une série selon le type de séance — partagé entre la
+    // génération en masse (genererSeriesGroupeEdit) et l'ajout d'une série
+    // isolée (ajouterSerieGroupe).
+    const buildSeriePayload = (type, params, tempsRepos) => {
+      if (type === 'musculation' || !type) return { nb_reps: params.nb_reps || null, poids_cible: params.poids_cible || null, rm: params.rm || null, tempo: params.tempo || null, temps_repos: tempsRepos || null }
+      if (type === 'natation' || type === 'athletisme') return { nb_series: '1', metres: params.metres || null, intensite: params.intensite || null, temps_repos: tempsRepos || null }
+      if (type === 'pliometrie') return { nb_series: '1', bonds: params.bonds || null, intensite: params.intensite || null, temps_repos: tempsRepos || null }
+      return {}
+    }
+
     const genererSeriesGroupeEdit = async (groupe, seance) => {
       const form = groupeForms.value[groupe.key]
       if (!form) return
       const type = seance.type_seance || 'musculation'
-      const buildPayload = (params) => {
-        if (type === 'musculation') return { nb_reps: params.nb_reps || null, poids_cible: params.poids_cible || null, rm: params.rm || null, tempo: params.tempo || null, temps_repos: form.temps_repos || null }
-        if (type === 'natation' || type === 'athletisme') return { nb_series: '1', metres: params.metres || null, intensite: params.intensite || null, temps_repos: form.temps_repos || null }
-        if (type === 'pliometrie') return { nb_series: '1', bonds: params.bonds || null, intensite: params.intensite || null, temps_repos: form.temps_repos || null }
-        return {}
-      }
       for (const exo of groupe.exercices) {
         const params = form.params[exo.id] || {}
-        for (let i = 0; i < form.nb_series; i++) await api.post(`/exercices/${exo.id}/series/`, buildPayload(params))
+        for (let i = 0; i < form.nb_series; i++) await api.post(`/exercices/${exo.id}/series/`, buildSeriePayload(type, params, form.temps_repos))
       }
       await fetchSeances(programmeActif.value.id)
+    }
+
+    // Ajoute une seule série à un groupe déjà généré, en reprenant les
+    // valeurs de la dernière série comme point de départ (repos compris).
+    const ajouterSerieGroupe = async (groupe, seance) => {
+      const type = seance.type_seance || 'musculation'
+      for (const exo of groupe.exercices) {
+        const derniere = exo.series[exo.series.length - 1] || {}
+        const data = await api.post(`/exercices/${exo.id}/series/`, buildSeriePayload(type, derniere, derniere.temps_repos))
+        exo.series.push(data)
+      }
+    }
+
+    const supprimerSerieIndex = async (groupe, idx) => {
+      if (!confirm(`Supprimer la série ${idx + 1} ?`)) return
+      for (const exo of groupe.exercices) {
+        const serie = exo.series[idx]
+        if (serie) {
+          await api.del(`/series/${serie.id}`)
+          exo.series.splice(idx, 1)
+        }
+      }
+    }
+
+    // Réordonnancement des groupes d'exercices (drag manuel via flèches) :
+    // on renumérote l'`ordre` de tous les exercices de la séance en suivant
+    // le nouvel ordre des groupes, puis on ne PATCH que ceux qui ont changé.
+    const estPremierGroupe = (seance, groupe) => grouperExercices(seance.exercices)[0]?.key === groupe.key
+    const estDernierGroupe = (seance, groupe) => {
+      const groupes = grouperExercices(seance.exercices)
+      return groupes[groupes.length - 1]?.key === groupe.key
+    }
+
+    const deplacerGroupe = async (seance, groupe, direction) => {
+      const groupesOrdre = grouperExercices(seance.exercices)
+      const idx = groupesOrdre.findIndex(g => g.key === groupe.key)
+      const cible = idx + direction
+      if (idx === -1 || cible < 0 || cible >= groupesOrdre.length) return
+      const reordonnes = [...groupesOrdre]
+      ;[reordonnes[idx], reordonnes[cible]] = [reordonnes[cible], reordonnes[idx]]
+
+      let ordre = 1
+      const aPatcher = []
+      for (const g of reordonnes) {
+        for (const exo of g.exercices) {
+          if (exo.ordre !== ordre) aPatcher.push(exo)
+          exo.ordre = ordre
+          ordre++
+        }
+      }
+      for (const exo of aPatcher) await mettreAJourExercice(exo)
     }
 
     const syncReposSuperset = async (groupe, serieIdx) => {
@@ -747,6 +819,8 @@ export default {
       nouvelleSeance, jours, labelType, letterFor, grouperExercices,
       semaineActive, semainesDisponibles, seancesFiltrees,
       groupeForms, getGroupeForm, genererSeriesGroupeEdit,
+      ajouterSerieGroupe, supprimerSerieIndex,
+      estPremierGroupe, estDernierGroupe, deplacerGroupe,
       syncReposSuperset, ajouterAuSupersetEdit,
       seancesOuvertes, toggleSeance, isSeanceOuverte,
       groupesSeriesOuverts, toggleGroupeSeries, isGroupeSeriesOuvert,
@@ -945,6 +1019,9 @@ export default {
 }
 .exo-group.is-superset { background: var(--color-superset-bg); border: 1px solid var(--color-superset-border); border-left: 4px solid var(--color-primary); }
 .superset-banner { display: flex; align-items: center; gap: 6px; font-size: var(--font-size-xs); color: var(--color-superset-text); font-weight: 600; }
+.exo-group-toolbar { display: flex; align-items: center; gap: 4px; }
+.exo-group-toolbar-label { font-size: var(--font-size-xs); color: var(--color-text-muted); margin-left: 2px; }
+.exo-group-toolbar .btn-icon-tiny:disabled { opacity: 0.25; cursor: not-allowed; }
 .exo-list { display: flex; flex-direction: column; gap: 6px; }
 .exo-block { display: flex; flex-direction: column; gap: 6px; background: var(--color-bg); border-radius: var(--radius-md); padding: var(--spacing-sm) var(--spacing-md); border: 1px solid var(--color-border); }
 .exo-head { display: flex; align-items: center; gap: var(--spacing-sm); flex-wrap: wrap; }
@@ -1038,6 +1115,8 @@ export default {
   align-self: flex-start;
 }
 .serie-exos { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 0; }
+.serie-delete-btn { flex-shrink: 0; align-self: center; }
+.btn-ajouter-serie { align-self: flex-start; }
 .serie-exo { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
 .exo-letter-mini {
   font-size: var(--font-size-xs);
