@@ -1,14 +1,11 @@
 <template>
   <AppLayout :title="vueLabel">
     <template #nav>
+      <div class="nav-item" :class="{ active: onglet === 'athletes' }" @click="onglet = 'athletes'">
+        <i class="ti ti-users"></i> Athlètes
+      </div>
       <div class="nav-item" :class="{ active: onglet === 'programmes' }" @click="onglet = 'programmes'">
         <i class="ti ti-layout-grid"></i> Programmes
-      </div>
-      <div class="nav-item" :class="{ active: onglet === 'athletes' }" @click="onglet = 'athletes'">
-        <i class="ti ti-users"></i> Mes athlètes
-      </div>
-      <div class="nav-item" :class="{ active: onglet === 'monitoring' }" @click="onglet = 'monitoring'">
-        <i class="ti ti-activity-heartbeat"></i> Monitoring
       </div>
     </template>
 
@@ -112,17 +109,8 @@
               </button>
             </div>
 
-            <div class="tabs">
-              <div class="tab" :class="{ active: tabDetail === 'seances' }" @click="tabDetail = 'seances'">
-                Séances & exercices
-              </div>
-              <div class="tab" :class="{ active: tabDetail === 'logs' }" @click="onClickTabLogs">
-                Logs athlètes
-              </div>
-            </div>
-
-            <!-- TAB SÉANCES -->
-            <div v-if="tabDetail === 'seances'" class="tab-content">
+            <div class="section-title">Séances &amp; exercices</div>
+            <div class="tab-content">
               <div class="semaines-tabs" v-if="semainesDisponibles.length > 0">
                 <div
                   v-for="sem in semainesDisponibles"
@@ -379,100 +367,6 @@
               </div>
             </div>
 
-            <!-- TAB LOGS -->
-            <div v-if="tabDetail === 'logs'" class="tab-content">
-              <div v-if="programmeActif.athletes.length === 0" class="empty">Aucun athlète assigné à ce programme.</div>
-
-              <div v-if="!athleteLogs" class="logs-athletes-list">
-                <div v-for="a in programmeActif.athletes" :key="a.id" class="athlete-card" @click="voirLogsAthlete(a)">
-                  <div class="mini-av-lg">{{ initiales(a.nom) }}</div>
-                  <div class="athlete-info">
-                    <div class="athlete-nom">{{ a.nom }}</div>
-                    <div class="athlete-email">{{ a.email }}</div>
-                  </div>
-                  <i class="ti ti-chevron-right"></i>
-                </div>
-              </div>
-
-              <div v-else class="logs-detail">
-                <div class="logs-header">
-                  <button class="btn btn-sm retour-logs" @click="athleteLogs = null">
-                    <i class="ti ti-arrow-left"></i> Retour
-                  </button>
-                  <div class="logs-title">
-                    <div class="mini-av-lg">{{ initiales(athleteLogs.nom) }}</div>
-                    <div>
-                      <div class="athlete-nom">{{ athleteLogs.nom }}</div>
-                      <div class="athlete-email">{{ athleteLogs.email }}</div>
-                    </div>
-                  </div>
-                </div>
-
-                <div v-if="loadingLogs" class="empty">Chargement...</div>
-                <div v-else-if="logsGroupes.length === 0" class="empty">Aucun log enregistré pour cet athlète.</div>
-
-                <div v-else>
-                  <div v-for="session in logsGroupes" :key="session.key" class="session-block">
-                    <div class="session-head">
-                      <span class="badge badge-purple" v-if="session.jour">{{ session.jour }}</span>
-                      <span class="session-nom">{{ session.seanceNom }}</span>
-                      <span class="session-date">{{ formatDate(session.date) }}</span>
-                    </div>
-                    <div class="session-body">
-                      <div v-for="exo in session.exercices" :key="exo.id" class="exo-bloc">
-                        <div class="exo-header">
-                          <div class="exo-num">{{ exo.ordre }}</div>
-                          <span class="exo-name">{{ exo.nom }}</span>
-                        </div>
-                        <div class="comparatif-grid">
-                          <div class="comparatif-header">
-                            <span>#</span><span>Prescrit</span><span>Réalisé</span><span></span>
-                          </div>
-                          <div v-for="(log, i) in exo.logs" :key="log.id" class="comparatif-row" :class="getStatutClasse(log, session.typeSeance)">
-                            <span class="serie-num">{{ i + 1 }}</span>
-                            <div class="prescrit-cell">
-                              <template v-if="session.typeSeance === 'natation' || session.typeSeance === 'athletisme'">
-                                <span v-if="log.serie.metres">{{ log.serie.metres }} m</span>
-                                <span v-if="log.serie.intensite"> · {{ log.serie.intensite }}</span>
-                              </template>
-                              <template v-else-if="session.typeSeance === 'pliometrie'">
-                                <span v-if="log.serie.bonds">{{ log.serie.bonds }} bonds</span>
-                                <span v-if="log.serie.intensite"> · {{ log.serie.intensite }}</span>
-                              </template>
-                              <template v-else>
-                                <span v-if="log.serie.nb_reps">{{ log.serie.nb_reps }} reps</span>
-                                <span v-if="log.serie.poids_cible"> · {{ log.serie.poids_cible }}</span>
-                                <span v-if="log.serie.rm"> · {{ log.serie.rm }}</span>
-                              </template>
-                            </div>
-                            <div class="realise-cell">
-                              <template v-if="log.fait">
-                                <template v-if="session.typeSeance === 'natation' || session.typeSeance === 'athletisme'">
-                                  <span v-if="log.reps_realisees">{{ log.reps_realisees }} m</span>
-                                  <span v-if="log.poids_realise"> · {{ log.poids_realise }}</span>
-                                </template>
-                                <template v-else-if="session.typeSeance === 'pliometrie'">
-                                  <span v-if="log.reps_realisees">{{ log.reps_realisees }} bonds</span>
-                                  <span v-if="log.poids_realise"> · {{ log.poids_realise }}</span>
-                                </template>
-                                <template v-else>
-                                  <span v-if="log.reps_realisees">{{ log.reps_realisees }} reps</span>
-                                  <span v-if="log.poids_realise"> · {{ log.poids_realise }}</span>
-                                </template>
-                                <span v-if="!log.reps_realisees && !log.poids_realise">—</span>
-                              </template>
-                              <span v-else class="non-fait">non réalisé</span>
-                            </div>
-                            <span class="statut-icon"><i :class="getStatutIcon(log, session.typeSeance)"></i></span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
           </div>
           <!-- fin panel-detail -->
 
@@ -484,86 +378,14 @@
       <!-- fin onglet-wrapper programmes -->
 
       <!-- ONGLET ATHLETES -->
-      <div v-if="onglet === 'athletes'" class="onglet-wrapper athletes-page">
-        <GroupesManagerModal
-          v-if="modalGroupes"
-          :groupes="groupes"
-          :monCercle="monCercle"
-          :athleteFocus="athleteFocusGroupes"
-          @fermer="modalGroupes = false"
-          @modifie="fetchGroupes"
-        />
-
-        <div class="athletes-header">
-          <div class="section-title">Mon cercle d'athlètes</div>
-          <button class="btn btn-sm" @click="ouvrirGestionGroupes()"><i class="ti ti-tags"></i> Gérer mes groupes</button>
-        </div>
-
-        <div class="filtres-row" v-if="groupes.length > 0 || authStore.role === 'super_prepa'">
-          <div class="groupe-filtre-chips" v-if="groupes.length > 0">
-            <button class="chip-filtre" :class="{ active: groupeFiltre === 'tous' }" @click="groupeFiltre = 'tous'">Tous</button>
-            <button
-              v-for="g in groupes"
-              :key="g.id"
-              class="chip-filtre"
-              :class="{ active: groupeFiltre === g.id }"
-              @click="groupeFiltre = groupeFiltre === g.id ? 'tous' : g.id"
-            >
-              <span class="groupe-dot" :style="{ background: g.couleur || 'var(--color-primary)' }"></span>
-              {{ g.nom }}
-            </button>
-          </div>
-          <select v-if="authStore.role === 'super_prepa'" v-model="organisationFiltre" class="select-org-filtre">
-            <option value="toutes">Toutes organisations</option>
-            <option value="independant">Indépendant</option>
-            <option v-for="org in organisationsCercle" :key="org.id" :value="org.id">{{ org.nom }}</option>
-          </select>
-        </div>
-
-        <div v-if="cercleFiltre.length === 0" class="empty">Aucun athlète pour ce filtre.</div>
-        <div v-for="a in cercleFiltre" :key="a.id" class="athlete-row">
-          <div class="mini-av-lg">{{ initiales(a.nom) }}</div>
-          <div class="athlete-info">
-            <div class="athlete-nom">
-              {{ a.nom }}
-              <span class="badge badge-gray org-badge" v-if="authStore.role === 'super_prepa'">
-                {{ a.organisation?.nom || 'Indépendant' }}
-              </span>
-            </div>
-            <div class="athlete-email">{{ a.email }}</div>
-            <div class="groupes-badges" v-if="groupesDe(a).length > 0">
-              <span
-                class="groupe-badge"
-                v-for="g in groupesDe(a)"
-                :key="g.id"
-                :style="{ background: (g.couleur || '#7F77DD') + '22', color: g.couleur || 'var(--color-primary-dark)' }"
-              >{{ g.nom }}</span>
-            </div>
-          </div>
-          <button class="btn-icon-tiny" title="Voir/modifier ses groupes" @click="ouvrirGestionGroupes(a)"><i class="ti ti-tags"></i></button>
-          <button class="btn btn-sm btn-danger" @click="retirerDuCercle(a)">Retirer</button>
-        </div>
-        <div class="add-athlete-row">
-          <input v-model="searchEmail" placeholder="Email de l'athlète" type="email" />
-          <button class="btn" @click="rechercherAthlète" :disabled="!searchEmail">Rechercher</button>
-        </div>
-        <div v-if="athleteTrouve" class="athlete-row found">
-          <div class="mini-av-lg">{{ initiales(athleteTrouve.nom) }}</div>
-          <div class="athlete-info">
-            <div class="athlete-nom">{{ athleteTrouve.nom }}</div>
-            <div class="athlete-email">{{ athleteTrouve.email }}</div>
-          </div>
-          <button class="btn btn-sm btn-primary" @click="ajouterAuCercle">+ Ajouter</button>
-        </div>
-        <div v-if="searchError" class="error">{{ searchError }}</div>
-      </div>
-
-      <!-- ONGLET MONITORING -->
-      <MonitoringPanel
-        v-if="onglet === 'monitoring'"
+      <AthletesPanel
+        v-if="onglet === 'athletes'"
         :monCercle="monCercle"
         :groupes="groupes"
-        :actif="onglet === 'monitoring'"
+        :programmes="programmes"
+        :actif="onglet === 'athletes'"
+        @modifie="onModifie"
+        @ouvrir-programme="ouvrirProgrammeDepuisFiche"
       />
 
     </div>
@@ -578,35 +400,23 @@ import { useApi } from '../services/api'
 import AppLayout from '../components/AppLayout.vue'
 import ProgrammeForm from '../components/prepa/ProgrammeForm.vue'
 import AssignerAthleteModal from '../components/prepa/AssignerAthleteModal.vue'
-import GroupesManagerModal from '../components/prepa/GroupesManagerModal.vue'
-import MonitoringPanel from '../components/prepa/MonitoringPanel.vue'
+import AthletesPanel from '../components/prepa/AthletesPanel.vue'
 
 export default {
-  components: { AppLayout, ProgrammeForm, AssignerAthleteModal, GroupesManagerModal, MonitoringPanel },
+  components: { AppLayout, ProgrammeForm, AssignerAthleteModal, AthletesPanel },
   setup() {
     const programmes = ref([])
     const programmeActif = ref(null)
     const seances = ref([])
     const monCercle = ref([])
     const groupes = ref([])
-    const groupeFiltre = ref('tous')
-    const organisationFiltre = ref('toutes')
-    const modalGroupes = ref(false)
-    const athleteFocusGroupes = ref(null)
     const loadingSeances = ref(false)
     const modalAssigner = ref(false)
     const vue = ref('liste')
-    const onglet = ref('programmes')
-    const tabDetail = ref('seances')
+    const onglet = ref('athletes')
     const editMode = ref(false)
     const editNom = ref('')
     const editDesc = ref('')
-    const searchEmail = ref('')
-    const athleteTrouve = ref(null)
-    const searchError = ref('')
-    const athleteLogs = ref(null)
-    const logs = ref([])
-    const loadingLogs = ref(false)
     const nouvelleSeance = ref({ nom: '', jour: '', type_seance: 'musculation' })
     const semaineActive = ref(1)
     const seanceEnEdition = ref(null)
@@ -619,11 +429,7 @@ export default {
     const api = useApi()
 
     const jours = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche']
-    const vueLabel = computed(() => {
-      if (onglet.value === 'athletes') return 'Mes athlètes'
-      if (onglet.value === 'monitoring') return 'Monitoring'
-      return 'Programmes'
-    })
+    const vueLabel = computed(() => onglet.value === 'athletes' ? 'Athlètes' : 'Programmes')
 
     const labelType = (t) => {
       const map = { musculation: 'Musculation', natation: 'Natation', athletisme: 'Athlétisme', pliometrie: 'Pliométrie' }
@@ -731,18 +537,6 @@ export default {
         })
     })
 
-    const logsGroupes = computed(() => {
-      const sessions = {}
-      logs.value.forEach(log => {
-        const dateStr = log.date.split('T')[0]
-        const key = `${dateStr}__${log.seance.id}`
-        if (!sessions[key]) sessions[key] = { key, date: dateStr, seanceNom: log.seance.nom, jour: log.seance.jour, typeSeance: log.seance.type_seance, exercices: {} }
-        if (!sessions[key].exercices[log.exercice.id]) sessions[key].exercices[log.exercice.id] = { id: log.exercice.id, nom: log.exercice.nom, ordre: log.exercice.ordre, logs: [] }
-        sessions[key].exercices[log.exercice.id].logs.push(log)
-      })
-      return Object.values(sessions).sort((a, b) => b.date.localeCompare(a.date)).map(s => ({ ...s, exercices: Object.values(s.exercices).sort((a, b) => a.ordre - b.ordre) }))
-    })
-
     const fetchProgrammes = async () => {
       programmes.value = await api.get('/programmes/')
       if (programmes.value.length > 0 && !programmeActif.value) programmeActif.value = programmes.value[0]
@@ -772,28 +566,6 @@ export default {
       groupes.value = await api.get('/groupes/')
     }
 
-    const groupesDe = (athlete) => groupes.value.filter(g => g.athletes.find(a => a.id === athlete.id))
-
-    const organisationsCercle = computed(() => {
-      const map = {}
-      monCercle.value.forEach(a => { if (a.organisation) map[a.organisation.id] = a.organisation })
-      return Object.values(map).sort((a, b) => a.nom.localeCompare(b.nom))
-    })
-
-    const cercleFiltre = computed(() => {
-      return monCercle.value.filter(a => {
-        if (groupeFiltre.value !== 'tous' && !groupesDe(a).find(g => g.id === groupeFiltre.value)) return false
-        if (organisationFiltre.value === 'independant' && a.organisation_id) return false
-        if (organisationFiltre.value !== 'toutes' && organisationFiltre.value !== 'independant' && a.organisation_id !== organisationFiltre.value) return false
-        return true
-      })
-    })
-
-    const ouvrirGestionGroupes = (athlete = null) => {
-      athleteFocusGroupes.value = athlete
-      modalGroupes.value = true
-    }
-
     const selectProgramme = (p) => {
       if (editMode.value) {
         if (!confirm('Annuler les modifications en cours ?')) return
@@ -808,9 +580,17 @@ export default {
 
     watch(programmeActif, (p) => {
       if (p) fetchSeances(p.id)
-      athleteLogs.value = null
-      tabDetail.value = 'seances'
     })
+
+    // Depuis la Fiche Athlète (onglet Athlètes), bouton "Voir / éditer" d'un
+    // programme assigné : bascule vers l'onglet Programmes avec ce
+    // programme déjà sélectionné.
+    const ouvrirProgrammeDepuisFiche = (programme) => {
+      onglet.value = 'programmes'
+      selectProgramme(programme)
+      vue.value = 'liste'
+      mobileDetail.value = true
+    }
 
     const startEditMode = () => {
       editNom.value = programmeActif.value.nom
@@ -890,36 +670,6 @@ export default {
       seance.exercices = seance.exercices.filter(e => e.id !== exo.id)
     }
 
-    const onClickTabLogs = () => { tabDetail.value = 'logs'; athleteLogs.value = null }
-
-    const voirLogsAthlete = async (athlete) => {
-      athleteLogs.value = athlete
-      loadingLogs.value = true
-      logs.value = await api.get(`/logs/programme/${programmeActif.value.id}/athlete/${athlete.id}`)
-      loadingLogs.value = false
-    }
-
-    const formatDate = (d) => new Date(d).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
-
-    const getStatutClasse = (log, typeSeance) => {
-      if (!log.fait) return 'statut-skip'
-      if (!log.reps_realisees && !log.poids_realise) return 'statut-warn'
-      const prescrit = typeSeance === 'natation' || typeSeance === 'athletisme'
-        ? log.serie.metres
-        : typeSeance === 'pliometrie'
-          ? log.serie.bonds
-          : log.serie.nb_reps
-      const prescR = parseFloat(prescrit)
-      const realR = parseFloat(log.reps_realisees)
-      if (!isNaN(prescR) && !isNaN(realR) && realR < prescR) return 'statut-warn'
-      return 'statut-done'
-    }
-
-    const getStatutIcon = (log, typeSeance) => {
-      if (!log.fait) return 'ti ti-x'
-      return getStatutClasse(log, typeSeance) === 'statut-warn' ? 'ti ti-alert-triangle' : 'ti ti-check'
-    }
-
     const onTermine = () => { vue.value = 'liste'; fetchProgrammes() }
 
     const onModifie = async () => {
@@ -927,30 +677,6 @@ export default {
       await fetchMonCercle()
       await fetchGroupes()
       if (programmeActif.value) programmeActif.value = programmes.value.find(p => p.id === programmeActif.value.id)
-    }
-
-    const retirerDuCercle = async (athlete) => {
-      await api.del(`/users/mes-athletes/${athlete.id}`)
-      monCercle.value = monCercle.value.filter(a => a.id !== athlete.id)
-      await fetchGroupes()
-    }
-
-    const rechercherAthlète = async () => {
-      searchError.value = ''
-      athleteTrouve.value = null
-      try {
-        const found = await api.get(`/users/recherche?email=${encodeURIComponent(searchEmail.value)}`)
-        if (found.detail) { searchError.value = found.detail; return }
-        if (monCercle.value.find(a => a.id === found.id)) { searchError.value = 'Déjà dans votre cercle'; return }
-        athleteTrouve.value = found
-      } catch { searchError.value = 'Athlète introuvable' }
-    }
-
-    const ajouterAuCercle = async () => {
-      await api.post(`/users/mes-athletes/${athleteTrouve.value.id}`)
-      monCercle.value.push(athleteTrouve.value)
-      athleteTrouve.value = null
-      searchEmail.value = ''
     }
 
     const logout = () => { authStore.logout(); router.push('/') }
@@ -1015,11 +741,8 @@ export default {
       seanceEnEdition.value = null
     }
     return {
-      programmes, programmeActif, seances, monCercle,
-      groupes, groupeFiltre, organisationFiltre, organisationsCercle, cercleFiltre,
-      modalGroupes, athleteFocusGroupes, fetchGroupes, groupesDe, ouvrirGestionGroupes,
+      programmes, programmeActif, seances, monCercle, groupes,
       loadingSeances, modalAssigner, vue, onglet, vueLabel,
-      tabDetail, athleteLogs, logs, loadingLogs, logsGroupes,
       editMode, editNom, editDesc,
       nouvelleSeance, jours, labelType, letterFor, grouperExercices,
       semaineActive, semainesDisponibles, seancesFiltrees,
@@ -1027,17 +750,12 @@ export default {
       syncReposSuperset, ajouterAuSupersetEdit,
       seancesOuvertes, toggleSeance, isSeanceOuverte,
       groupesSeriesOuverts, toggleGroupeSeries, isGroupeSeriesOuvert,
-      searchEmail, athleteTrouve, searchError,
       selectProgramme, startEditMode, sauvegarderEditMode, annulerEditMode,
       ajouterSeance, ajouterExercice, mettreAJourSerie,
       dupliquerSemaine, supprimerSemaine,
       supprimerProgramme, supprimerSeance, supprimerExercice,
-      onTermine, onModifie, logout, initiales,
-      onClickTabLogs, voirLogsAthlete, formatDate,
-      getStatutClasse, getStatutIcon,
-      retirerDuCercle, rechercherAthlète, ajouterAuCercle,
-      mobileDetail, mettreAJourSeance, mettreAJourExercice, onFocusSeanceChamp,
-      authStore
+      onTermine, onModifie, ouvrirProgrammeDepuisFiche, logout, initiales,
+      mobileDetail, mettreAJourSeance, mettreAJourExercice, onFocusSeanceChamp
     }
   }
 }
@@ -1148,22 +866,6 @@ export default {
   font-weight: 600;
   color: var(--color-avatar-athlete-text);
 }
-
-.tabs { display: flex; border-bottom: 1px solid var(--color-border); flex-shrink: 0; }
-.tab {
-  padding: var(--spacing-md) var(--spacing-lg);
-  min-height: var(--tap-min);
-  display: flex;
-  align-items: center;
-  font-size: var(--font-size-sm);
-  font-weight: 500;
-  cursor: pointer;
-  color: var(--color-text-secondary);
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
-  user-select: none;
-}
-.tab.active { color: var(--color-primary-dark); border-bottom-color: var(--color-primary); font-weight: 600; }
 
 .semaines-tabs { display: flex; gap: var(--spacing-sm); flex-wrap: wrap; padding: var(--spacing-sm) 0; flex-shrink: 0; align-items: center; }
 .semaine-tab {
@@ -1471,148 +1173,6 @@ export default {
 }
 .input-inline:focus { outline: none; border-color: var(--color-primary); }
 
-/* --- Athlètes --- */
-.athletes-page { padding: var(--spacing-xl) var(--spacing-2xl); display: flex; flex-direction: column; gap: var(--spacing-sm); overflow-y: auto; }
-.athletes-header { display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-md); flex-wrap: wrap; }
-.filtres-row { display: flex; align-items: center; gap: var(--spacing-md); flex-wrap: wrap; padding-bottom: var(--spacing-xs); }
-.groupe-filtre-chips { display: flex; gap: 6px; flex-wrap: wrap; }
-.chip-filtre {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 36px;
-  padding: 0 var(--spacing-md);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-full);
-  font-size: var(--font-size-sm);
-  background: var(--color-bg);
-  color: var(--color-text-secondary);
-  cursor: pointer;
-}
-.chip-filtre:hover { border-color: var(--color-primary); }
-.chip-filtre.active { background: var(--color-primary-light); border-color: var(--color-primary); color: var(--color-primary-text); font-weight: 600; }
-.groupe-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
-.select-org-filtre {
-  min-height: 36px;
-  padding: 0 var(--spacing-md);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  font-size: var(--font-size-sm);
-  background: var(--color-bg);
-  color: var(--color-text-body);
-}
-.groupes-badges { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
-.groupe-badge {
-  font-size: var(--font-size-xs);
-  font-weight: 600;
-  padding: 2px 8px;
-  border-radius: var(--radius-full);
-}
-.athlete-row {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-md);
-  padding: var(--spacing-md) var(--spacing-lg);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-bg);
-}
-.athlete-row.found { border-color: var(--color-primary); background: var(--color-primary-light); }
-.mini-av-lg {
-  width: var(--avatar-md);
-  height: var(--avatar-md);
-  border-radius: 50%;
-  background: var(--color-avatar-athlete-bg);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: var(--font-size-xs);
-  font-weight: 600;
-  color: var(--color-avatar-athlete-text);
-  flex-shrink: 0;
-}
-.athlete-info { flex: 1; min-width: 0; }
-.athlete-nom { font-size: var(--font-size-sm); font-weight: 600; }
-.athlete-nom .org-badge { margin-left: 6px; font-weight: 500; }
-.athlete-email { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
-.add-athlete-row { display: flex; gap: var(--spacing-sm); margin-top: var(--spacing-sm); flex-wrap: wrap; }
-.add-athlete-row input {
-  flex: 1;
-  min-width: 180px;
-  min-height: var(--tap-min);
-  padding: 0 var(--spacing-md);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  font-size: var(--font-size-base);
-  background: var(--color-bg);
-}
-
-/* --- Logs --- */
-.logs-athletes-list { display: flex; flex-direction: column; gap: var(--spacing-sm); }
-.athlete-card {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-md);
-  min-height: 56px;
-  padding: var(--spacing-sm) var(--spacing-lg);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  cursor: pointer;
-  background: var(--color-bg);
-}
-.athlete-card:hover { border-color: var(--color-primary); background: var(--color-bg-secondary); }
-.logs-detail { display: flex; flex-direction: column; gap: var(--spacing-md); }
-.logs-header { display: flex; flex-direction: column; gap: var(--spacing-md); }
-.retour-logs { align-self: flex-start; }
-.logs-title { display: flex; align-items: center; gap: var(--spacing-md); }
-.session-block { border: 1px solid var(--color-border); border-radius: var(--radius-lg); overflow: hidden; flex-shrink: 0; background: var(--color-bg); }
-.session-head {
-  padding: var(--spacing-md) var(--spacing-lg);
-  background: var(--color-bg-secondary);
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  border-bottom: 1px solid var(--color-border);
-  font-size: var(--font-size-sm);
-  font-weight: 500;
-  flex-wrap: wrap;
-}
-.session-nom { flex: 1; font-weight: 600; }
-.session-date { font-size: var(--font-size-xs); color: var(--color-text-secondary); text-transform: capitalize; }
-.session-body { padding: var(--spacing-md) var(--spacing-lg); display: flex; flex-direction: column; gap: var(--spacing-lg); }
-.exo-bloc { display: flex; flex-direction: column; gap: 6px; }
-.exo-header { display: flex; align-items: center; gap: var(--spacing-sm); }
-.comparatif-grid { display: flex; flex-direction: column; gap: 2px; }
-.comparatif-header {
-  display: grid;
-  grid-template-columns: 32px 1.4fr 1.4fr 24px;
-  gap: var(--spacing-sm);
-  font-size: var(--font-size-xs);
-  color: var(--color-text-secondary);
-  font-weight: 600;
-  padding: 0 4px 4px;
-}
-.comparatif-row {
-  display: grid;
-  grid-template-columns: 32px 1.4fr 1.4fr 24px;
-  gap: var(--spacing-sm);
-  align-items: center;
-  padding: var(--spacing-sm) 4px;
-  border-radius: var(--radius-md);
-  font-size: var(--font-size-sm);
-}
-.comparatif-row.statut-done { background: var(--color-valid-bg-soft); }
-.comparatif-row.statut-done .statut-icon { color: var(--color-valid-text); }
-.comparatif-row.statut-warn { background: var(--color-warning-bg-soft); }
-.comparatif-row.statut-warn .statut-icon { color: var(--color-warning-icon); }
-.comparatif-row.statut-skip { background: var(--color-danger-bg-soft); }
-.comparatif-row.statut-skip .statut-icon { color: var(--color-danger-text); }
-.prescrit-cell { color: var(--color-text-secondary); }
-.realise-cell { font-weight: 500; }
-.non-fait { color: var(--color-danger-text); font-style: italic; }
-.statut-icon { display: flex; justify-content: center; }
-.serie-num { font-size: var(--font-size-sm); color: var(--color-text-muted); text-align: center; }
-
 /* --- Mobile : liste → détail, un seul écran à la fois --- */
 @media (max-width: 768px) {
   .panel-list {
@@ -1627,9 +1187,6 @@ export default {
   .content-body.detail-ouvert .panel-detail { display: flex; }
   .retour-mobile { display: inline-flex; }
 
-  .athletes-page { padding: var(--spacing-md) var(--spacing-lg); }
-
   .serie-group-row { flex-direction: column; gap: var(--spacing-sm); }
-  .comparatif-header, .comparatif-row { grid-template-columns: 24px 1.2fr 1.2fr 20px; }
 }
 </style>

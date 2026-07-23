@@ -1,14 +1,17 @@
 <template>
-  <div class="monitoring-panel">
-    <div class="monitoring-header">
-      <h2 class="monitoring-titre">Monitoring</h2>
-      <button class="btn-aide" @click="aideOuverte = true">
-        <i class="ti ti-help-circle"></i> Comment lire ces indicateurs ?
-      </button>
-    </div>
-
+  <div class="athletes-panel">
     <!-- VUE LISTE -->
-    <template v-if="!athleteDetail">
+    <template v-if="!athleteSelectionne">
+      <div class="athletes-panel-header">
+        <h2 class="athletes-panel-titre">Athlètes</h2>
+        <div class="header-actions">
+          <button class="btn btn-sm" @click="ouvrirGestionGroupes()"><i class="ti ti-tags"></i> Gérer mes groupes</button>
+          <button class="btn-aide" @click="aideOuverte = true">
+            <i class="ti ti-help-circle"></i> Comment lire ces indicateurs ?
+          </button>
+        </div>
+      </div>
+
       <div class="resume-cercle-grid" v-if="!loading && resumes.length > 0">
         <div class="resume-tile">
           <div class="resume-valeur">{{ resumeCercle.total }}</div>
@@ -59,89 +62,88 @@
       </div>
 
       <div v-if="loading" class="empty">Chargement...</div>
-      <div v-else-if="resumesFiltres.length === 0" class="empty">Aucun athlète pour ce filtre.</div>
+      <div v-else-if="athletesFiltres.length === 0" class="empty">Aucun athlète pour ce filtre.</div>
 
       <div class="athlete-monitoring-list">
-        <button class="athlete-monitoring-card" v-for="r in resumesFiltres" :key="r.athlete_id" @click="ouvrirDetail(r.athlete_id)">
-          <div class="amc-head">
-            <div class="mini-av-lg">{{ initiales(r.nom) }}</div>
-            <div class="amc-info">
-              <div class="amc-nom">
-                {{ r.nom }}
-                <span class="badge badge-gray org-badge" v-if="estSuperPrepa">{{ r.organisation?.nom || 'Indépendant' }}</span>
+        <div class="athlete-monitoring-card" v-for="a in athletesFiltres" :key="a.id">
+          <button class="amc-clic" @click="ouvrirFiche(a)">
+            <div class="amc-head">
+              <div class="mini-av-lg">{{ initiales(a.nom) }}</div>
+              <div class="amc-info">
+                <div class="amc-nom">
+                  {{ a.nom }}
+                  <span class="badge badge-gray org-badge" v-if="estSuperPrepa">{{ a.organisation?.nom || 'Indépendant' }}</span>
+                </div>
+                <div class="amc-meta" v-if="a.resume">
+                  <span>Charge semaine : <strong>{{ Math.round(a.resume.charge_semaine) }}</strong></span>
+                  <i class="ti tendance-icon" :class="iconeTendance(a.resume.tendance)"></i>
+                  <span class="wellness-statut" :class="{ ok: a.resume.wellness_repondu_aujourdhui }">
+                    <i class="ti" :class="a.resume.wellness_repondu_aujourdhui ? 'ti-circle-check' : 'ti-circle-dashed'"></i>
+                    wellness
+                  </span>
+                </div>
+                <div class="groupes-badges" v-if="groupesDe(a.id).length > 0">
+                  <span
+                    class="groupe-badge"
+                    v-for="g in groupesDe(a.id)"
+                    :key="g.id"
+                    :style="{ background: (g.couleur || '#7F77DD') + '22', color: g.couleur || 'var(--color-primary-dark)' }"
+                  >{{ g.nom }}</span>
+                </div>
               </div>
-              <div class="amc-meta">
-                <span>Charge semaine : <strong>{{ Math.round(r.charge_semaine) }}</strong></span>
-                <i class="ti tendance-icon" :class="iconeTendance(r.tendance)"></i>
-                <span class="wellness-statut" :class="{ ok: r.wellness_repondu_aujourdhui }">
-                  <i class="ti" :class="r.wellness_repondu_aujourdhui ? 'ti-circle-check' : 'ti-circle-dashed'"></i>
-                  wellness
-                </span>
-              </div>
+              <span class="acwr-badge" v-if="a.resume" :class="'zone-' + (a.resume.acwr.zone || 'insuffisant')">
+                {{ a.resume.acwr.valeur !== null ? a.resume.acwr.valeur.toFixed(2) : '—' }}
+              </span>
             </div>
-            <span class="acwr-badge" :class="'zone-' + (r.acwr.zone || 'insuffisant')">
-              {{ r.acwr.valeur !== null ? r.acwr.valeur.toFixed(2) : '—' }}
-            </span>
+            <div class="amc-signaux" v-if="a.resume && a.resume.signaux.length > 0">
+              <span class="signal-badge" v-for="(s, i) in a.resume.signaux" :key="i">
+                <i class="ti ti-alert-triangle"></i> {{ s }}
+              </span>
+            </div>
+          </button>
+          <div class="amc-actions">
+            <button class="btn-icon-tiny" title="Voir/modifier ses groupes" @click="ouvrirGestionGroupes(a)"><i class="ti ti-tags"></i></button>
+            <button class="btn btn-sm btn-danger" @click="retirerDuCercle(a)">Retirer</button>
           </div>
-          <div class="amc-signaux" v-if="r.signaux.length > 0">
-            <span class="signal-badge" v-for="(s, i) in r.signaux" :key="i">
-              <i class="ti ti-alert-triangle"></i> {{ s }}
-            </span>
-          </div>
-        </button>
+        </div>
       </div>
+
+      <div class="add-athlete-row">
+        <input v-model="searchEmail" placeholder="Email de l'athlète" type="email" />
+        <button class="btn" @click="rechercherAthlète" :disabled="!searchEmail">Rechercher</button>
+      </div>
+      <div v-if="athleteTrouve" class="athlete-row found">
+        <div class="mini-av-lg">{{ initiales(athleteTrouve.nom) }}</div>
+        <div class="athlete-info">
+          <div class="athlete-nom">{{ athleteTrouve.nom }}</div>
+          <div class="athlete-email">{{ athleteTrouve.email }}</div>
+        </div>
+        <button class="btn btn-sm btn-primary" @click="ajouterAuCercle">+ Ajouter</button>
+      </div>
+      <div v-if="searchError" class="error">{{ searchError }}</div>
     </template>
 
-    <!-- VUE DÉTAIL -->
-    <template v-else>
-      <button class="btn btn-sm retour-detail" @click="athleteDetail = null">
-        <i class="ti ti-arrow-left"></i> Retour
-      </button>
+    <!-- FICHE ATHLÈTE -->
+    <FicheAthlete
+      v-else
+      :key="athleteSelectionne.id"
+      :athlete="athleteSelectionne"
+      :programmes="programmes"
+      :groupes="groupes"
+      :monCercle="monCercle"
+      @fermer="athleteSelectionneId = null"
+      @modifie="onModifie"
+      @ouvrir-programme="$emit('ouvrir-programme', $event)"
+    />
 
-      <div v-if="loadingDetail" class="empty">Chargement...</div>
-
-      <template v-else-if="detail">
-        <div class="detail-header">
-          <div class="mini-av-lg">{{ initiales(detail.nom) }}</div>
-          <h3>{{ detail.nom }}</h3>
-        </div>
-
-        <div class="stat-card">
-          <GraphiqueAcwrZones :points="pointsAcwr" :actuel="detail.acwr_actuel" />
-        </div>
-
-        <div class="detail-grid">
-          <div class="stat-card">
-            <CourbeProgression :points="detail.charges_quotidiennes.map(p => ({ date: p.date, valeur: p.valeur }))" label="Charge quotidienne" unite=" UA" axe-x="dates" />
-          </div>
-          <div class="stat-card">
-            <CourbeProgression :points="detail.charges_hebdomadaires.map(p => ({ date: p.date, valeur: p.valeur }))" label="Charge hebdomadaire (glissante)" unite=" UA" axe-x="dates" />
-          </div>
-        </div>
-
-        <div class="stat-card">
-          <GraphiqueDouble :points="pointsAigueChronique" label="Charge aiguë vs chronique" label-a="Aiguë (7j)" label-b="Chronique (28j)" />
-        </div>
-
-        <div class="detail-grid">
-          <div class="stat-card">
-            <CourbeProgression :points="pointsMonotonie" label="Monotonie" unite="" axe-x="dates" />
-          </div>
-          <div class="stat-card">
-            <CourbeProgression :points="pointsContrainte" label="Contrainte (strain)" unite=" UA" axe-x="dates" />
-          </div>
-        </div>
-
-        <div class="stat-card">
-          <div class="stat-card-titre">Wellness — Hooper Index</div>
-          <CourbeProgression :points="pointsHooper" label="Hooper Index (4 à 28, plus bas = mieux)" unite="" axe-x="dates" />
-          <template v-if="dernierWellness">
-            <div class="stat-card-titre stat-card-titre-sm">Dernier relevé — {{ formatDateCourt(dernierWellness.date) }}</div>
-            <GraphiqueBarres :barres="barresDernierWellness" unite="/7" />
-          </template>
-        </div>
-      </template>
-    </template>
+    <GroupesManagerModal
+      v-if="modalGroupes"
+      :groupes="groupes"
+      :monCercle="monCercle"
+      :athleteFocus="athleteFocusGroupes"
+      @fermer="modalGroupes = false"
+      @modifie="onModifie"
+    />
 
     <div class="modal-overlay" v-if="aideOuverte" @click.self="aideOuverte = false">
       <div class="modal modal-large">
@@ -187,19 +189,19 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { useApi } from '../../services/api'
 import { useAuthStore } from '../../stores/auth'
-import CourbeProgression from '../athlete/CourbeProgression.vue'
-import GraphiqueDouble from '../monitoring/GraphiqueDouble.vue'
-import GraphiqueAcwrZones from '../monitoring/GraphiqueAcwrZones.vue'
-import GraphiqueBarres from '../monitoring/GraphiqueBarres.vue'
+import FicheAthlete from './FicheAthlete.vue'
+import GroupesManagerModal from './GroupesManagerModal.vue'
 
 export default {
-  components: { CourbeProgression, GraphiqueDouble, GraphiqueAcwrZones, GraphiqueBarres },
+  components: { FicheAthlete, GroupesManagerModal },
+  emits: ['modifie', 'ouvrir-programme'],
   props: {
     monCercle: { type: Array, default: () => [] },
     groupes: { type: Array, default: () => [] },
+    programmes: { type: Array, default: () => [] },
     actif: { type: Boolean, default: false }
   },
-  setup(props) {
+  setup(props, { emit }) {
     const api = useApi()
     const authStore = useAuthStore()
     const estSuperPrepa = computed(() => authStore.role === 'super_prepa')
@@ -209,11 +211,24 @@ export default {
     const rechercheNom = ref('')
     const groupeFiltre = ref('tous')
     const organisationFiltre = ref('toutes')
-
-    const athleteDetail = ref(null)
-    const detail = ref(null)
-    const loadingDetail = ref(false)
     const aideOuverte = ref(false)
+
+    // On ne garde que l'id sélectionné : l'objet athlète est relu depuis
+    // monCercle à chaque rendu, donc toujours à jour après un fetchMonCercle
+    // déclenché par onModifie (cf. DashboardPrepa.vue).
+    const athleteSelectionneId = ref(null)
+    const athleteSelectionne = computed(() => props.monCercle.find(a => a.id === athleteSelectionneId.value) || null)
+
+    const modalGroupes = ref(false)
+    const athleteFocusGroupes = ref(null)
+    const ouvrirGestionGroupes = (athlete = null) => {
+      athleteFocusGroupes.value = athlete
+      modalGroupes.value = true
+    }
+
+    const searchEmail = ref('')
+    const athleteTrouve = ref(null)
+    const searchError = ref('')
 
     const groupesDe = (athleteId) => props.groupes.filter(g => g.athletes.find(a => a.id === athleteId))
 
@@ -223,13 +238,19 @@ export default {
       return Object.values(map).sort((a, b) => a.nom.localeCompare(b.nom))
     })
 
-    const resumesFiltres = computed(() => {
-      return resumes.value.filter(r => {
-        if (rechercheNom.value && !r.nom.toLowerCase().includes(rechercheNom.value.toLowerCase())) return false
-        if (groupeFiltre.value !== 'tous' && !groupesDe(r.athlete_id).find(g => g.id === groupeFiltre.value)) return false
-        const athlete = props.monCercle.find(a => a.id === r.athlete_id)
-        if (organisationFiltre.value === 'independant' && athlete?.organisation_id) return false
-        if (organisationFiltre.value !== 'toutes' && organisationFiltre.value !== 'independant' && athlete?.organisation_id !== organisationFiltre.value) return false
+    // Fusionne l'identité du cercle (nom, email, organisation) avec les
+    // résumés monitoring (charge, ACWR, wellness, signaux) : les deux
+    // listes couvrent toujours le même ensemble d'athlètes côté API.
+    const athletesEnrichis = computed(() =>
+      props.monCercle.map(a => ({ ...a, resume: resumes.value.find(r => r.athlete_id === a.id) || null }))
+    )
+
+    const athletesFiltres = computed(() => {
+      return athletesEnrichis.value.filter(a => {
+        if (rechercheNom.value && !a.nom.toLowerCase().includes(rechercheNom.value.toLowerCase())) return false
+        if (groupeFiltre.value !== 'tous' && !groupesDe(a.id).find(g => g.id === groupeFiltre.value)) return false
+        if (organisationFiltre.value === 'independant' && a.organisation_id) return false
+        if (organisationFiltre.value !== 'toutes' && organisationFiltre.value !== 'independant' && a.organisation_id !== organisationFiltre.value) return false
         return true
       })
     })
@@ -254,53 +275,62 @@ export default {
       loading.value = false
     }
 
-    const ouvrirDetail = async (athleteId) => {
-      athleteDetail.value = athleteId
-      loadingDetail.value = true
-      detail.value = await api.get(`/monitoring/athlete/${athleteId}`)
-      loadingDetail.value = false
+    const ouvrirFiche = (athlete) => { athleteSelectionneId.value = athlete.id }
+
+    // Point d'entrée unique pour toute mutation (cercle, groupes,
+    // assignation programme) : remonte au parent (monCercle/groupes/
+    // programmes) et rafraîchit les résumés monitoring possédés ici.
+    const onModifie = async () => {
+      emit('modifie')
+      await fetchResumes()
     }
 
-    const pointsAcwr = computed(() => detail.value ? detail.value.aigue_chronique.map(p => ({ date: p.date, acwr: p.acwr })) : [])
-    const pointsAigueChronique = computed(() => detail.value ? detail.value.aigue_chronique.map(p => ({ date: p.date, valeurA: p.aigue, valeurB: p.chronique })) : [])
-    const pointsMonotonie = computed(() => detail.value ? detail.value.monotonie_contrainte.filter(p => p.monotonie !== null).map(p => ({ date: p.date, valeur: p.monotonie })) : [])
-    const pointsContrainte = computed(() => detail.value ? detail.value.monotonie_contrainte.filter(p => p.contrainte !== null).map(p => ({ date: p.date, valeur: p.contrainte })) : [])
-    const pointsHooper = computed(() => detail.value ? detail.value.wellness.map(p => ({ date: p.date, valeur: p.hooper_index })) : [])
-    const dernierWellness = computed(() => detail.value?.wellness.length ? detail.value.wellness[detail.value.wellness.length - 1] : null)
-    const barresDernierWellness = computed(() => {
-      if (!dernierWellness.value) return []
-      const w = dernierWellness.value
-      return [
-        { cle: 'sommeil', nom: 'Sommeil', valeur: w.sommeil },
-        { cle: 'fatigue', nom: 'Fatigue', valeur: w.fatigue },
-        { cle: 'courbatures', nom: 'Courbatures', valeur: w.courbatures },
-        { cle: 'stress', nom: 'Stress', valeur: w.stress }
-      ]
-    })
+    const retirerDuCercle = async (athlete) => {
+      await api.del(`/users/mes-athletes/${athlete.id}`)
+      await onModifie()
+    }
+
+    const rechercherAthlète = async () => {
+      searchError.value = ''
+      athleteTrouve.value = null
+      try {
+        const found = await api.get(`/users/recherche?email=${encodeURIComponent(searchEmail.value)}`)
+        if (found.detail) { searchError.value = found.detail; return }
+        if (props.monCercle.find(a => a.id === found.id)) { searchError.value = 'Déjà dans votre cercle'; return }
+        athleteTrouve.value = found
+      } catch { searchError.value = 'Athlète introuvable' }
+    }
+
+    const ajouterAuCercle = async () => {
+      await api.post(`/users/mes-athletes/${athleteTrouve.value.id}`)
+      athleteTrouve.value = null
+      searchEmail.value = ''
+      await onModifie()
+    }
 
     const iconeTendance = (t) => ({ hausse: 'ti-trending-up', baisse: 'ti-trending-down', stable: 'ti-minus' }[t] || 'ti-minus')
     const initiales = (nom) => nom.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
-    const formatDateCourt = (d) => new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
 
     watch(() => props.actif, (actif) => { if (actif && resumes.value.length === 0 && !loading.value) fetchResumes() })
     onMounted(() => { if (props.actif) fetchResumes() })
 
     return {
-      resumes, loading, rechercheNom, groupeFiltre, organisationFiltre, organisationsCercle, resumesFiltres,
-      estSuperPrepa, athleteDetail, detail, loadingDetail, ouvrirDetail, aideOuverte, resumeCercle,
-      pointsAcwr, pointsAigueChronique, pointsMonotonie, pointsContrainte, pointsHooper,
-      dernierWellness, barresDernierWellness,
-      iconeTendance, initiales, formatDateCourt
+      resumes, loading, rechercheNom, groupeFiltre, organisationFiltre, organisationsCercle, athletesFiltres,
+      estSuperPrepa, athleteSelectionneId, athleteSelectionne, ouvrirFiche, aideOuverte, resumeCercle,
+      modalGroupes, athleteFocusGroupes, ouvrirGestionGroupes, groupesDe,
+      searchEmail, athleteTrouve, searchError, rechercherAthlète, ajouterAuCercle, retirerDuCercle,
+      onModifie, iconeTendance, initiales
     }
   }
 }
 </script>
 
 <style scoped>
-.monitoring-panel { display: flex; flex-direction: column; gap: var(--spacing-lg); padding: var(--spacing-xl) var(--spacing-2xl); overflow-y: auto; flex: 1; }
+.athletes-panel { display: flex; flex-direction: column; gap: var(--spacing-lg); padding: var(--spacing-xl) var(--spacing-2xl); overflow-y: auto; flex: 1; }
 
-.monitoring-header { display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-md); flex-wrap: wrap; }
-.monitoring-titre { margin: 0; font-size: var(--font-size-lg); font-weight: 700; }
+.athletes-panel-header { display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-md); flex-wrap: wrap; }
+.athletes-panel-titre { margin: 0; font-size: var(--font-size-lg); font-weight: 700; }
+.header-actions { display: flex; align-items: center; gap: var(--spacing-sm); flex-wrap: wrap; }
 .btn-aide {
   display: inline-flex; align-items: center; gap: 6px;
   min-height: 36px; padding: 0 var(--spacing-md);
@@ -369,10 +399,14 @@ export default {
   display: flex; flex-direction: column; gap: var(--spacing-sm);
   padding: var(--spacing-md) var(--spacing-lg);
   border: 1px solid var(--color-border); border-radius: var(--radius-lg);
-  background: var(--color-bg); cursor: pointer; text-align: left; width: 100%;
-  font-family: inherit;
+  background: var(--color-bg);
 }
 .athlete-monitoring-card:hover { border-color: var(--color-primary); background: var(--color-bg-secondary); }
+.amc-clic {
+  display: flex; flex-direction: column; gap: var(--spacing-sm);
+  background: none; border: none; padding: 0; margin: 0;
+  text-align: left; cursor: pointer; width: 100%; font-family: inherit;
+}
 .amc-head { display: flex; align-items: center; gap: var(--spacing-md); }
 .mini-av-lg {
   width: var(--avatar-md); height: var(--avatar-md); border-radius: 50%;
@@ -387,6 +421,8 @@ export default {
 .tendance-icon { font-size: var(--font-size-base); }
 .wellness-statut { display: inline-flex; align-items: center; gap: 3px; color: var(--color-text-muted); }
 .wellness-statut.ok { color: var(--color-valid-text-strong); }
+.groupes-badges { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
+.groupe-badge { font-size: var(--font-size-xs); font-weight: 600; padding: 2px 8px; border-radius: var(--radius-full); }
 .acwr-badge {
   font-size: var(--font-size-sm); font-weight: 700; padding: 4px 10px; border-radius: var(--radius-full); flex-shrink: 0;
 }
@@ -402,21 +438,33 @@ export default {
   padding: 3px 9px; border-radius: var(--radius-full);
   background: var(--color-warning-bg); color: var(--color-warning-text-strong);
 }
-
-.retour-detail { align-self: flex-start; }
-.detail-header { display: flex; align-items: center; gap: var(--spacing-md); }
-.detail-header h3 { margin: 0; font-size: var(--font-size-xl); font-weight: 700; }
-.detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-lg); }
-.stat-card {
-  background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-lg);
-  padding: var(--spacing-lg); display: flex; flex-direction: column; gap: var(--spacing-sm);
+.amc-actions { display: flex; justify-content: flex-end; align-items: center; gap: var(--spacing-sm); }
+.btn-icon-tiny {
+  width: 28px; height: 28px; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: var(--radius-sm); border: none; cursor: pointer;
+  background: transparent; color: var(--color-text-secondary); flex-shrink: 0;
 }
-.stat-card-titre { font-size: var(--font-size-sm); font-weight: 700; }
-.stat-card-titre-sm { font-size: var(--font-size-xs); color: var(--color-text-secondary); font-weight: 600; margin-top: var(--spacing-xs); }
+.btn-icon-tiny:hover { background: var(--color-bg-tertiary); color: var(--color-text); }
+
+.add-athlete-row { display: flex; gap: var(--spacing-sm); margin-top: var(--spacing-sm); flex-wrap: wrap; }
+.add-athlete-row input {
+  flex: 1; min-width: 180px; min-height: var(--tap-min);
+  padding: 0 var(--spacing-md); border: 1px solid var(--color-border);
+  border-radius: var(--radius-md); font-size: var(--font-size-base); background: var(--color-bg);
+}
+.athlete-row {
+  display: flex; align-items: center; gap: var(--spacing-md);
+  padding: var(--spacing-md) var(--spacing-lg);
+  border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-bg);
+}
+.athlete-row.found { border-color: var(--color-primary); background: var(--color-primary-light); }
+.athlete-info { flex: 1; min-width: 0; }
+.athlete-nom { font-size: var(--font-size-sm); font-weight: 600; }
+.athlete-email { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
 
 @media (max-width: 768px) {
-  .monitoring-panel { padding: var(--spacing-md) var(--spacing-lg); }
-  .detail-grid { grid-template-columns: 1fr; }
+  .athletes-panel { padding: var(--spacing-md) var(--spacing-lg); }
   .resume-cercle-grid { grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); }
 }
 </style>
