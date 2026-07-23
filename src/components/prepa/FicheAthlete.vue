@@ -119,51 +119,65 @@
               <span class="session-date">{{ formatDate(session.date) }}</span>
             </div>
             <div class="session-body">
-              <div v-for="exo in session.exercices" :key="exo.id" class="exo-bloc">
-                <div class="exo-header">
-                  <div class="exo-num">{{ exo.ordre }}</div>
-                  <span class="exo-name">{{ exo.nom }}</span>
+              <div
+                v-for="groupe in grouperExosSession(session.exercices)"
+                :key="groupe.key"
+                class="exo-groupe-log"
+                :class="{ 'is-superset': groupe.exercices.length > 1 }"
+              >
+                <div v-if="groupe.exercices.length > 1" class="superset-banner">
+                  <i class="ti ti-link"></i>
+                  <span>Superset/Biset · {{ groupe.exercices.length }} exercices</span>
                 </div>
-                <div class="comparatif-grid">
-                  <div class="comparatif-header">
-                    <span>#</span><span>Prescrit</span><span>Réalisé</span><span></span>
+
+                <div v-for="(exo, eidx) in groupe.exercices" :key="exo.id" class="exo-bloc">
+                  <div class="exo-header">
+                    <span class="exo-letter" v-if="groupe.exercices.length > 1">{{ letterFor(eidx) }}</span>
+                    <div class="exo-num" v-else>{{ exo.ordre }}</div>
+                    <span class="exo-name">{{ exo.nom }}</span>
                   </div>
-                  <div v-for="(log, i) in exo.logs" :key="log.id" class="comparatif-row" :class="getStatutClasse(log, session.typeSeance)">
-                    <span class="serie-num">{{ i + 1 }}</span>
-                    <div class="prescrit-cell">
-                      <template v-if="session.typeSeance === 'natation' || session.typeSeance === 'athletisme'">
-                        <span v-if="log.serie.metres">{{ log.serie.metres }} m</span>
-                        <span v-if="log.serie.intensite"> · {{ log.serie.intensite }}</span>
-                      </template>
-                      <template v-else-if="session.typeSeance === 'pliometrie'">
-                        <span v-if="log.serie.bonds">{{ log.serie.bonds }} bonds</span>
-                        <span v-if="log.serie.intensite"> · {{ log.serie.intensite }}</span>
-                      </template>
-                      <template v-else>
-                        <span v-if="log.serie.nb_reps">{{ log.serie.nb_reps }} reps</span>
-                        <span v-if="log.serie.poids_cible"> · {{ log.serie.poids_cible }}</span>
-                        <span v-if="log.serie.rm"> · {{ log.serie.rm }}</span>
-                      </template>
+                  <div class="comparatif-grid">
+                    <div class="comparatif-header">
+                      <span>Série</span><span>Prescrit</span><span></span><span>Réalisé</span><span></span>
                     </div>
-                    <div class="realise-cell">
-                      <template v-if="log.fait">
+                    <div v-for="(log, i) in exo.logs" :key="log.id" class="comparatif-row" :class="getStatutClasse(log, session.typeSeance)">
+                      <span class="serie-num">{{ i + 1 }}</span>
+                      <div class="prescrit-cell">
                         <template v-if="session.typeSeance === 'natation' || session.typeSeance === 'athletisme'">
-                          <span v-if="log.reps_realisees">{{ log.reps_realisees }} m</span>
-                          <span v-if="log.poids_realise"> · {{ log.poids_realise }}</span>
+                          <span v-if="log.serie.metres">{{ log.serie.metres }} m</span>
+                          <span v-if="log.serie.intensite"> · {{ log.serie.intensite }}</span>
                         </template>
                         <template v-else-if="session.typeSeance === 'pliometrie'">
-                          <span v-if="log.reps_realisees">{{ log.reps_realisees }} bonds</span>
-                          <span v-if="log.poids_realise"> · {{ log.poids_realise }}</span>
+                          <span v-if="log.serie.bonds">{{ log.serie.bonds }} bonds</span>
+                          <span v-if="log.serie.intensite"> · {{ log.serie.intensite }}</span>
                         </template>
                         <template v-else>
-                          <span v-if="log.reps_realisees">{{ log.reps_realisees }} reps</span>
-                          <span v-if="log.poids_realise"> · {{ log.poids_realise }}</span>
+                          <span v-if="log.serie.nb_reps">{{ log.serie.nb_reps }} reps</span>
+                          <span v-if="log.serie.poids_cible"> · {{ log.serie.poids_cible }}</span>
+                          <span v-if="log.serie.rm"> · {{ log.serie.rm }}</span>
                         </template>
-                        <span v-if="!log.reps_realisees && !log.poids_realise">—</span>
-                      </template>
-                      <span v-else class="non-fait">non réalisé</span>
+                      </div>
+                      <i class="ti ti-arrow-right comparatif-arrow"></i>
+                      <div class="realise-cell">
+                        <template v-if="log.fait">
+                          <template v-if="session.typeSeance === 'natation' || session.typeSeance === 'athletisme'">
+                            <span v-if="log.reps_realisees">{{ log.reps_realisees }} m</span>
+                            <span v-if="log.poids_realise"> · {{ log.poids_realise }}</span>
+                          </template>
+                          <template v-else-if="session.typeSeance === 'pliometrie'">
+                            <span v-if="log.reps_realisees">{{ log.reps_realisees }} bonds</span>
+                            <span v-if="log.poids_realise"> · {{ log.poids_realise }}</span>
+                          </template>
+                          <template v-else>
+                            <span v-if="log.reps_realisees">{{ log.reps_realisees }} reps</span>
+                            <span v-if="log.poids_realise"> · {{ log.poids_realise }}</span>
+                          </template>
+                          <span v-if="!log.reps_realisees && !log.poids_realise">—</span>
+                        </template>
+                        <span v-else class="non-fait"><i class="ti ti-x"></i> non réalisée</span>
+                      </div>
+                      <span class="statut-icon"><i :class="getStatutIcon(log, session.typeSeance)"></i></span>
                     </div>
-                    <span class="statut-icon"><i :class="getStatutIcon(log, session.typeSeance)"></i></span>
                   </div>
                 </div>
               </div>
@@ -290,17 +304,55 @@ export default {
     }
     watch(programmeLogsId, fetchLogs)
 
+    // L'API renvoie les logs triés par date décroissante (dernière tentative
+    // en tête) — un ordre qui reflète QUAND chaque série a été loguée, pas SA
+    // position prescrite. Comme la série non réalisée d'une séance est
+    // souvent celle envoyée en dernier (donc la plus récente), elle remontait
+    // en position 1 au lieu de sa vraie place : on retrie chaque exercice par
+    // l'id de la série prescrite (attribué dans l'ordre de création, donc
+    // dans l'ordre du programme) pour retrouver l'ordre réel 1, 2, 3...
     const logsGroupes = computed(() => {
       const sessions = {}
       logs.value.forEach(log => {
         const dateStr = log.date.split('T')[0]
         const key = `${dateStr}__${log.seance.id}`
         if (!sessions[key]) sessions[key] = { key, date: dateStr, seanceNom: log.seance.nom, jour: log.seance.jour, typeSeance: log.seance.type_seance, exercices: {} }
-        if (!sessions[key].exercices[log.exercice.id]) sessions[key].exercices[log.exercice.id] = { id: log.exercice.id, nom: log.exercice.nom, ordre: log.exercice.ordre, logs: [] }
+        if (!sessions[key].exercices[log.exercice.id]) {
+          sessions[key].exercices[log.exercice.id] = { id: log.exercice.id, nom: log.exercice.nom, ordre: log.exercice.ordre, groupe: log.exercice.groupe, logs: [] }
+        }
         sessions[key].exercices[log.exercice.id].logs.push(log)
       })
-      return Object.values(sessions).sort((a, b) => b.date.localeCompare(a.date)).map(s => ({ ...s, exercices: Object.values(s.exercices).sort((a, b) => a.ordre - b.ordre) }))
+      return Object.values(sessions)
+        .sort((a, b) => b.date.localeCompare(a.date))
+        .map(s => ({
+          ...s,
+          exercices: Object.values(s.exercices)
+            .sort((a, b) => a.ordre - b.ordre)
+            .map(e => ({ ...e, logs: [...e.logs].sort((a, b) => a.serie.id - b.serie.id) }))
+        }))
     })
+
+    // Regroupe les exercices d'une session en supersets/bisets (même logique
+    // que grouperExercices côté édition de programme) pour un affichage plus
+    // lisible quand plusieurs exercices sont enchaînés.
+    const grouperExosSession = (exercices) => {
+      const groupes = []
+      const map = {}
+      exercices.forEach(exo => {
+        if (exo.groupe) {
+          if (!map[exo.groupe]) {
+            map[exo.groupe] = { key: `g${exo.groupe}`, exercices: [] }
+            groupes.push(map[exo.groupe])
+          }
+          map[exo.groupe].exercices.push(exo)
+        } else {
+          groupes.push({ key: `e${exo.id}`, exercices: [exo] })
+        }
+      })
+      return groupes
+    }
+
+    const letterFor = (idx) => String.fromCharCode(65 + idx)
 
     const formatDate = (d) => new Date(d).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
 
@@ -383,6 +435,7 @@ export default {
       pointsHooper, dernierWellness, barresDernierWellness, formatDateCourt,
       enCours, estAssigne, assignerProgramme, retirerProgramme,
       programmesAssignes, programmeLogsId, loadingLogs, logsGroupes, ouvrirSeances,
+      grouperExosSession, letterFor,
       formatDate, getStatutClasse, getStatutIcon,
       loadingPoids, courbePoids, ouvrirPoids,
       allerA, onSwipeStart, onSwipeEnd
@@ -392,7 +445,7 @@ export default {
 </script>
 
 <style scoped>
-.fiche-athlete { display: flex; flex-direction: column; gap: var(--spacing-lg); padding: var(--spacing-xl) var(--spacing-2xl); overflow-y: auto; flex: 1; }
+.fiche-athlete { display: flex; flex-direction: column; gap: var(--spacing-lg); padding: var(--spacing-xl) var(--spacing-2xl); overflow-y: auto; flex: 1; touch-action: pan-y; }
 
 .fiche-topbar { display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-md); flex-wrap: wrap; }
 .retour-fiche { flex-shrink: 0; }
@@ -486,11 +539,22 @@ export default {
 .session-nom { flex: 1; font-weight: 600; }
 .session-date { font-size: var(--font-size-xs); color: var(--color-text-secondary); text-transform: capitalize; }
 .session-body { padding: var(--spacing-md) var(--spacing-lg); display: flex; flex-direction: column; gap: var(--spacing-lg); }
-.exo-bloc { display: flex; flex-direction: column; gap: 6px; }
+
+.exo-groupe-log { display: flex; flex-direction: column; gap: var(--spacing-md); }
+.exo-groupe-log.is-superset {
+  padding: var(--spacing-md);
+  background: var(--color-superset-bg);
+  border: 1px solid var(--color-superset-border);
+  border-left: 4px solid var(--color-primary);
+  border-radius: var(--radius-lg);
+}
+.exo-groupe-log.is-superset .exo-bloc + .exo-bloc { padding-top: var(--spacing-md); border-top: 1px dashed var(--color-superset-border); }
+
+.exo-bloc { display: flex; flex-direction: column; gap: var(--spacing-sm); }
 .exo-header { display: flex; align-items: center; gap: var(--spacing-sm); }
-.exo-num {
-  width: 24px;
-  height: 24px;
+.exo-num, .exo-letter {
+  width: 26px;
+  height: 26px;
   border-radius: var(--radius-sm);
   background: var(--color-primary-light);
   color: var(--color-superset-text);
@@ -501,25 +565,29 @@ export default {
   justify-content: center;
   flex-shrink: 0;
 }
-.exo-name { font-size: var(--font-size-base); font-weight: 500; flex: 1; }
-.comparatif-grid { display: flex; flex-direction: column; gap: 2px; }
+.exo-letter { background: var(--color-primary); color: var(--color-on-primary); }
+.exo-name { font-size: var(--font-size-base); font-weight: 600; flex: 1; }
+
+.comparatif-grid { display: flex; flex-direction: column; gap: 4px; }
 .comparatif-header {
   display: grid;
-  grid-template-columns: 32px 1.4fr 1.4fr 24px;
+  grid-template-columns: 40px 1.3fr 20px 1.3fr 24px;
   gap: var(--spacing-sm);
   font-size: var(--font-size-xs);
   color: var(--color-text-secondary);
   font-weight: 600;
-  padding: 0 4px 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  padding: 0 var(--spacing-sm) 4px;
 }
 .comparatif-row {
   display: grid;
-  grid-template-columns: 32px 1.4fr 1.4fr 24px;
+  grid-template-columns: 40px 1.3fr 20px 1.3fr 24px;
   gap: var(--spacing-sm);
   align-items: center;
-  padding: var(--spacing-sm) 4px;
+  padding: var(--spacing-sm);
   border-radius: var(--radius-md);
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-base);
 }
 .comparatif-row.statut-done { background: var(--color-valid-bg-soft); }
 .comparatif-row.statut-done .statut-icon { color: var(--color-valid-text); }
@@ -527,14 +595,25 @@ export default {
 .comparatif-row.statut-warn .statut-icon { color: var(--color-warning-icon); }
 .comparatif-row.statut-skip { background: var(--color-danger-bg-soft); }
 .comparatif-row.statut-skip .statut-icon { color: var(--color-danger-text); }
-.prescrit-cell { color: var(--color-text-secondary); }
-.realise-cell { font-weight: 500; }
-.non-fait { color: var(--color-danger-text); font-style: italic; }
+.prescrit-cell { color: var(--color-text-secondary); font-size: var(--font-size-sm); }
+.comparatif-arrow { font-size: var(--font-size-sm); color: var(--color-text-muted); justify-self: center; }
+.realise-cell { font-weight: 600; }
+.non-fait { display: inline-flex; align-items: center; gap: 4px; color: var(--color-danger-text); font-weight: 500; font-style: normal; }
 .statut-icon { display: flex; justify-content: center; }
-.serie-num { font-size: var(--font-size-sm); color: var(--color-text-muted); text-align: center; }
+.serie-num {
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-sm);
+  text-align: center;
+  padding: 4px 0;
+}
 
 @media (max-width: 768px) {
   .fiche-athlete { padding: var(--spacing-md) var(--spacing-lg); }
   .detail-grid { grid-template-columns: 1fr; }
+  .comparatif-header, .comparatif-row { grid-template-columns: 30px 1fr 16px 1fr 20px; gap: 6px; }
+  .prescrit-cell, .non-fait { font-size: var(--font-size-xs); }
 }
 </style>
