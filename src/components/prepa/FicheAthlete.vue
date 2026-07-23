@@ -39,10 +39,10 @@
     />
 
     <div class="tabs">
-      <div class="tab" :class="{ active: sousOnglet === 'apercu' }" @click="allerA('apercu')">Aperçu</div>
-      <div class="tab" :class="{ active: sousOnglet === 'programme' }" @click="allerA('programme')">Programme</div>
-      <div class="tab" :class="{ active: sousOnglet === 'seances' }" @click="allerA('seances')">Séances</div>
-      <div class="tab" :class="{ active: sousOnglet === 'poids' }" @click="allerA('poids')">Poids</div>
+      <div :ref="(el) => setTabRef('apercu', el)" class="tab" :class="{ active: sousOnglet === 'apercu' }" @click="allerA('apercu')">Aperçu</div>
+      <div :ref="(el) => setTabRef('programme', el)" class="tab" :class="{ active: sousOnglet === 'programme' }" @click="allerA('programme')">Programme</div>
+      <div :ref="(el) => setTabRef('seances', el)" class="tab" :class="{ active: sousOnglet === 'seances' }" @click="allerA('seances')">Séances</div>
+      <div :ref="(el) => setTabRef('poids', el)" class="tab" :class="{ active: sousOnglet === 'poids' }" @click="allerA('poids')">Poids</div>
     </div>
 
     <!-- APERÇU : monitoring (charge, ACWR, wellness) -->
@@ -199,7 +199,7 @@
 </template>
 
 <script>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useApi } from '../../services/api'
 import { useAuthStore } from '../../stores/auth'
 import CourbeProgression from '../athlete/CourbeProgression.vue'
@@ -400,10 +400,22 @@ export default {
 
     // --- Navigation par onglet (clic ou swipe) ---
     const ONGLETS_FICHE = ['apercu', 'programme', 'seances', 'poids']
+
+    // Recentre l'onglet actif dans la barre (qui peut déborder sur mobile) :
+    // au swipe comme au clic, l'onglet qui devient actif se replace bien en
+    // vue, quitte à faire sortir son opposé de l'autre côté.
+    const tabRefs = {}
+    const setTabRef = (tab, el) => { if (el) tabRefs[tab] = el }
+    const centrerOnglet = async (tab) => {
+      await nextTick()
+      tabRefs[tab]?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
+    }
+
     const allerA = (tab) => {
       if (tab === 'seances') ouvrirSeances()
       else if (tab === 'poids') ouvrirPoids()
       else sousOnglet.value = tab
+      centrerOnglet(tab)
     }
 
     // Swipe gauche/droite pour changer d'onglet, même logique que le swipe
@@ -438,7 +450,7 @@ export default {
       grouperExosSession, letterFor,
       formatDate, getStatutClasse, getStatutIcon,
       loadingPoids, courbePoids, ouvrirPoids,
-      allerA, onSwipeStart, onSwipeEnd
+      allerA, onSwipeStart, onSwipeEnd, setTabRef
     }
   }
 }
@@ -472,12 +484,14 @@ export default {
 .groupes-badges { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 2px; }
 .groupe-badge { font-size: var(--font-size-xs); font-weight: 600; padding: 2px 8px; border-radius: var(--radius-full); }
 
-.tabs { display: flex; border-bottom: 1px solid var(--color-border); flex-shrink: 0; overflow-x: auto; }
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--color-border); flex-shrink: 0; overflow-x: auto; scroll-behavior: smooth; }
 .tab {
   padding: var(--spacing-md) var(--spacing-lg);
   min-height: var(--tap-min);
   display: flex;
   align-items: center;
+  justify-content: center;
+  flex: 1 0 auto;
   font-size: var(--font-size-sm);
   font-weight: 500;
   cursor: pointer;
@@ -486,6 +500,7 @@ export default {
   margin-bottom: -1px;
   user-select: none;
   white-space: nowrap;
+  text-align: center;
 }
 .tab.active { color: var(--color-primary-dark); border-bottom-color: var(--color-primary); font-weight: 600; }
 .tab-content { display: flex; flex-direction: column; gap: var(--spacing-md); }
