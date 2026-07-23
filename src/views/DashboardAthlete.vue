@@ -1,6 +1,9 @@
 <template>
   <AppLayout title="Mon programme">
     <template #nav>
+      <div class="nav-item" :class="{ active: onglet === 'mes-stats' }" @click="onglet = 'mes-stats'">
+        <i class="ti ti-home-2"></i> Accueil
+      </div>
       <div class="nav-item" :class="{ active: onglet === 'programme' }" @click="onglet = 'programme'">
         <i class="ti ti-barbell"></i> Séances
       </div>
@@ -9,9 +12,6 @@
       </div>
       <div class="nav-item" :class="{ active: onglet === 'poids' }" @click="onglet = 'poids'">
         <i class="ti ti-scale"></i> Poids
-      </div>
-      <div class="nav-item" :class="{ active: onglet === 'mes-stats' }" @click="onglet = 'mes-stats'">
-        <i class="ti ti-chart-bar"></i> Mes stats
       </div>
     </template>
 
@@ -667,7 +667,7 @@ export default {
     const logs = ref({})
     const historique = ref([])
     const loadingSeances = ref(false)
-    const onglet = ref('programme')
+    const onglet = ref('mes-stats')
     const popupRessenti = ref(false)
     const popupWellness = ref(false)
     const focusRessenti = ref(false)
@@ -1501,7 +1501,7 @@ export default {
     // Swipe horizontal entre onglets (Séances <-> Performances <-> Poids), sur
     // tout le contenu du dashboard. Le panneau de saisie a son propre swipe
     // interne qui stoppe la propagation, donc les deux ne se marchent pas dessus.
-    const ONGLETS = ['programme', 'performances', 'poids', 'mes-stats']
+    const ONGLETS = ['mes-stats', 'programme', 'performances', 'poids']
     const tabSwipeState = { startX: 0, startY: 0, active: false }
     const onTabSwipeStart = (e) => {
       if (e.pointerType === 'mouse' && e.button !== 0) return

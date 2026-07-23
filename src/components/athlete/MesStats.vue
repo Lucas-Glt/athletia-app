@@ -67,9 +67,9 @@
     </div>
 
     <!-- Stats descriptives, aucune interprétation -->
-    <div class="stat-card stat-hero" v-if="stats">
-      <div class="hero-valeur">{{ formatNombre(stats.tonnage_total_musculation) }}<span> kg</span></div>
-      <div class="hero-label">Tonnage soulevé au total (musculation)</div>
+    <div class="stat-card" v-if="stats?.tonnage_hebdomadaire?.length > 0">
+      <div class="stat-card-titre"><i class="ti ti-weight"></i> Tonnage hebdo (musculation)</div>
+      <CourbeProgression :points="stats.tonnage_hebdomadaire" label="Tonnage" unite="kg" axe-x="dates" />
     </div>
 
     <div class="stat-card" v-if="stats">
@@ -245,8 +245,6 @@ export default {
       return jours
     })
 
-    const formatNombre = (v) => Math.round(v).toLocaleString('fr-FR')
-
     const scrollVers = async (el) => {
       await nextTick()
       el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -276,7 +274,7 @@ export default {
       stats, ressenti, rpeForm, dureeForm, labelRpe, envoyerRessenti,
       wellnessFait, wellnessForm, itemsWellness, wellnessComplet, envoyerWellness,
       performances, exerciceChoisiId, exerciceChoisi, courbeExerciceChoisi,
-      repartitionBarres, derniersJours, formatNombre,
+      repartitionBarres, derniersJours,
       ressentiEl, wellnessEl
     }
   }
@@ -341,11 +339,6 @@ export default {
   cursor: pointer;
 }
 .wellness-btn.active { background: var(--color-primary); border-color: var(--color-primary); color: var(--color-on-primary); }
-
-.stat-hero { align-items: center; text-align: center; background: var(--color-primary-light); border-color: var(--color-primary); }
-.hero-valeur { font-size: 40px; font-weight: 800; color: var(--color-primary-text); line-height: 1; }
-.hero-valeur span { font-size: var(--font-size-lg); font-weight: 600; }
-.hero-label { font-size: var(--font-size-sm); color: var(--color-primary-text); }
 
 .regularite-grille { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
 .regularite-case { aspect-ratio: 1; border-radius: 4px; background: var(--color-bg-tertiary); }
