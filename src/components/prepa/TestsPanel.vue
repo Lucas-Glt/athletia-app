@@ -70,7 +70,7 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { useApi } from '../../services/api'
 import { useAuthStore } from '../../stores/auth'
-import { CATEGORIES_TEST, CATALOGUE_TESTS, categorieDe, testDe, testsDeCategorie } from '../../data/catalogueTests'
+import { CATEGORIES_TEST, categorieDe, testDe } from '../../data/catalogueTests'
 import NouveauTestModal from './NouveauTestModal.vue'
 
 export default {
@@ -93,9 +93,18 @@ export default {
     const rechercheNom = ref('')
     const tri = ref('recent')
 
-    const optionsTestFiltre = computed(() =>
-      categorieFiltre.value === 'tous' ? CATALOGUE_TESTS : testsDeCategorie(categorieFiltre.value)
-    )
+    // Ne propose que les tests ayant au moins un enregistrement — pas tout
+    // le catalogue, pour ne pas noyer le filtre de types jamais utilisés.
+    const optionsTestFiltre = computed(() => {
+      const presents = new Set(
+        tests.value
+          .filter((t) => categorieFiltre.value === 'tous' || t.categorie === categorieFiltre.value)
+          .map((t) => t.type_test)
+      )
+      return Array.from(presents)
+        .map((id) => ({ id, label: labelTest(id) }))
+        .sort((a, b) => a.label.localeCompare(b.label))
+    })
     watch(categorieFiltre, () => { testFiltre.value = 'tous' })
 
     const fetchTests = async () => {

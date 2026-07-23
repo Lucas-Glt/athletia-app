@@ -18,7 +18,7 @@
       </button>
     </template>
 
-    <div class="dashboard-root">
+    <div class="dashboard-root" @pointerdown="onTabSwipeStart" @pointerup="onTabSwipeEnd" @pointercancel="onTabSwipeEnd">
       <AssignerAthleteModal
         v-if="modalAssigner"
         :programme="programmeActif"
@@ -459,6 +459,30 @@ export default {
     const jours = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche']
     const vueLabel = computed(() => onglet.value === 'athletes' ? 'Athlètes' : onglet.value === 'tests' ? 'Tests' : 'Programmes')
 
+    // Swipe entre les onglets Athlètes/Programmes/Tests, même logique que
+    // le swipe de tabs du dashboard athlète. Sans effet quand la fiche
+    // d'un athlète est ouverte : FicheAthlete.vue stoppe la propagation de
+    // ses propres pointerdown/pointerup, son swipe interne (Aperçu/
+    // Programme/Séances/Poids) est alors prioritaire.
+    const ONGLETS_PREPA = ['athletes', 'programmes', 'tests']
+    const tabSwipeState = { startX: 0, startY: 0, active: false }
+    const onTabSwipeStart = (e) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return
+      tabSwipeState.startX = e.clientX
+      tabSwipeState.startY = e.clientY
+      tabSwipeState.active = true
+    }
+    const onTabSwipeEnd = (e) => {
+      if (!tabSwipeState.active) return
+      tabSwipeState.active = false
+      const dx = e.clientX - tabSwipeState.startX
+      const dy = e.clientY - tabSwipeState.startY
+      if (Math.abs(dy) > Math.abs(dx) + 10) return
+      const idx = ONGLETS_PREPA.indexOf(onglet.value)
+      if (dx <= -60 && idx < ONGLETS_PREPA.length - 1) onglet.value = ONGLETS_PREPA[idx + 1]
+      else if (dx >= 60 && idx > 0) onglet.value = ONGLETS_PREPA[idx - 1]
+    }
+
     const labelType = (t) => {
       const map = { musculation: 'Musculation', natation: 'Natation', athletisme: 'Athlétisme', pliometrie: 'Pliométrie' }
       return map[t] || 'Musculation'
@@ -826,6 +850,7 @@ export default {
     return {
       programmes, programmeActif, seances, monCercle, groupes,
       loadingSeances, modalAssigner, vue, onglet, vueLabel,
+      onTabSwipeStart, onTabSwipeEnd,
       editMode, editNom, editDesc,
       nouvelleSeance, jours, labelType, letterFor, grouperExercices,
       semaineActive, semainesDisponibles, seancesFiltrees,
@@ -847,7 +872,7 @@ export default {
 </script>
 
 <style scoped>
-.dashboard-root { display: flex; flex: 1; flex-direction: column; overflow: hidden; min-height: 0; }
+.dashboard-root { display: flex; flex: 1; flex-direction: column; overflow: hidden; min-height: 0; touch-action: pan-y; }
 .onglet-wrapper { display: flex; flex: 1; overflow: hidden; min-height: 0; }
 .content-body { display: flex; flex: 1; overflow: hidden; min-height: 0; min-width: 0; }
 

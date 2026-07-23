@@ -7,39 +7,70 @@
       </div>
 
       <div class="modal-body">
-        <!-- 1. Catégorie -->
+        <!-- Mode : catalogue ou test personnalisé -->
         <div class="bloc">
-          <div class="section-title">Catégorie</div>
-          <div class="categorie-chips">
-            <button
-              v-for="c in CATEGORIES_TEST"
-              :key="c.id"
-              class="chip-filtre"
-              :class="{ active: categorieId === c.id }"
-              @click="choisirCategorie(c.id)"
-            >
-              <i class="ti" :class="c.icone"></i> {{ c.label }}
+          <div class="mode-creation-toggle">
+            <button class="chip-filtre" :class="{ active: modeCreation === 'catalogue' }" @click="modeCreation = 'catalogue'">Catalogue</button>
+            <button class="chip-filtre" :class="{ active: modeCreation === 'personnalise' }" @click="modeCreation = 'personnalise'">
+              <i class="ti ti-plus"></i> Test personnalisé
             </button>
           </div>
         </div>
 
-        <!-- 2. Test précis -->
-        <div class="bloc" v-if="categorieId">
-          <div class="section-title">Test</div>
-          <div class="test-chips">
-            <button
-              v-for="t in testsDeCategorie(categorieId)"
-              :key="t.id"
-              class="chip-filtre chip-test"
-              :class="{ active: testId === t.id }"
-              @click="testId = t.id"
-            >
-              {{ t.label }}
-            </button>
+        <template v-if="modeCreation === 'catalogue'">
+          <!-- 1. Catégorie -->
+          <div class="bloc">
+            <div class="section-title">Catégorie</div>
+            <div class="categorie-chips">
+              <button
+                v-for="c in CATEGORIES_TEST"
+                :key="c.id"
+                class="chip-filtre"
+                :class="{ active: categorieId === c.id }"
+                @click="choisirCategorie(c.id)"
+              >
+                <i class="ti" :class="c.icone"></i> {{ c.label }}
+              </button>
+            </div>
+          </div>
+
+          <!-- 2. Test précis -->
+          <div class="bloc" v-if="categorieId">
+            <div class="section-title">Test</div>
+            <div class="test-chips">
+              <button
+                v-for="t in testsDeCategorie(categorieId)"
+                :key="t.id"
+                class="chip-filtre chip-test"
+                :class="{ active: testId === t.id }"
+                @click="testId = t.id"
+              >
+                {{ t.label }}
+              </button>
+            </div>
+          </div>
+        </template>
+
+        <!-- Test personnalisé : nom / catégorie / unité libres -->
+        <div class="bloc champs-perso" v-else>
+          <div class="field">
+            <label>Nom du test</label>
+            <input v-model="testPerso.nom" placeholder="ex: Sit and reach" />
+          </div>
+          <div class="field">
+            <label>Catégorie</label>
+            <select v-model="testPerso.categorie">
+              <option value="" disabled>Choisir une catégorie</option>
+              <option v-for="c in CATEGORIES_TEST" :key="c.id" :value="c.id">{{ c.label }}</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Unité</label>
+            <input v-model="testPerso.unite" placeholder="ex: kg, s, cm, reps..." />
           </div>
         </div>
 
-        <!-- 3. Athlète, date, valeur, notes -->
+        <!-- Athlète, calcul 1RM éventuel, date, valeur, notes -->
         <template v-if="testChoisi">
           <div class="bloc">
             <div class="section-title">Athlète</div>
@@ -76,15 +107,45 @@
             </template>
           </div>
 
+          <div class="bloc" v-if="testChoisi.categorie === 'musculation'">
+            <div class="section-title">Saisie</div>
+            <div class="mode-1rm-toggle">
+              <button type="button" class="chip-filtre" :class="{ active: !modeCalcul1RM }" @click="modeCalcul1RM = false">Résultat direct</button>
+              <button type="button" class="chip-filtre" :class="{ active: modeCalcul1RM }" @click="modeCalcul1RM = true">
+                Calculer depuis charge × reps (max {{ REPS_MAX_ESTIMATION_1RM }})
+              </button>
+            </div>
+          </div>
+
           <div class="bloc champs-resultat">
             <div class="field">
               <label>Date</label>
               <input v-model="date" type="date" />
             </div>
-            <div class="field">
-              <label>Résultat ({{ testChoisi.unite }})</label>
-              <input v-model="valeur" type="number" step="any" :placeholder="`ex: 12.5`" />
-            </div>
+
+            <template v-if="!enMode1RM">
+              <div class="field">
+                <label>Résultat ({{ testChoisi.unite }})</label>
+                <input v-model="valeur" type="number" step="any" placeholder="ex: 12.5" />
+              </div>
+            </template>
+            <template v-else>
+              <div class="field">
+                <label>Charge (kg)</label>
+                <input v-model="chargeRM" type="number" step="any" placeholder="ex: 110" />
+              </div>
+              <div class="field">
+                <label>Répétitions (max {{ REPS_MAX_ESTIMATION_1RM }})</label>
+                <input v-model="repsRM" type="number" step="1" min="1" placeholder="ex: 4" />
+              </div>
+              <div class="field field-notes">
+                <span class="error-inline" v-if="repsInvalides">
+                  Au-delà de {{ REPS_MAX_ESTIMATION_1RM }} répétitions, l'estimation du 1RM n'est pas fiable.
+                </span>
+                <span class="max-estime" v-else-if="maxEstime">1RM estimé : <strong>{{ maxEstime }} kg</strong></span>
+              </div>
+            </template>
+
             <div class="field field-notes">
               <label>Notes (optionnel)</label>
               <input v-model="notes" placeholder="ex: sous fatigue, 2e tentative..." />
@@ -106,10 +167,10 @@
 </template>
 
 <script>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useApi } from '../../services/api'
 import { useAuthStore } from '../../stores/auth'
-import { CATEGORIES_TEST, testsDeCategorie, testDe } from '../../data/catalogueTests'
+import { CATEGORIES_TEST, testsDeCategorie, testDe, REPS_MAX_ESTIMATION_1RM, estimer1RM } from '../../data/catalogueTests'
 
 const aujourdhui = () => new Date().toISOString().slice(0, 10)
 
@@ -123,17 +184,37 @@ export default {
     const authStore = useAuthStore()
     const estSuperPrepa = computed(() => authStore.role === 'super_prepa')
 
+    const modeCreation = ref('catalogue')
     const categorieId = ref(null)
     const testId = ref(null)
+    const testPerso = ref({ nom: '', categorie: '', unite: '' })
+
     const athleteChoisi = ref(null)
     const rechercheAthlete = ref('')
     const date = ref(aujourdhui())
     const valeur = ref('')
+    const modeCalcul1RM = ref(false)
+    const chargeRM = ref('')
+    const repsRM = ref('')
     const notes = ref('')
     const erreur = ref('')
     const enCours = ref(false)
 
-    const testChoisi = computed(() => (testId.value ? testDe(testId.value) : null))
+    const testChoisi = computed(() => {
+      if (modeCreation.value === 'personnalise') {
+        const { nom, categorie, unite } = testPerso.value
+        if (!nom.trim() || !categorie || !unite.trim()) return null
+        return { id: nom.trim(), label: nom.trim(), categorie, unite: unite.trim() }
+      }
+      return testId.value ? testDe(testId.value) : null
+    })
+
+    watch(modeCreation, () => {
+      categorieId.value = null
+      testId.value = null
+      testPerso.value = { nom: '', categorie: '', unite: '' }
+    })
+    watch(() => testChoisi.value?.categorie, () => { modeCalcul1RM.value = false })
 
     const choisirCategorie = (id) => {
       categorieId.value = id
@@ -153,23 +234,42 @@ export default {
 
     const initiales = (nom) => nom.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
 
-    const peutEnregistrer = computed(() =>
-      !!(athleteChoisi.value && date.value && valeur.value !== '' && !isNaN(parseFloat(valeur.value)))
-    )
+    const enMode1RM = computed(() => modeCalcul1RM.value && testChoisi.value?.categorie === 'musculation')
+    const repsInvalides = computed(() => {
+      const reps = parseInt(repsRM.value, 10)
+      return !!reps && reps > REPS_MAX_ESTIMATION_1RM
+    })
+    const maxEstime = computed(() => {
+      const charge = parseFloat(chargeRM.value)
+      const reps = parseInt(repsRM.value, 10)
+      if (!charge || !reps || reps > REPS_MAX_ESTIMATION_1RM) return null
+      return estimer1RM(charge, reps)
+    })
+
+    const peutEnregistrer = computed(() => {
+      if (!testChoisi.value || !athleteChoisi.value || !date.value) return false
+      if (enMode1RM.value) return !!maxEstime.value
+      return valeur.value !== '' && !isNaN(parseFloat(valeur.value))
+    })
 
     const enregistrer = async () => {
       if (!peutEnregistrer.value) return
       erreur.value = ''
       enCours.value = true
       try {
+        const valeurFinale = enMode1RM.value ? maxEstime.value : parseFloat(valeur.value)
+        const uniteFinale = enMode1RM.value ? 'kg' : testChoisi.value.unite
+        const notesFinal = enMode1RM.value
+          ? (notes.value ? `${notes.value} — ` : '') + `1RM estimé : ${chargeRM.value}kg × ${repsRM.value} reps (Epley)`
+          : notes.value
         await api.post('/tests/', {
           athlete_id: athleteChoisi.value.id,
-          categorie: categorieId.value,
-          type_test: testId.value,
-          valeur: parseFloat(valeur.value),
-          unite: testChoisi.value.unite,
+          categorie: testChoisi.value.categorie,
+          type_test: testChoisi.value.id,
+          valeur: valeurFinale,
+          unite: uniteFinale,
           date: date.value,
-          notes: notes.value || null
+          notes: notesFinal || null
         })
         emit('cree')
         emit('fermer')
@@ -181,10 +281,12 @@ export default {
     }
 
     return {
-      CATEGORIES_TEST, testsDeCategorie,
+      CATEGORIES_TEST, testsDeCategorie, REPS_MAX_ESTIMATION_1RM,
+      modeCreation, testPerso,
       categorieId, testId, testChoisi, choisirCategorie,
       athleteChoisi, rechercheAthlete, suggestionsAthletes, selectionnerAthlete,
-      date, valeur, notes, erreur, enCours, peutEnregistrer, enregistrer,
+      date, valeur, modeCalcul1RM, chargeRM, repsRM, enMode1RM, repsInvalides, maxEstime,
+      notes, erreur, enCours, peutEnregistrer, enregistrer,
       estSuperPrepa, initiales
     }
   }
@@ -195,6 +297,7 @@ export default {
 .modal-large { max-width: 560px; }
 .bloc { display: flex; flex-direction: column; gap: var(--spacing-sm); }
 
+.mode-creation-toggle, .mode-1rm-toggle { display: flex; gap: 6px; flex-wrap: wrap; }
 .categorie-chips, .test-chips { display: flex; gap: 6px; flex-wrap: wrap; }
 .chip-filtre {
   display: inline-flex;
@@ -212,6 +315,16 @@ export default {
 .chip-filtre:hover { border-color: var(--color-primary); }
 .chip-filtre.active { background: var(--color-primary-light); border-color: var(--color-primary); color: var(--color-primary-text); font-weight: 600; }
 .chip-test { border-radius: var(--radius-md); }
+
+.champs-perso { display: grid; grid-template-columns: 2fr 1.4fr 1fr; gap: var(--spacing-md); }
+.champs-perso select {
+  min-height: var(--tap-min);
+  padding: 0 var(--spacing-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-base);
+  background: var(--color-bg);
+}
 
 .input-recherche-athlete {
   min-height: var(--tap-min);
@@ -275,9 +388,13 @@ export default {
   background: var(--color-bg);
 }
 .field input:focus { outline: none; border-color: var(--color-primary); }
+.error-inline { font-size: var(--font-size-sm); color: var(--color-danger-text); }
+.max-estime { font-size: var(--font-size-sm); color: var(--color-valid-text-strong); }
+.max-estime strong { font-size: var(--font-size-base); }
 
 @media (max-width: 480px) {
   .champs-resultat { grid-template-columns: 1fr; }
   .field-notes { grid-column: auto; }
+  .champs-perso { grid-template-columns: 1fr; }
 }
 </style>

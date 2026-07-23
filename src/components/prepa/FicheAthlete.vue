@@ -422,13 +422,17 @@ export default {
     // de tabs du dashboard athlète (détection au relâché uniquement, pour
     // ne jamais interférer avec le scroll vertical ou les clics).
     const swipeState = { startX: 0, startY: 0, active: false }
+    // Coupe la propagation : la fiche a la priorité sur le swipe de tabs du
+    // dashboard prépa (Athlètes/Programmes/Tests) quand elle est ouverte.
     const onSwipeStart = (e) => {
+      e.stopPropagation()
       if (e.pointerType === 'mouse' && e.button !== 0) return
       swipeState.startX = e.clientX
       swipeState.startY = e.clientY
       swipeState.active = true
     }
     const onSwipeEnd = (e) => {
+      e.stopPropagation()
       if (!swipeState.active) return
       swipeState.active = false
       const dx = e.clientX - swipeState.startX
