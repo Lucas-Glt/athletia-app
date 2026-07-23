@@ -7,6 +7,9 @@
       <div class="nav-item" :class="{ active: onglet === 'programmes' }" @click="onglet = 'programmes'">
         <i class="ti ti-layout-grid"></i> Programmes
       </div>
+      <div class="nav-item" :class="{ active: onglet === 'tests' }" @click="onglet = 'tests'">
+        <i class="ti ti-clipboard-list"></i> Tests
+      </div>
     </template>
 
     <template #actions>
@@ -405,6 +408,13 @@
         @ouvrir-programme="ouvrirProgrammeDepuisFiche"
       />
 
+      <!-- ONGLET TESTS -->
+      <TestsPanel
+        v-if="onglet === 'tests'"
+        :monCercle="monCercle"
+        :actif="onglet === 'tests'"
+      />
+
     </div>
   </AppLayout>
 </template>
@@ -418,9 +428,10 @@ import AppLayout from '../components/AppLayout.vue'
 import ProgrammeForm from '../components/prepa/ProgrammeForm.vue'
 import AssignerAthleteModal from '../components/prepa/AssignerAthleteModal.vue'
 import AthletesPanel from '../components/prepa/AthletesPanel.vue'
+import TestsPanel from '../components/prepa/TestsPanel.vue'
 
 export default {
-  components: { AppLayout, ProgrammeForm, AssignerAthleteModal, AthletesPanel },
+  components: { AppLayout, ProgrammeForm, AssignerAthleteModal, AthletesPanel, TestsPanel },
   setup() {
     const programmes = ref([])
     const programmeActif = ref(null)
@@ -446,7 +457,7 @@ export default {
     const api = useApi()
 
     const jours = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche']
-    const vueLabel = computed(() => onglet.value === 'athletes' ? 'Athlètes' : 'Programmes')
+    const vueLabel = computed(() => onglet.value === 'athletes' ? 'Athlètes' : onglet.value === 'tests' ? 'Tests' : 'Programmes')
 
     const labelType = (t) => {
       const map = { musculation: 'Musculation', natation: 'Natation', athletisme: 'Athlétisme', pliometrie: 'Pliométrie' }
