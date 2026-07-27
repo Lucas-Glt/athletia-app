@@ -7,7 +7,7 @@
       @focus="onFocus"
       @blur="onBlur"
       :placeholder="placeholder"
-      class="input-flex"
+      class="exo-autocomplete-input"
     />
     <Teleport to="body">
       <div v-if="ouvert && resultats.length" class="autocomplete-dropdown" :style="dropdownStyle">
@@ -131,6 +131,19 @@ export default {
 
 <style scoped>
 .exo-autocomplete { position: relative; flex: 1; }
+
+.exo-autocomplete-input {
+  width: 100%;
+  min-width: 140px;
+  min-height: var(--tap-min);
+  padding: 0 var(--spacing-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-base);
+  background: var(--color-bg);
+  color: var(--color-text-body);
+}
+.exo-autocomplete-input:focus { outline: none; border-color: var(--color-primary); }
 
 .autocomplete-dropdown {
   position: fixed;
