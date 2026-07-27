@@ -9,23 +9,25 @@
       :placeholder="placeholder"
       class="input-flex"
     />
-    <div v-if="ouvert && resultats.length" class="autocomplete-dropdown" :class="{ 'vers-le-haut': versLeHaut }">
-      <button
-        v-for="r in resultats"
-        :key="r.id"
-        type="button"
-        class="autocomplete-item"
-        @mousedown.prevent="choisir(r)"
-      >
-        <img :src="urlImage(r.image_url)" :alt="r.nom" loading="lazy" />
-        <span>{{ r.nom }}</span>
-      </button>
-    </div>
+    <Teleport to="body">
+      <div v-if="ouvert && resultats.length" class="autocomplete-dropdown" :style="dropdownStyle">
+        <button
+          v-for="r in resultats"
+          :key="r.id"
+          type="button"
+          class="autocomplete-item"
+          @mousedown.prevent="choisir(r)"
+        >
+          <img :src="urlImage(r.image_url)" :alt="r.nom" loading="lazy" />
+          <span>{{ r.nom }}</span>
+        </button>
+      </div>
+    </Teleport>
   </div>
 </template>
 
 <script>
-import { ref } from 'vue'
+import { ref, onBeforeUnmount } from 'vue'
 import { useApi } from '../../services/api'
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
@@ -40,16 +42,18 @@ export default {
     const api = useApi()
     const resultats = ref([])
     const ouvert = ref(false)
-    const versLeHaut = ref(false)
     const inputRef = ref(null)
+    const dropdownStyle = ref({})
     let timer = null
 
-    // Sur mobile, la barre d'onglets et la bannière d'installation PWA sont
-    // fixées en bas de l'écran et mangent une partie de la hauteur visible
-    // sans que window.innerHeight n'en tienne compte : on cherche leur bord
-    // haut réel pour savoir combien de place reste vraiment sous le champ,
-    // et on bascule le menu vers le haut si ça ne suffit pas.
-    const majDirection = () => {
+    // Le menu est téléporté dans <body> et positionné en fixed à partir des
+    // coordonnées écran du champ : ça l'affranchit de tout ancêtre en
+    // overflow:hidden/auto (panneaux scrollables de la fiche programme) et
+    // de la pile d'empilement locale. Position recalculée à l'ouverture, à
+    // chaque nouveau résultat, et au redimensionnement (clavier virtuel qui
+    // s'ouvre/se referme, barre d'onglets et bannière PWA fixes en bas
+    // d'écran mangent de la place sans que window.innerHeight ne bouge).
+    const majPosition = () => {
       if (!inputRef.value) return
       const rect = inputRef.value.getBoundingClientRect()
       let basVisible = window.innerHeight
@@ -59,8 +63,23 @@ export default {
       })
       const espaceEnDessous = basVisible - rect.bottom
       const espaceAuDessus = rect.top
-      versLeHaut.value = espaceEnDessous < 150 && espaceAuDessus > espaceEnDessous
+      const versLeHaut = espaceEnDessous < 150 && espaceAuDessus > espaceEnDessous
+      const espaceDispo = Math.max(120, (versLeHaut ? espaceAuDessus : espaceEnDessous) - 12)
+
+      dropdownStyle.value = versLeHaut
+        ? { left: `${rect.left}px`, width: `${rect.width}px`, bottom: `${window.innerHeight - rect.top + 4}px`, maxHeight: `${espaceDispo}px` }
+        : { left: `${rect.left}px`, width: `${rect.width}px`, top: `${rect.bottom + 4}px`, maxHeight: `${espaceDispo}px` }
     }
+
+    const onReposition = () => { if (ouvert.value) majPosition() }
+    window.addEventListener('resize', onReposition)
+    window.addEventListener('scroll', onReposition, true)
+    window.visualViewport?.addEventListener('resize', onReposition)
+    onBeforeUnmount(() => {
+      window.removeEventListener('resize', onReposition)
+      window.removeEventListener('scroll', onReposition, true)
+      window.visualViewport?.removeEventListener('resize', onReposition)
+    })
 
     const rechercher = async (q) => {
       if (q.trim().length < 2) {
@@ -69,7 +88,7 @@ export default {
       }
       try {
         resultats.value = await api.get(`/exercices/catalogue?q=${encodeURIComponent(q.trim())}`)
-        majDirection()
+        majPosition()
       } catch {
         resultats.value = []
       }
@@ -85,7 +104,7 @@ export default {
 
     const onFocus = () => {
       if (resultats.value.length) {
-        majDirection()
+        majPosition()
         ouvert.value = true
       }
     }
@@ -102,7 +121,7 @@ export default {
 
     const urlImage = (path) => `${BASE_URL}${path}`
 
-    return { resultats, ouvert, versLeHaut, inputRef, onInput, onFocus, onBlur, choisir, urlImage }
+    return { resultats, ouvert, inputRef, dropdownStyle, onInput, onFocus, onBlur, choisir, urlImage }
   }
 }
 </script>
@@ -111,23 +130,15 @@ export default {
 .exo-autocomplete { position: relative; flex: 1; }
 
 .autocomplete-dropdown {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  right: 0;
+  position: fixed;
   background: var(--color-bg);
   border: 1px solid var(--color-primary-light);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-dropdown);
-  max-height: 280px;
   overflow-y: auto;
   /* au-dessus de la bannière d'installation PWA (z-index: 300) et de la
      barre d'onglets mobile (z-index: 90), fixes en bas de l'écran */
   z-index: 310;
-}
-.autocomplete-dropdown.vers-le-haut {
-  top: auto;
-  bottom: calc(100% + 4px);
 }
 
 .autocomplete-item {
@@ -136,6 +147,8 @@ export default {
   padding: 6px var(--spacing-md);
   background: none;
   border: none;
+  appearance: none;
+  -webkit-appearance: none;
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
