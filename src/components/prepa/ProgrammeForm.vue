@@ -103,7 +103,11 @@
             </button>
 
             <div v-if="groupe._formOpen" class="add-exo-form">
-              <input v-model="groupe._nouvelExoNom" placeholder="Nom de l'exercice à enchaîner" class="input-flex" />
+              <ExerciceAutocomplete
+                v-model="groupe._nouvelExoNom"
+                placeholder="Nom de l'exercice à enchaîner"
+                @select="item => groupe._nouvelExoCatalogueId = item?.id ?? null"
+              />
               <button class="btn btn-sm btn-primary" @click="ajouterAuSuperset(seance, groupe)" :disabled="!groupe._nouvelExoNom">+ Ajouter</button>
               <button class="btn btn-sm btn-secondary" @click="groupe._formOpen = false">Annuler</button>
             </div>
@@ -162,7 +166,11 @@
         </div>
 
         <div class="add-exercice-form">
-          <input v-model="seance._nouvelExercice.nom" placeholder="Nom du nouvel exercice" class="input-flex" />
+          <ExerciceAutocomplete
+            v-model="seance._nouvelExercice.nom"
+            placeholder="Nom du nouvel exercice"
+            @select="item => seance._nouvelExercice.catalogueId = item?.id ?? null"
+          />
           <button class="btn btn-secondary" @click="ajouterExercice(seance)" :disabled="!seance._nouvelExercice.nom">
             + Exercice
           </button>
@@ -196,8 +204,10 @@
 <script>
 import { ref } from 'vue'
 import { useApi } from '../../services/api'
+import ExerciceAutocomplete from './ExerciceAutocomplete.vue'
 
 export default {
+  components: { ExerciceAutocomplete },
   emits: ['termine'],
   setup(_, { emit }) {
     const api = useApi()
@@ -228,7 +238,8 @@ export default {
       _nb_series: 4,
       _temps_repos: '',
       _formOpen: false,
-      _nouvelExoNom: ''
+      _nouvelExoNom: '',
+      _nouvelExoCatalogueId: null
     })
 
     const creerProgramme = async () => {
@@ -252,7 +263,7 @@ export default {
         ...data,
         exercices: [],
         _groupes: [],
-        _nouvelExercice: { nom: '' }
+        _nouvelExercice: { nom: '', catalogueId: null }
       })
       nouvelleSeance.value = { nom: '', jour: '', type_seance: 'musculation' }
     }
@@ -267,12 +278,13 @@ export default {
       const data = await api.post(`/seances/${seance.id}/exercices/`, {
         nom: seance._nouvelExercice.nom,
         ordre: seance.exercices.length + 1,
-        groupe: null
+        groupe: null,
+        catalogue_id: seance._nouvelExercice.catalogueId
       })
       const exo = { ...data, series: [], _params: paramsVides() }
       seance.exercices.push(exo)
       seance._groupes.push(nouveauGroupe(exo))
-      seance._nouvelExercice = { nom: '' }
+      seance._nouvelExercice = { nom: '', catalogueId: null }
     }
 
     const ajouterAuSuperset = async (seance, groupe) => {
@@ -284,7 +296,8 @@ export default {
           nom: premierExo.nom,
           ordre: premierExo.ordre,
           groupe: groupe.groupeNum,
-          optionnel: premierExo.optionnel || false
+          optionnel: premierExo.optionnel || false,
+          catalogue_id: premierExo.catalogue_id
         })
         premierExo.groupe = groupe.groupeNum
       }
@@ -292,12 +305,14 @@ export default {
       const data = await api.post(`/seances/${seance.id}/exercices/`, {
         nom: groupe._nouvelExoNom,
         ordre: seance.exercices.length + 1,
-        groupe: groupe.groupeNum
+        groupe: groupe.groupeNum,
+        catalogue_id: groupe._nouvelExoCatalogueId
       })
       const exo = { ...data, series: [], _params: paramsVides() }
       seance.exercices.push(exo)
       groupe.exercices.push(exo)
       groupe._nouvelExoNom = ''
+      groupe._nouvelExoCatalogueId = null
       groupe._formOpen = false
     }
 
@@ -316,7 +331,8 @@ export default {
         nom: exo.nom,
         ordre: exo.ordre,
         groupe: exo.groupe || null,
-        optionnel: exo.optionnel
+        optionnel: exo.optionnel,
+        catalogue_id: exo.catalogue_id
       })
     }
 

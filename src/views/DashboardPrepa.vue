@@ -233,7 +233,11 @@
                         <i class="ti ti-link"></i> Ajouter un superset à ce groupe
                       </button>
                       <div v-else class="add-exo-superset-form">
-                        <input v-model="getGroupeForm(groupe, groupe.exercices[0])._nouvelExoNom" placeholder="Nom de l'exercice à enchaîner" class="input-flex" />
+                        <ExerciceAutocomplete
+                          v-model="getGroupeForm(groupe, groupe.exercices[0])._nouvelExoNom"
+                          placeholder="Nom de l'exercice à enchaîner"
+                          @select="item => getGroupeForm(groupe, groupe.exercices[0])._nouvelExoCatalogueId = item?.id ?? null"
+                        />
                         <button class="btn btn-sm btn-primary" @click="ajouterAuSupersetEdit(seance, groupe)" :disabled="!getGroupeForm(groupe, groupe.exercices[0])._nouvelExoNom">+ Ajouter</button>
                         <button class="btn btn-sm btn-secondary" @click="getGroupeForm(groupe, groupe.exercices[0])._formSupersetOuvert = false">Annuler</button>
                       </div>
@@ -365,7 +369,11 @@
                   </div>
 
                   <div v-if="editMode" class="add-exercice-form">
-                    <input v-model="seance._nouvelExercice.nom" placeholder="Nom de l'exercice" class="input-flex" />
+                    <ExerciceAutocomplete
+                      v-model="seance._nouvelExercice.nom"
+                      placeholder="Nom de l'exercice"
+                      @select="item => seance._nouvelExercice.catalogueId = item?.id ?? null"
+                    />
                     <button class="btn btn-sm" @click="ajouterExercice(seance)" :disabled="!seance._nouvelExercice.nom">+ Exercice</button>
                   </div>
                 </div>
@@ -429,9 +437,10 @@ import ProgrammeForm from '../components/prepa/ProgrammeForm.vue'
 import AssignerAthleteModal from '../components/prepa/AssignerAthleteModal.vue'
 import AthletesPanel from '../components/prepa/AthletesPanel.vue'
 import TestsPanel from '../components/prepa/TestsPanel.vue'
+import ExerciceAutocomplete from '../components/prepa/ExerciceAutocomplete.vue'
 
 export default {
-  components: { AppLayout, ProgrammeForm, AssignerAthleteModal, AthletesPanel, TestsPanel },
+  components: { AppLayout, ProgrammeForm, AssignerAthleteModal, AthletesPanel, TestsPanel, ExerciceAutocomplete },
   setup() {
     const programmes = ref([])
     const programmeActif = ref(null)
@@ -518,7 +527,7 @@ export default {
     const getGroupeForm = (groupe, exo) => {
       const key = groupe.key
       if (!groupeForms.value[key]) {
-        groupeForms.value[key] = { nb_series: 4, temps_repos: '', params: {}, _formSupersetOuvert: false, _nouvelExoNom: '' }
+        groupeForms.value[key] = { nb_series: 4, temps_repos: '', params: {}, _formSupersetOuvert: false, _nouvelExoNom: '', _nouvelExoCatalogueId: null }
       }
       const form = groupeForms.value[key]
       groupe.exercices.forEach(e => {
@@ -616,12 +625,13 @@ export default {
         const maxGroupe = Math.max(0, ...seance.exercices.map(e => e.groupe || 0))
         numGroupe = maxGroupe + 1
         const premierExo = groupe.exercices[0]
-        await api.patch(`/exercices/${premierExo.id}`, { nom: premierExo.nom, ordre: premierExo.ordre, groupe: numGroupe, optionnel: premierExo.optionnel || false })
+        await api.patch(`/exercices/${premierExo.id}`, { nom: premierExo.nom, ordre: premierExo.ordre, groupe: numGroupe, optionnel: premierExo.optionnel || false, catalogue_id: premierExo.catalogue_id })
         premierExo.groupe = numGroupe
       }
-      const data = await api.post(`/seances/${seance.id}/exercices/`, { nom: form._nouvelExoNom, ordre: seance.exercices.length + 1, groupe: numGroupe })
+      const data = await api.post(`/seances/${seance.id}/exercices/`, { nom: form._nouvelExoNom, ordre: seance.exercices.length + 1, groupe: numGroupe, catalogue_id: form._nouvelExoCatalogueId })
       seance.exercices.push({ ...data, series: [] })
       form._nouvelExoNom = ''
+      form._nouvelExoCatalogueId = null
       form._formSupersetOuvert = false
       await fetchSeances(programmeActif.value.id)
     }
@@ -652,7 +662,7 @@ export default {
     const fetchSeances = async (programmeId) => {
       loadingSeances.value = true
       const data = await api.get(`/programmes/${programmeId}/seances/`)
-      seances.value = data.map(s => ({ ...s, _nouvelExercice: { nom: '' } }))
+      seances.value = data.map(s => ({ ...s, _nouvelExercice: { nom: '', catalogueId: null } }))
       seances.value.forEach(s => {
         if (seancesOuvertes.value[s.id] === undefined) {
           seancesOuvertes.value[s.id] = false
@@ -726,7 +736,7 @@ export default {
         jour: nouvelleSeance.value.jour || null, semaine: semaineActive.value,
         type_seance: nouvelleSeance.value.type_seance
       })
-      seances.value.push({ ...data, exercices: [], _nouvelExercice: { nom: '' } })
+      seances.value.push({ ...data, exercices: [], _nouvelExercice: { nom: '', catalogueId: null } })
       seancesOuvertes.value[data.id] = true
       nouvelleSeance.value = { nom: '', jour: '', type_seance: 'musculation' }
     }
@@ -744,9 +754,9 @@ export default {
     }
 
     const ajouterExercice = async (seance) => {
-      const data = await api.post(`/seances/${seance.id}/exercices/`, { nom: seance._nouvelExercice.nom, ordre: seance.exercices.length + 1, groupe: null })
+      const data = await api.post(`/seances/${seance.id}/exercices/`, { nom: seance._nouvelExercice.nom, ordre: seance.exercices.length + 1, groupe: null, catalogue_id: seance._nouvelExercice.catalogueId })
       seance.exercices.push({ ...data, series: [] })
-      seance._nouvelExercice = { nom: '' }
+      seance._nouvelExercice = { nom: '', catalogueId: null }
     }
 
     const mettreAJourSerie = async (serie) => {
@@ -800,7 +810,8 @@ export default {
         nom: exo.nom,
         ordre: exo.ordre,
         groupe: exo.groupe || null,
-        optionnel: exo.optionnel || false
+        optionnel: exo.optionnel || false,
+        catalogue_id: exo.catalogue_id
       })
     }
 
