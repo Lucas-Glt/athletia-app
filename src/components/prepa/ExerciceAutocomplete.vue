@@ -1,6 +1,7 @@
 <template>
   <div class="exo-autocomplete">
     <input
+      ref="inputRef"
       :value="modelValue"
       @input="onInput($event.target.value)"
       @focus="onFocus"
@@ -8,7 +9,7 @@
       :placeholder="placeholder"
       class="input-flex"
     />
-    <div v-if="ouvert && resultats.length" class="autocomplete-dropdown">
+    <div v-if="ouvert && resultats.length" class="autocomplete-dropdown" :class="{ 'vers-le-haut': versLeHaut }">
       <button
         v-for="r in resultats"
         :key="r.id"
@@ -39,7 +40,27 @@ export default {
     const api = useApi()
     const resultats = ref([])
     const ouvert = ref(false)
+    const versLeHaut = ref(false)
+    const inputRef = ref(null)
     let timer = null
+
+    // Sur mobile, la barre d'onglets et la bannière d'installation PWA sont
+    // fixées en bas de l'écran et mangent une partie de la hauteur visible
+    // sans que window.innerHeight n'en tienne compte : on cherche leur bord
+    // haut réel pour savoir combien de place reste vraiment sous le champ,
+    // et on bascule le menu vers le haut si ça ne suffit pas.
+    const majDirection = () => {
+      if (!inputRef.value) return
+      const rect = inputRef.value.getBoundingClientRect()
+      let basVisible = window.innerHeight
+      document.querySelectorAll('.bottom-nav, .install-banner').forEach(el => {
+        const top = el.getBoundingClientRect().top
+        if (top < basVisible) basVisible = top
+      })
+      const espaceEnDessous = basVisible - rect.bottom
+      const espaceAuDessus = rect.top
+      versLeHaut.value = espaceEnDessous < 150 && espaceAuDessus > espaceEnDessous
+    }
 
     const rechercher = async (q) => {
       if (q.trim().length < 2) {
@@ -48,6 +69,7 @@ export default {
       }
       try {
         resultats.value = await api.get(`/exercices/catalogue?q=${encodeURIComponent(q.trim())}`)
+        majDirection()
       } catch {
         resultats.value = []
       }
@@ -62,7 +84,10 @@ export default {
     }
 
     const onFocus = () => {
-      if (resultats.value.length) ouvert.value = true
+      if (resultats.value.length) {
+        majDirection()
+        ouvert.value = true
+      }
     }
     const onBlur = () => {
       setTimeout(() => { ouvert.value = false }, 150)
@@ -77,7 +102,7 @@ export default {
 
     const urlImage = (path) => `${BASE_URL}${path}`
 
-    return { resultats, ouvert, onInput, onFocus, onBlur, choisir, urlImage }
+    return { resultats, ouvert, versLeHaut, inputRef, onInput, onFocus, onBlur, choisir, urlImage }
   }
 }
 </script>
@@ -96,7 +121,13 @@ export default {
   box-shadow: var(--shadow-dropdown);
   max-height: 280px;
   overflow-y: auto;
-  z-index: 50;
+  /* au-dessus de la bannière d'installation PWA (z-index: 300) et de la
+     barre d'onglets mobile (z-index: 90), fixes en bas de l'écran */
+  z-index: 310;
+}
+.autocomplete-dropdown.vers-le-haut {
+  top: auto;
+  bottom: calc(100% + 4px);
 }
 
 .autocomplete-item {
