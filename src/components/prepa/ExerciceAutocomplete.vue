@@ -37,7 +37,7 @@ export default {
     modelValue: { type: String, default: '' },
     placeholder: { type: String, default: "Nom de l'exercice" }
   },
-  emits: ['update:modelValue', 'select'],
+  emits: ['update:modelValue', 'select', 'blur'],
   setup(_, { emit }) {
     const api = useApi()
     const resultats = ref([])
@@ -109,6 +109,9 @@ export default {
       }
     }
     const onBlur = () => {
+      // le mousedown.prevent d'un choix au clic garde le focus sur le champ,
+      // donc cet événement ne se déclenche que sur une vraie sortie du champ
+      emit('blur')
       setTimeout(() => { ouvert.value = false }, 150)
     }
 

@@ -203,13 +203,13 @@
                         <div class="exo-head">
                           <span class="exo-letter" v-if="groupe.exercices.length > 1">{{ letterFor(eidx) }}</span>
                           <span class="exo-num" v-else>{{ exo.ordre }}</span>
-                          <input
+                          <ExerciceAutocomplete
                             v-if="editMode"
                             v-model="exo.nom"
-                            @change="mettreAJourExercice(exo)"
-                            @click.stop
-                            class="input-inline"
                             placeholder="Nom de l'exercice"
+                            @select="item => { exo.catalogue_id = item?.id ?? null; if (item) mettreAJourExercice(exo) }"
+                            @blur="mettreAJourExercice(exo)"
+                            @click.stop
                           />
                           <span v-else class="exo-name">{{ exo.nom }}</span>
                           <span v-if="!editMode && exo.optionnel" class="optionnel-badge">optionnelle</span>
