@@ -29,6 +29,7 @@
       >
         <i class="ti ti-check"></i> Enregistrer
       </button>
+      <p v-if="erreurRessenti" class="stat-card-erreur">{{ erreurRessenti }}</p>
       <p class="stat-card-note">Modifiable pendant une heure après la séance.</p>
     </div>
 
@@ -63,6 +64,7 @@
         <button class="btn btn-primary btn-envoyer" :disabled="!wellnessComplet" @click="envoyerWellness">
           <i class="ti ti-check"></i> Envoyer
         </button>
+        <p v-if="erreurWellness" class="stat-card-erreur">{{ erreurWellness }}</p>
       </template>
     </div>
 
@@ -204,7 +206,12 @@ export default {
 
     const fetchHistoriqueExercice = async () => {
       if (!exerciceChoisi.value) { historiqueExercice.value = []; return }
-      historiqueExercice.value = await api.get(`/logs/programme/${exerciceChoisi.value.programme_id}/moi`)
+      try {
+        historiqueExercice.value = await api.get(`/logs/programme/${exerciceChoisi.value.programme_id}/moi`)
+      } catch (e) {
+        console.error('Erreur chargement historique exercice:', e)
+        historiqueExercice.value = []
+      }
     }
 
     const cleTentative = (l) => l.session_id || l.date.split('T')[0]
@@ -230,20 +237,38 @@ export default {
 
     watch(exerciceChoisiId, fetchHistoriqueExercice)
 
+    // Sans ces messages, un envoi qui échoue ne produisait rien du tout à
+    // l'écran : le bouton restait actif et l'athlète ne savait pas si c'était
+    // enregistré.
+    const erreurRessenti = ref('')
+    const erreurWellness = ref('')
+
     const envoyerRessenti = async () => {
       if (rpeForm.value === null || !dureeForm.value) return
-      await api.post(`/seances/${ressenti.value.seance_id}/charge`, {
-        session_id: ressenti.value.session_id, rpe: rpeForm.value, duree_minutes: dureeForm.value
-      })
+      erreurRessenti.value = ''
+      try {
+        await api.post(`/seances/${ressenti.value.seance_id}/charge`, {
+          session_id: ressenti.value.session_id, rpe: rpeForm.value, duree_minutes: dureeForm.value
+        })
+      } catch (e) {
+        erreurRessenti.value = e.message || "Erreur lors de l'enregistrement"
+        return
+      }
       ressenti.value = null
-      await fetchStats()
+      await fetchStats().catch(e => console.error('Erreur rechargement stats:', e))
     }
 
     const wellnessComplet = computed(() => Object.values(wellnessForm.value).every(v => v !== null))
 
     const envoyerWellness = async () => {
       if (!wellnessComplet.value) return
-      await api.post('/wellness/', wellnessForm.value)
+      erreurWellness.value = ''
+      try {
+        await api.post('/wellness/', wellnessForm.value)
+      } catch (e) {
+        erreurWellness.value = e.message || "Erreur lors de l'envoi"
+        return
+      }
       wellnessFait.value = true
     }
 
@@ -253,6 +278,12 @@ export default {
       }))
     )
 
+    // Date locale au format ISO : toISOString() bascule en UTC et décalait la
+    // grille d'un jour entre minuit et 2 h du matin (France en UTC+1/+2),
+    // marquant « aujourd'hui » sur la case de la veille.
+    const pad2 = (n) => String(n).padStart(2, '0')
+    const dateISOLocale = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
+
     const derniersJours = computed(() => {
       const parJour = {}
       ;(stats.value?.jours_avec_seance || []).forEach(j => { parJour[j.date] = j })
@@ -261,7 +292,7 @@ export default {
       for (let i = 34; i >= 0; i--) {
         const d = new Date(today)
         d.setDate(d.getDate() - i)
-        const iso = d.toISOString().split('T')[0]
+        const iso = dateISOLocale(d)
         const info = parJour[iso]
         jours.push({ date: iso, nb: info?.nb_seances || 0, types: info?.types || [], estAujourdhui: i === 0 })
       }
@@ -298,7 +329,15 @@ export default {
     })
 
     onMounted(async () => {
-      await Promise.all([fetchStats(), fetchRessenti(), fetchWellness(), fetchPerformances(), fetchPoids()])
+      // allSettled et pas all : c'est l'onglet d'accueil de l'athlète, un seul
+      // appel en échec (réseau coupé en salle, endpoint en erreur) laissait
+      // l'écran entièrement vide et sautait tout ce qui suit.
+      const resultats = await Promise.allSettled([
+        fetchStats(), fetchRessenti(), fetchWellness(), fetchPerformances(), fetchPoids()
+      ])
+      resultats
+        .filter(r => r.status === 'rejected')
+        .forEach(r => console.error('Erreur chargement stats athlète:', r.reason))
       await fetchHistoriqueExercice()
       if (props.focusRessenti) { await scrollVers(ressentiEl.value); emit('focus-consomme', 'ressenti') }
       if (props.focusWellness) { await scrollVers(wellnessEl.value); emit('focus-consomme', 'wellness') }
@@ -307,6 +346,7 @@ export default {
     return {
       stats, ressenti, rpeForm, dureeForm, labelRpe, envoyerRessenti,
       wellnessFait, wellnessForm, itemsWellness, wellnessComplet, envoyerWellness,
+      erreurRessenti, erreurWellness,
       performances, exerciceChoisiId, exerciceChoisi, courbeExerciceChoisi,
       repartitionBarres, derniersJours, styleJour, courbePoids,
       ressentiEl, wellnessEl
@@ -330,6 +370,7 @@ export default {
 .stat-card-titre { display: flex; align-items: center; gap: 8px; font-size: var(--font-size-base); font-weight: 700; }
 .stat-card-sub { font-size: var(--font-size-sm); color: var(--color-text-secondary); margin: 0; }
 .stat-card-note { font-size: var(--font-size-xs); color: var(--color-text-muted); margin: 0; }
+.stat-card-erreur { font-size: var(--font-size-sm); color: var(--color-danger-text); margin: 0; }
 
 .rpe-picker { display: flex; flex-wrap: wrap; gap: 6px; }
 .rpe-btn {

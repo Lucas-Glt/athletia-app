@@ -178,15 +178,22 @@ export default {
       }
     }
 
+    const onInstallPrompt = (e) => {
+      e.preventDefault()
+      installPrompt.value = e
+      if (!isInStandaloneMode) showInstallBanner.value = true
+    }
+
     onMounted(() => {
       document.addEventListener('click', fermerMenu)
-      window.addEventListener('beforeinstallprompt', (e) => {
-        e.preventDefault()
-        installPrompt.value = e
-        if (!isInStandaloneMode) showInstallBanner.value = true
-      })
+      window.addEventListener('beforeinstallprompt', onInstallPrompt)
     })
-    onUnmounted(() => document.removeEventListener('click', fermerMenu))
+    onUnmounted(() => {
+      document.removeEventListener('click', fermerMenu)
+      // le listener restait attaché à window à chaque démontage du layout
+      // (connexion -> dashboard, changement de rôle) et s'accumulait
+      window.removeEventListener('beforeinstallprompt', onInstallPrompt)
+    })
 
     const deconnexion = () => {
       authStore.logout()
@@ -241,7 +248,12 @@ export default {
     const installPrompt = ref(null)
     const showInstallBanner = ref(false)
     const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent)
-    const isInStandaloneMode = window.matchMedia('(display-mode: standalone)').matches
+    // navigator.standalone en plus du media query : sur iOS, une app lancée
+    // depuis l'écran d'accueil ne remonte pas display-mode: standalone, si
+    // bien que la bannière « installez l'app » restait affichée en
+    // permanence… dans l'app déjà installée.
+    const isInStandaloneMode =
+      window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true
     const showIosBanner = ref(isIos && !isInStandaloneMode)
 
     const installerApp = async () => {

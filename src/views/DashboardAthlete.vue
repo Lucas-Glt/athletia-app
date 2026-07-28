@@ -36,7 +36,9 @@
     />
 
     <div class="dashboard-root" @pointerdown="onTabSwipeStart" @pointerup="onTabSwipeEnd" @pointercancel="onTabSwipeCancel">
-      <div class="empty-state" v-if="programmes.length === 0">
+      <!-- Réservé à l'onglet Séances : les autres (Accueil, Poids) restent
+           utilisables sans programme assigné -->
+      <div class="empty-state" v-if="programmes.length === 0 && onglet === 'programme'">
         <i class="ti ti-calendar-off empty-icon"></i>
         <p>Aucun programme assigné pour le moment.</p>
         <span>Contactez votre préparateur physique.</span>
@@ -524,7 +526,7 @@
                 class="btn-suivi"
                 :class="{ active: perf.suivi }"
                 @click="toggleSuiviPerformance(perf)"
-                aria-label="Ne plus suivre les performances"
+                :aria-label="perf.suivi ? 'Ne plus suivre les performances' : 'Suivre les performances'"
               >
                 <i class="ti ti-star"></i>
               </button>
@@ -604,7 +606,9 @@
         </template>
 
         <template v-else>
-          <CourbeProgression :points="courbePoids" label="Poids" unite="kg" />
+          <!-- axe-x="dates" : une pesée par jour dépasse vite la dizaine de
+               points, un label « S1…Sn » par point déborderait de l'écran -->
+          <CourbeProgression :points="courbePoids" label="Poids" unite="kg" axe-x="dates" />
         </template>
 
         <!-- Modale de saisie du poids d'un jour -->
@@ -652,8 +656,6 @@
 
 <script>
 import { ref, computed, onMounted, watch } from 'vue'
-import { useRouter } from 'vue-router'
-import { useAuthStore } from '../stores/auth'
 import { useApi } from '../services/api'
 import AppLayout from '../components/AppLayout.vue'
 import CourbeProgression from '../components/athlete/CourbeProgression.vue'
@@ -664,6 +666,12 @@ import ExerciceImage from '../components/ExerciceImage.vue'
 // Distance horizontale minimale pour valider un swipe. Volontairement haute :
 // un doigt qui ripe sur un simple appui ne doit jamais changer d'écran.
 const SEUIL_SWIPE = 80
+
+// Identifiant d'une tentative de séance. crypto.randomUUID n'existe pas avant
+// iOS 15.4 ni hors contexte sécurisé : sans repli, démarrer une séance levait
+// une exception et l'écran ne s'ouvrait pas du tout.
+const nouvelIdSession = () =>
+  crypto.randomUUID?.() ?? `s-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
 
 export default {
   components: { AppLayout, CourbeProgression, MesStats, PopupBanniere, ExerciceImage },
@@ -700,9 +708,6 @@ export default {
       if (quoi === 'ressenti') focusRessenti.value = false
       if (quoi === 'wellness') focusWellness.value = false
     }
-    const groupesOuverts = ref({})
-    const router = useRouter()
-    const authStore = useAuthStore()
     const api = useApi()
 
     const labelType = (t) => {
@@ -731,35 +736,12 @@ export default {
       return groupes
     }
 
-    const toggleGroupe = (key) => {
-      groupesOuverts.value[key] = !groupesOuverts.value[key]
-    }
-
-    const isGroupeOuvert = (key) => !!groupesOuverts.value[key]
-
     const getLogs = (exoId, serieIdx) => {
       if (!logs.value[exoId]) logs.value[exoId] = {}
       if (!logs.value[exoId][serieIdx]) {
         logs.value[exoId][serieIdx] = { reps_realisees: '', poids_realise: '', fait: false }
       }
       return logs.value[exoId][serieIdx]
-    }
-
-    const getLogsAvecHistorique = (exo, serieIdx) => {
-      const serie = exo.series[serieIdx]
-      if (!serie) return getLogs(exo.id, serieIdx)
-
-      // Si on a des logs existants pour cette série et qu'on est en consultation
-      if (logsParSerie.value[serie.id] && !getLogs(exo.id, serieIdx).fait) {
-        const logExistant = logsParSerie.value[serie.id]
-        logs.value[exo.id] = logs.value[exo.id] || {}
-        logs.value[exo.id][serieIdx] = {
-          reps_realisees: logExistant.reps_realisees || '',
-          poids_realise: logExistant.poids_realise || '',
-          fait: logExistant.fait
-        }
-      }
-      return getLogs(exo.id, serieIdx)
     }
 
     const isGroupeDone = (groupe, serieIdx) => {
@@ -791,13 +773,13 @@ export default {
         const toutesValidees = Array.from({ length: nbSeries }, (_, i) => i)
           .every(i => isGroupeDone(groupe, i))
 
-        if (toutesValidees) {
-          // Ferme automatiquement l'accordéon
-          groupesOuverts.value[groupe.key] = false
-          // Groupe terminé : referme le panneau de saisie, retour à la vue d'ensemble
-          if (groupeSaisie.value?.key === groupe.key) {
-            setTimeout(() => { fermerSaisie() }, 400)
-          }
+        // Groupe terminé : referme le panneau de saisie, retour à la vue
+        // d'ensemble. La clé est revérifiée à l'échéance : ouvrir un autre
+        // exercice pendant ces 400 ms refermait sinon ce nouveau panneau.
+        if (toutesValidees && groupeSaisie.value?.key === groupe.key) {
+          setTimeout(() => {
+            if (groupeSaisie.value?.key === groupe.key) fermerSaisie()
+          }, 400)
         }
       }
     }
@@ -1165,26 +1147,11 @@ export default {
     }
 
     const seancesCompletees = ref(new Set())
-    const logsParSerie = ref({}) // { serie_id: { reps_realisees, poids_realise, fait } }
 
     const chargerLogsExistants = async (programmeId) => {
       try {
         const logs = await api.get(`/logs/programme/${programmeId}/moi`)
         const completees = new Set()
-
-        // Groupe les logs par serie_id — l'API renvoie du plus récent au plus
-        // ancien, on ne garde que la première occurrence (donc la plus récente ;
-        // l'ancien code écrasait à chaque tour et gardait la plus VIEILLE)
-        logs.forEach(log => {
-          if (!logsParSerie.value[log.serie.id]) {
-            logsParSerie.value[log.serie.id] = {
-              id: log.id,
-              reps_realisees: log.reps_realisees || '',
-              poids_realise: log.poids_realise || '',
-              fait: log.fait
-            }
-          }
-        })
 
         // Détermine quelles séances sont validées dans l'historique. Une
         // séance l'est si UNE MÊME tentative (session_id, ou jour à défaut) a
@@ -1225,12 +1192,6 @@ export default {
       }
     }
 
-    const isSeanceComplete = (seance) => {
-      if (!seance.exercices || seance.exercices.length === 0) return false
-      const groupes = grouperExercices(seance.exercices)
-      return groupes.every(groupe => isGroupeComplete(groupe))
-    }
-
     const jourOrdre = { lundi: 1, mardi: 2, mercredi: 3, jeudi: 4, vendredi: 5, samedi: 6, dimanche: 7 }
 
     // Un programme multi-semaines duplique un même créneau (nom + jour +
@@ -1262,16 +1223,30 @@ export default {
     })
 
     const fetchProgrammes = async () => {
-      programmes.value = await api.get('/programmes/')
-      if (programmes.value.length > 0) selectProgramme(programmes.value[0])
+      try {
+        programmes.value = await api.get('/programmes/')
+      } catch (e) {
+        console.error('Erreur chargement programmes:', e)
+        return
+      }
+      if (programmes.value.length > 0) await selectProgramme(programmes.value[0])
     }
 
     const selectProgramme = async (p) => {
       programmeActif.value = p
       seanceActive.value = null
       loadingSeances.value = true
-      seances.value = await api.get(`/programmes/${p.id}/seances/`)
-      loadingSeances.value = false
+      try {
+        seances.value = await api.get(`/programmes/${p.id}/seances/`)
+      } catch (e) {
+        // Sans ce filet, une coupure réseau laissait « Chargement... » à
+        // l'écran indéfiniment, l'athlète n'ayant aucun moyen de réessayer.
+        console.error('Erreur chargement séances:', e)
+        seances.value = []
+        return
+      } finally {
+        loadingSeances.value = false
+      }
 
       // Charge les logs existants après les séances
       await chargerLogsExistants(p.id)
@@ -1290,15 +1265,10 @@ export default {
       // avec un nouvel identifiant de tentative — la dernière performance
       // validée reste consultable via le swipe, pas pré-remplie ici.
       if (seanceEnCoursId.value !== seance.id) {
-        sessionSaisieId.value = crypto.randomUUID()
+        sessionSaisieId.value = nouvelIdSession()
         logs.value = {}
         seanceEnCoursId.value = seance.id
       }
-
-      groupesOuverts.value = {}
-      grouperExercices(seance.exercices).forEach(g => {
-        groupesOuverts.value[g.key] = false
-      })
 
       // Recharge l'historique à chaque (re)démarrage : sinon il reste figé
       // sur l'état du chargement de la page et n'inclut pas les performances
@@ -1547,9 +1517,6 @@ export default {
     // jamais un geste : on abandonne, sans rien interpréter.
     const onTabSwipeCancel = () => { tabSwipeState.pointerId = null }
 
-    const logout = () => { authStore.logout(); router.push('/') }
-    const panelListVisible = ref(false)
-
     onMounted(fetchProgrammes)
 
     const isGroupeComplete = (groupe) => {
@@ -1581,17 +1548,13 @@ export default {
       programmes, programmeActif, seances, seanceActive, logs, historique,
       loadingSeances, onglet,
       seancesAffichees,
-      groupesOuverts, toggleGroupe, isGroupeOuvert,
       labelType, letterFor, grouperExercices,
-      getLogs, isGroupeDone, toggleGroupeDone,
+      getLogs, isGroupeDone,
       estEnEdition,
       etatBoutonSerie, toggleSerie, historiqueGroupeExiste, supprimerSeanceHistorique,
       selectProgramme, demarrerSeance, validerSeance,
-      logout, panelListVisible, isGroupeComplete,
-      isSeanceComplete,
-      logsParSerie, chargerLogsExistants, getLogsAvecHistorique,
+      isGroupeComplete,
       progressionSeance,
-      sauvegarderSerie,
       groupeSaisie, ouvrirSaisie, fermerSaisie, valeursSerie, resumeExo,
       saisieVue, historiqueIndex, nbTentativesGroupe, retourSaisie,
       onSaisieSwipeStart, onSaisieSwipeEnd, onSaisieSwipeCancel,
