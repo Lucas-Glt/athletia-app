@@ -14,15 +14,25 @@
   <Teleport to="body">
     <Transition name="exo-lightbox-fade">
       <div v-if="ouvert" class="exo-lightbox" @click="fermer">
-        <div class="exo-lightbox-card" @click.stop>
+        <div class="exo-lightbox-card" :class="{ 'est-double': url2 }" @click.stop>
           <div class="exo-lightbox-head">
             <span class="exo-lightbox-nom">{{ nom }}</span>
             <button type="button" class="exo-lightbox-close" @click="fermer" aria-label="Fermer">
               <i class="ti ti-x"></i>
             </button>
           </div>
-          <div class="exo-lightbox-img">
-            <img :src="url" :alt="nom" />
+          <div class="exo-lightbox-img" :class="{ 'a-deux-phases': url2 }">
+            <figure class="exo-phase">
+              <img :src="url" :alt="nom" />
+              <figcaption v-if="url2">Départ</figcaption>
+            </figure>
+            <template v-if="url2">
+              <i class="ti ti-arrow-right exo-phase-fleche"></i>
+              <figure class="exo-phase">
+                <img :src="url2" :alt="`${nom} — position finale`" />
+                <figcaption>Fin</figcaption>
+              </figure>
+            </template>
           </div>
         </div>
       </div>
@@ -40,6 +50,9 @@ export default {
     // chemin relatif renvoyé par l'API (`/static/exercices/xxx.png`), null si
     // l'exercice n'est pas rattaché au catalogue : on n'affiche alors rien
     src: { type: String, default: null },
+    // seconde phase du mouvement quand le catalogue en a une : la vignette
+    // reste sur la position de départ, les deux ne s'affichent qu'en grand
+    src2: { type: String, default: null },
     nom: { type: String, default: '' },
     size: { type: String, default: 'md' } // md (42px) | lg (52px)
   },
@@ -48,6 +61,7 @@ export default {
     const erreur = ref(false)
     const posterKo = ref(false)
     const url = computed(() => (props.src ? `${BASE_URL}${props.src}` : null))
+    const url2 = computed(() => (props.src2 ? `${BASE_URL}${props.src2}` : null))
 
     // Quelques exercices du catalogue sont des GIF animés (jusqu'à 1,6 Mo,
     // 100 images) : les animer dans une vignette de 42 px au milieu d'une
@@ -82,7 +96,7 @@ export default {
 
     onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 
-    return { ouvert, erreur, url, urlVignette, onErreurVignette, ouvrir, fermer }
+    return { ouvert, erreur, url, url2, urlVignette, onErreurVignette, ouvrir, fermer }
   }
 }
 </script>
@@ -164,6 +178,7 @@ export default {
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-modal);
 }
+.exo-lightbox-card.est-double { max-width: 760px; }
 .exo-lightbox-head {
   display: flex;
   align-items: center;
@@ -200,14 +215,40 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: var(--spacing-md);
   padding: var(--spacing-lg);
   background: #fff;
 }
-.exo-lightbox-img img {
+.exo-phase {
+  margin: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.exo-phase img {
   max-width: 100%;
   max-height: 70dvh;
   object-fit: contain;
   display: block;
+}
+/* la plaque est toujours blanche, y compris en mode sombre : les couleurs de
+   texte sont donc en dur et pas prises aux tokens, qui s'inverseraient */
+.exo-phase figcaption {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: #6b7280;
+}
+.exo-phase-fleche { font-size: 22px; color: #9ca3af; flex-shrink: 0; }
+.a-deux-phases .exo-phase img { max-height: 50dvh; }
+
+@media (max-width: 560px) {
+  .a-deux-phases { flex-direction: column; }
+  .a-deux-phases .exo-phase-fleche { transform: rotate(90deg); }
+  .a-deux-phases .exo-phase img { max-height: 30dvh; }
 }
 
 .exo-lightbox-fade-enter-active,

@@ -125,7 +125,7 @@
                       class="exo-nom-inline"
                       :class="{ 'is-optionnel': exo.optionnel }"
                     >
-                      <ExerciceImage :src="exo.image_url" :nom="exo.nom" size="md" />
+                      <ExerciceImage :src="exo.image_url" :src2="exo.image_url_2" :nom="exo.nom" size="md" />
                       <span class="exo-letter" v-if="groupe.exercices.length > 1">{{ letterFor(eidx) }}</span>
                       {{ exo.nom }}
                       <span v-if="exo.optionnel" class="optionnel-badge">optionnelle</span>
@@ -196,6 +196,7 @@
                     <span v-for="(exo, eidx) in groupe.exercices" :key="exo.id" class="saisie-nom">
                       <ExerciceImage
                         :src="exo.image_url"
+                        :src2="exo.image_url_2"
                         :nom="exo.nom"
                         :size="groupe.exercices.length > 1 ? 'md' : 'lg'"
                       />

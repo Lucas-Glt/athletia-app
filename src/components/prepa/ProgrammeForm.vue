@@ -58,7 +58,7 @@
               <div class="exo-head">
                 <span class="exo-letter" v-if="groupe.exercices.length > 1">{{ letterFor(eidx) }}</span>
                 <span class="exo-num" v-else>{{ exo.ordre }}</span>
-                <ExerciceImage :src="exo.image_url" :nom="exo.nom" size="md" />
+                <ExerciceImage :src="exo.image_url" :src2="exo.image_url_2" :nom="exo.nom" size="md" />
                 <span class="exo-nom">{{ exo.nom }}</span>
                 <label class="optionnel-check">
                   <input type="checkbox" v-model="exo.optionnel" @change="toggleOptionnel(exo)" />
