@@ -660,6 +660,10 @@ import MesStats from '../components/athlete/MesStats.vue'
 import PopupBanniere from '../components/athlete/PopupBanniere.vue'
 import ExerciceImage from '../components/ExerciceImage.vue'
 
+// Distance horizontale minimale pour valider un swipe. Volontairement haute :
+// un doigt qui ripe sur un simple appui ne doit jamais changer d'écran.
+const SEUIL_SWIPE = 80
+
 export default {
   components: { AppLayout, CourbeProgression, MesStats, PopupBanniere, ExerciceImage },
   setup() {
@@ -882,11 +886,11 @@ export default {
       const dx = e.clientX - saisieSwipeState.startX
       const dy = e.clientY - saisieSwipeState.startY
       if (Math.abs(dy) > Math.abs(dx) + 10) return
-      if (dx >= 60) {
+      if (dx >= SEUIL_SWIPE) {
         if (saisieVue.value === 'progression') saisieVue.value = 'saisie'
         else if (saisieVue.value === 'saisie') { saisieVue.value = 'historique'; historiqueIndex.value = 0 }
         else if (historiqueIndex.value < nbTentativesGroupe.value - 1) historiqueIndex.value += 1
-      } else if (dx <= -60) {
+      } else if (dx <= -SEUIL_SWIPE) {
         if (saisieVue.value === 'historique') {
           if (historiqueIndex.value > 0) historiqueIndex.value -= 1
           else saisieVue.value = 'saisie'
@@ -1531,8 +1535,8 @@ export default {
       const dy = e.clientY - tabSwipeState.startY
       if (Math.abs(dy) > Math.abs(dx) + 10) return
       const idx = ONGLETS.indexOf(onglet.value)
-      if (dx <= -60 && idx < ONGLETS.length - 1) onglet.value = ONGLETS[idx + 1]
-      else if (dx >= 60 && idx > 0) onglet.value = ONGLETS[idx - 1]
+      if (dx <= -SEUIL_SWIPE && idx < ONGLETS.length - 1) onglet.value = ONGLETS[idx + 1]
+      else if (dx >= SEUIL_SWIPE && idx > 0) onglet.value = ONGLETS[idx - 1]
     }
     // iOS annule le pointeur dès que le navigateur prend la main (début de
     // scroll, appui long, zoom) et dispatche pointercancel sans coordonnées

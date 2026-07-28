@@ -441,6 +441,10 @@ import TestsPanel from '../components/prepa/TestsPanel.vue'
 import ExerciceAutocomplete from '../components/prepa/ExerciceAutocomplete.vue'
 import ExerciceImage from '../components/ExerciceImage.vue'
 
+// Distance horizontale minimale pour valider un swipe. Volontairement haute :
+// un doigt qui ripe sur un simple appui ne doit jamais changer d'onglet.
+const SEUIL_SWIPE = 80
+
 export default {
   components: { AppLayout, ProgrammeForm, AssignerAthleteModal, AthletesPanel, TestsPanel, ExerciceAutocomplete, ExerciceImage },
   setup() {
@@ -497,8 +501,8 @@ export default {
       const dy = e.clientY - tabSwipeState.startY
       if (Math.abs(dy) > Math.abs(dx) + 10) return
       const idx = ONGLETS_PREPA.indexOf(onglet.value)
-      if (dx <= -60 && idx < ONGLETS_PREPA.length - 1) onglet.value = ONGLETS_PREPA[idx + 1]
-      else if (dx >= 60 && idx > 0) onglet.value = ONGLETS_PREPA[idx - 1]
+      if (dx <= -SEUIL_SWIPE && idx < ONGLETS_PREPA.length - 1) onglet.value = ONGLETS_PREPA[idx + 1]
+      else if (dx >= SEUIL_SWIPE && idx > 0) onglet.value = ONGLETS_PREPA[idx - 1]
     }
 
     const labelType = (t) => {
