@@ -175,11 +175,15 @@ export default {
 }
 .autocomplete-item:hover { background: var(--color-bg-secondary); }
 .autocomplete-item img {
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   border-radius: var(--radius-sm);
-  object-fit: cover;
-  background: var(--color-bg-tertiary);
+  /* même traitement que la vignette ExerciceImage : plaque blanche (traits
+     noirs sur fond transparent, invisibles en mode sombre) et pas de
+     recadrage (formats de 400x192 à 185x400) */
+  object-fit: contain;
+  background: #fff;
+  border: 1px solid var(--color-border);
   flex-shrink: 0;
 }
 .autocomplete-item span { flex: 1; }

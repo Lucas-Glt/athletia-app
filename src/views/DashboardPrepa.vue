@@ -203,6 +203,7 @@
                         <div class="exo-head">
                           <span class="exo-letter" v-if="groupe.exercices.length > 1">{{ letterFor(eidx) }}</span>
                           <span class="exo-num" v-else>{{ exo.ordre }}</span>
+                          <ExerciceImage :src="exo.image_url" :nom="exo.nom" size="md" />
                           <ExerciceAutocomplete
                             v-if="editMode"
                             v-model="exo.nom"
@@ -438,9 +439,10 @@ import AssignerAthleteModal from '../components/prepa/AssignerAthleteModal.vue'
 import AthletesPanel from '../components/prepa/AthletesPanel.vue'
 import TestsPanel from '../components/prepa/TestsPanel.vue'
 import ExerciceAutocomplete from '../components/prepa/ExerciceAutocomplete.vue'
+import ExerciceImage from '../components/ExerciceImage.vue'
 
 export default {
-  components: { AppLayout, ProgrammeForm, AssignerAthleteModal, AthletesPanel, TestsPanel, ExerciceAutocomplete },
+  components: { AppLayout, ProgrammeForm, AssignerAthleteModal, AthletesPanel, TestsPanel, ExerciceAutocomplete, ExerciceImage },
   setup() {
     const programmes = ref([])
     const programmeActif = ref(null)
@@ -806,13 +808,16 @@ export default {
     })
 
     const mettreAJourExercice = async (exo) => {
-      await api.patch(`/exercices/${exo.id}`, {
+      const data = await api.patch(`/exercices/${exo.id}`, {
         nom: exo.nom,
         ordre: exo.ordre,
         groupe: exo.groupe || null,
         optionnel: exo.optionnel || false,
         catalogue_id: exo.catalogue_id
       })
+      // la vignette suit immédiatement le choix dans le catalogue (ou son
+      // retrait quand le nom est retapé à la main), sans recharger les séances
+      exo.image_url = data.image_url
     }
 
     const onFocusSeanceChamp = (seance) => {

@@ -658,7 +658,7 @@ import AppLayout from '../components/AppLayout.vue'
 import CourbeProgression from '../components/athlete/CourbeProgression.vue'
 import MesStats from '../components/athlete/MesStats.vue'
 import PopupBanniere from '../components/athlete/PopupBanniere.vue'
-import ExerciceImage from '../components/athlete/ExerciceImage.vue'
+import ExerciceImage from '../components/ExerciceImage.vue'
 
 export default {
   components: { AppLayout, CourbeProgression, MesStats, PopupBanniere, ExerciceImage },

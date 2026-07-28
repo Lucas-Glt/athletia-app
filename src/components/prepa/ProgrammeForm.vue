@@ -58,6 +58,7 @@
               <div class="exo-head">
                 <span class="exo-letter" v-if="groupe.exercices.length > 1">{{ letterFor(eidx) }}</span>
                 <span class="exo-num" v-else>{{ exo.ordre }}</span>
+                <ExerciceImage :src="exo.image_url" :nom="exo.nom" size="md" />
                 <span class="exo-nom">{{ exo.nom }}</span>
                 <label class="optionnel-check">
                   <input type="checkbox" v-model="exo.optionnel" @change="toggleOptionnel(exo)" />
@@ -205,9 +206,10 @@
 import { ref } from 'vue'
 import { useApi } from '../../services/api'
 import ExerciceAutocomplete from './ExerciceAutocomplete.vue'
+import ExerciceImage from '../ExerciceImage.vue'
 
 export default {
-  components: { ExerciceAutocomplete },
+  components: { ExerciceAutocomplete, ExerciceImage },
   emits: ['termine'],
   setup(_, { emit }) {
     const api = useApi()
