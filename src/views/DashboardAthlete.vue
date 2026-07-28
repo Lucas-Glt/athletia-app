@@ -125,6 +125,7 @@
                       class="exo-nom-inline"
                       :class="{ 'is-optionnel': exo.optionnel }"
                     >
+                      <ExerciceImage :src="exo.image_url" :nom="exo.nom" size="md" />
                       <span class="exo-letter" v-if="groupe.exercices.length > 1">{{ letterFor(eidx) }}</span>
                       {{ exo.nom }}
                       <span v-if="exo.optionnel" class="optionnel-badge">optionnelle</span>
@@ -193,6 +194,11 @@
                 <div class="saisie-titres">
                   <div class="saisie-noms">
                     <span v-for="(exo, eidx) in groupe.exercices" :key="exo.id" class="saisie-nom">
+                      <ExerciceImage
+                        :src="exo.image_url"
+                        :nom="exo.nom"
+                        :size="groupe.exercices.length > 1 ? 'md' : 'lg'"
+                      />
                       <span class="exo-letter-mini" v-if="groupe.exercices.length > 1">{{ letterFor(eidx) }}</span>
                       {{ exo.nom }}
                       <button
@@ -652,9 +658,10 @@ import AppLayout from '../components/AppLayout.vue'
 import CourbeProgression from '../components/athlete/CourbeProgression.vue'
 import MesStats from '../components/athlete/MesStats.vue'
 import PopupBanniere from '../components/athlete/PopupBanniere.vue'
+import ExerciceImage from '../components/athlete/ExerciceImage.vue'
 
 export default {
-  components: { AppLayout, CourbeProgression, MesStats, PopupBanniere },
+  components: { AppLayout, CourbeProgression, MesStats, PopupBanniere, ExerciceImage },
   setup() {
     const programmes = ref([])
     const programmeActif = ref(null)
@@ -1707,7 +1714,7 @@ export default {
 .exo-group-head .exo-noms-list { flex: 1; }
 .groupe-check { color: var(--color-valid-text); font-size: 24px; flex-shrink: 0; }
 
-.exo-noms-list { display: flex; flex-direction: column; gap: 6px; }
+.exo-noms-list { display: flex; flex-direction: column; gap: var(--spacing-sm); }
 .exo-nom-inline {
   display: flex;
   align-items: center;

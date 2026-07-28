@@ -46,6 +46,19 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         runtimeCaching: [
           {
+            // Illustrations d'exercices : un fichier = une entrée du catalogue,
+            // jamais modifié. Doit passer AVANT la règle /api (première règle
+            // qui matche gagne), sinon le NetworkFirst en no-store les
+            // retélécharge à chaque affichage de la feuille de séance.
+            urlPattern: /^https:\/\/athletia\.espacenum\.fr\/api\/static\/exercices\/.*/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'exercices-images',
+              cacheableResponse: { statuses: [0, 200] },
+              expiration: { maxEntries: 300, maxAgeSeconds: 60 * 60 * 24 * 90 }
+            }
+          },
+          {
             urlPattern: /^https:\/\/athletia\.espacenum\.fr\/api\/.*/i,
             handler: 'NetworkFirst',
             options: {
