@@ -18,7 +18,7 @@
           class="autocomplete-item"
           @mousedown.prevent="choisir(r)"
         >
-          <img :src="urlImage(r.image_url)" :alt="r.nom" loading="lazy" />
+          <img :src="urlImage(r.image_url)" :alt="r.nom" loading="lazy" @error="onErreurImage($event, r)" />
           <span>{{ r.nom }}</span>
         </button>
       </div>
@@ -122,9 +122,16 @@ export default {
       ouvert.value = false
     }
 
-    const urlImage = (path) => `${BASE_URL}${path}`
+    // Même règle que la vignette ExerciceImage : les GIF animés du catalogue
+    // sont affichés figés via le poster écrit à l'import, et on retombe sur le
+    // GIF si ce poster manque.
+    const urlImage = (path) => `${BASE_URL}${path}`.replace(/\.gif$/i, '_poster.png')
+    const onErreurImage = (e, item) => {
+      const brut = `${BASE_URL}${item.image_url}`
+      if (e.target.src !== brut) e.target.src = brut
+    }
 
-    return { resultats, ouvert, inputRef, dropdownStyle, onInput, onFocus, onBlur, choisir, urlImage }
+    return { resultats, ouvert, inputRef, dropdownStyle, onInput, onFocus, onBlur, choisir, urlImage, onErreurImage }
   }
 }
 </script>

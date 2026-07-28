@@ -7,7 +7,7 @@
     :aria-label="`Agrandir l'illustration : ${nom}`"
     @click="ouvrir"
   >
-    <img :src="url" :alt="nom" loading="lazy" decoding="async" @error="erreur = true" />
+    <img :src="urlVignette" :alt="nom" loading="lazy" decoding="async" @error="onErreurVignette" />
     <i class="ti ti-zoom-in exo-img-loupe"></i>
   </button>
 
@@ -46,7 +46,24 @@ export default {
   setup(props) {
     const ouvert = ref(false)
     const erreur = ref(false)
+    const posterKo = ref(false)
     const url = computed(() => (props.src ? `${BASE_URL}${props.src}` : null))
+
+    // Quelques exercices du catalogue sont des GIF animés (jusqu'à 1,6 Mo,
+    // 100 images) : les animer dans une vignette de 42 px au milieu d'une
+    // liste, pendant une séance, n'apporte rien et coûte cher. L'import écrit
+    // une première image figée `<nom>_poster.png` à côté du GIF — convention
+    // partagée avec scripts/import_wger_catalogue.py. L'animation reste
+    // servie en grand. Poster absent : on retombe sur le GIF plutôt que de
+    // perdre la vignette.
+    const urlVignette = computed(() => {
+      if (!url.value || posterKo.value || !/\.gif$/i.test(url.value)) return url.value
+      return url.value.replace(/\.gif$/i, '_poster.png')
+    })
+    const onErreurVignette = () => {
+      if (urlVignette.value !== url.value) posterKo.value = true
+      else erreur.value = true
+    }
 
     const fermer = () => {
       ouvert.value = false
@@ -65,7 +82,7 @@ export default {
 
     onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 
-    return { ouvert, erreur, url, ouvrir, fermer }
+    return { ouvert, erreur, url, urlVignette, onErreurVignette, ouvrir, fermer }
   }
 }
 </script>
