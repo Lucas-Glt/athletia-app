@@ -1,5 +1,5 @@
 <template>
-  <div class="fiche-athlete" @pointerdown="onSwipeStart" @pointerup="onSwipeEnd" @pointercancel="onSwipeEnd">
+  <div class="fiche-athlete" @pointerdown="onSwipeStart" @pointerup="onSwipeEnd" @pointercancel="onSwipeCancel">
     <div class="fiche-topbar">
       <button class="btn btn-sm retour-fiche" @click="$emit('fermer')">
         <i class="ti ti-arrow-left"></i> Retour
@@ -421,20 +421,30 @@ export default {
     // Swipe gauche/droite pour changer d'onglet, même logique que le swipe
     // de tabs du dashboard athlète (détection au relâché uniquement, pour
     // ne jamais interférer avec le scroll vertical ou les clics).
-    const swipeState = { startX: 0, startY: 0, active: false }
+    const swipeState = { startX: 0, startY: 0, pointerId: null }
     // Coupe la propagation : la fiche a la priorité sur le swipe de tabs du
     // dashboard prépa (Athlètes/Programmes/Tests) quand elle est ouverte.
     const onSwipeStart = (e) => {
       e.stopPropagation()
       if (e.pointerType === 'mouse' && e.button !== 0) return
+      // un second doigt ne doit pas redéfinir l'origine du geste en cours
+      if (!e.isPrimary) return
       swipeState.startX = e.clientX
       swipeState.startY = e.clientY
-      swipeState.active = true
+      swipeState.pointerId = e.pointerId
+    }
+    // iOS annule le pointeur dès que le navigateur prend la main (début de
+    // scroll, appui long, zoom) et dispatche pointercancel sans coordonnées
+    // utilisables : depuis (0, 0), dx vaut -startX, soit un changement
+    // d'onglet déclenché par un simple appui.
+    const onSwipeCancel = (e) => {
+      e.stopPropagation()
+      swipeState.pointerId = null
     }
     const onSwipeEnd = (e) => {
       e.stopPropagation()
-      if (!swipeState.active) return
-      swipeState.active = false
+      if (swipeState.pointerId !== e.pointerId) return
+      swipeState.pointerId = null
       const dx = e.clientX - swipeState.startX
       const dy = e.clientY - swipeState.startY
       if (Math.abs(dy) > Math.abs(dx) + 10) return
@@ -454,7 +464,7 @@ export default {
       grouperExosSession, letterFor,
       formatDate, getStatutClasse, getStatutIcon,
       loadingPoids, courbePoids, ouvrirPoids,
-      allerA, onSwipeStart, onSwipeEnd, setTabRef
+      allerA, onSwipeStart, onSwipeEnd, onSwipeCancel, setTabRef
     }
   }
 }

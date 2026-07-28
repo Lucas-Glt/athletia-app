@@ -35,7 +35,7 @@
       @non="popupWellness = false"
     />
 
-    <div class="dashboard-root" @pointerdown="onTabSwipeStart" @pointerup="onTabSwipeEnd" @pointercancel="onTabSwipeEnd">
+    <div class="dashboard-root" @pointerdown="onTabSwipeStart" @pointerup="onTabSwipeEnd" @pointercancel="onTabSwipeCancel">
       <div class="empty-state" v-if="programmes.length === 0">
         <i class="ti ti-calendar-off empty-icon"></i>
         <p>Aucun programme assigné pour le moment.</p>
@@ -226,7 +226,7 @@
                 class="saisie-body"
                 @pointerdown="onSaisieSwipeStart"
                 @pointerup="onSaisieSwipeEnd"
-                @pointercancel="onSaisieSwipeEnd"
+                @pointercancel="onSaisieSwipeCancel"
               >
               <div v-if="saisieVue !== 'saisie'" class="saisie-mode-banner">
                 <span v-if="saisieVue === 'historique'">
@@ -865,16 +865,20 @@ export default {
     // progression complète de l'exercice/superset (gauche).
     // Détection au relâché uniquement (pas de suivi live) pour ne jamais
     // interférer avec le scroll vertical ou les clics sur inputs/boutons.
-    const saisieSwipeState = { startX: 0, startY: 0, active: false }
+    const saisieSwipeState = { startX: 0, startY: 0, pointerId: null }
     const onSaisieSwipeStart = (e) => {
       if (e.pointerType === 'mouse' && e.button !== 0) return
+      if (!e.isPrimary) return
       saisieSwipeState.startX = e.clientX
       saisieSwipeState.startY = e.clientY
-      saisieSwipeState.active = true
+      saisieSwipeState.pointerId = e.pointerId
     }
+    // cf. onTabSwipeCancel : un pointercancel iOS ne doit jamais être lu
+    // comme une fin de geste
+    const onSaisieSwipeCancel = () => { saisieSwipeState.pointerId = null }
     const onSaisieSwipeEnd = (e) => {
-      if (!saisieSwipeState.active) return
-      saisieSwipeState.active = false
+      if (saisieSwipeState.pointerId !== e.pointerId) return
+      saisieSwipeState.pointerId = null
       const dx = e.clientX - saisieSwipeState.startX
       const dy = e.clientY - saisieSwipeState.startY
       if (Math.abs(dy) > Math.abs(dx) + 10) return
@@ -1510,16 +1514,19 @@ export default {
     // tout le contenu du dashboard. Le panneau de saisie a son propre swipe
     // interne qui stoppe la propagation, donc les deux ne se marchent pas dessus.
     const ONGLETS = ['mes-stats', 'programme', 'performances', 'poids']
-    const tabSwipeState = { startX: 0, startY: 0, active: false }
+    const tabSwipeState = { startX: 0, startY: 0, pointerId: null }
     const onTabSwipeStart = (e) => {
       if (e.pointerType === 'mouse' && e.button !== 0) return
+      // un second doigt (pinch, paume posée sur l'écran) ne doit pas redéfinir
+      // l'origine du geste en cours : son relâché produirait un dx énorme
+      if (!e.isPrimary) return
       tabSwipeState.startX = e.clientX
       tabSwipeState.startY = e.clientY
-      tabSwipeState.active = true
+      tabSwipeState.pointerId = e.pointerId
     }
     const onTabSwipeEnd = (e) => {
-      if (!tabSwipeState.active) return
-      tabSwipeState.active = false
+      if (tabSwipeState.pointerId !== e.pointerId) return
+      tabSwipeState.pointerId = null
       const dx = e.clientX - tabSwipeState.startX
       const dy = e.clientY - tabSwipeState.startY
       if (Math.abs(dy) > Math.abs(dx) + 10) return
@@ -1527,6 +1534,13 @@ export default {
       if (dx <= -60 && idx < ONGLETS.length - 1) onglet.value = ONGLETS[idx + 1]
       else if (dx >= 60 && idx > 0) onglet.value = ONGLETS[idx - 1]
     }
+    // iOS annule le pointeur dès que le navigateur prend la main (début de
+    // scroll, appui long, zoom) et dispatche pointercancel sans coordonnées
+    // utilisables. L'évaluer comme une fin de geste transformait un simple
+    // appui en swipe : depuis (0, 0), dx vaut -startX, soit largement plus que
+    // le seuil pour un appui au centre de l'écran. Un pointeur annulé n'est
+    // jamais un geste : on abandonne, sans rien interpréter.
+    const onTabSwipeCancel = () => { tabSwipeState.pointerId = null }
 
     const logout = () => { authStore.logout(); router.push('/') }
     const panelListVisible = ref(false)
@@ -1575,8 +1589,8 @@ export default {
       sauvegarderSerie,
       groupeSaisie, ouvrirSaisie, fermerSaisie, valeursSerie, resumeExo,
       saisieVue, historiqueIndex, nbTentativesGroupe, retourSaisie,
-      onSaisieSwipeStart, onSaisieSwipeEnd,
-      onTabSwipeStart, onTabSwipeEnd,
+      onSaisieSwipeStart, onSaisieSwipeEnd, onSaisieSwipeCancel,
+      onTabSwipeStart, onTabSwipeEnd, onTabSwipeCancel,
       historiqueSeriePourExo, n1SeriePourExo, formatDateCourt, formatDateNumerique, diffVsHistorique,
       champsGraphique, courbeExo,
       performances, toggleSuivi, toggleSuiviPerformance, dateTentativeGroupe,

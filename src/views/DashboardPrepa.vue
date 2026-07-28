@@ -18,7 +18,7 @@
       </button>
     </template>
 
-    <div class="dashboard-root" @pointerdown="onTabSwipeStart" @pointerup="onTabSwipeEnd" @pointercancel="onTabSwipeEnd">
+    <div class="dashboard-root" @pointerdown="onTabSwipeStart" @pointerup="onTabSwipeEnd" @pointercancel="onTabSwipeCancel">
       <AssignerAthleteModal
         v-if="modalAssigner"
         :programme="programmeActif"
@@ -476,16 +476,23 @@ export default {
     // ses propres pointerdown/pointerup, son swipe interne (Aperçu/
     // Programme/Séances/Poids) est alors prioritaire.
     const ONGLETS_PREPA = ['athletes', 'programmes', 'tests']
-    const tabSwipeState = { startX: 0, startY: 0, active: false }
+    const tabSwipeState = { startX: 0, startY: 0, pointerId: null }
     const onTabSwipeStart = (e) => {
       if (e.pointerType === 'mouse' && e.button !== 0) return
+      // un second doigt ne doit pas redéfinir l'origine du geste en cours
+      if (!e.isPrimary) return
       tabSwipeState.startX = e.clientX
       tabSwipeState.startY = e.clientY
-      tabSwipeState.active = true
+      tabSwipeState.pointerId = e.pointerId
     }
+    // iOS annule le pointeur dès que le navigateur prend la main (début de
+    // scroll, appui long, zoom) et dispatche pointercancel sans coordonnées
+    // utilisables : depuis (0, 0), dx vaut -startX, soit un swipe d'onglet
+    // déclenché par un simple appui. Un pointeur annulé n'est pas un geste.
+    const onTabSwipeCancel = () => { tabSwipeState.pointerId = null }
     const onTabSwipeEnd = (e) => {
-      if (!tabSwipeState.active) return
-      tabSwipeState.active = false
+      if (tabSwipeState.pointerId !== e.pointerId) return
+      tabSwipeState.pointerId = null
       const dx = e.clientX - tabSwipeState.startX
       const dy = e.clientY - tabSwipeState.startY
       if (Math.abs(dy) > Math.abs(dx) + 10) return
@@ -866,7 +873,7 @@ export default {
     return {
       programmes, programmeActif, seances, monCercle, groupes,
       loadingSeances, modalAssigner, vue, onglet, vueLabel,
-      onTabSwipeStart, onTabSwipeEnd,
+      onTabSwipeStart, onTabSwipeEnd, onTabSwipeCancel,
       editMode, editNom, editDesc,
       nouvelleSeance, jours, labelType, letterFor, grouperExercices,
       semaineActive, semainesDisponibles, seancesFiltrees,
