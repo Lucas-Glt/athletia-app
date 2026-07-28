@@ -30,7 +30,7 @@
         <i class="ti ti-check"></i> Enregistrer
       </button>
       <p v-if="erreurRessenti" class="stat-card-erreur">{{ erreurRessenti }}</p>
-      <p class="stat-card-note">Modifiable pendant une heure après la séance.</p>
+      <p class="stat-card-note">{{ noteRessenti }}</p>
     </div>
 
     <!-- Wellness du jour -->
@@ -258,6 +258,14 @@ export default {
       await fetchStats().catch(e => console.error('Erreur rechargement stats:', e))
     }
 
+    // Deux délais distincts côté API : 24 h pour donner un ressenti jamais
+    // renseigné, 1 h pour corriger celui qu'on vient de donner.
+    const noteRessenti = computed(() =>
+      ressenti.value?.rpe == null
+        ? 'À compléter dans les 24 h qui suivent la séance.'
+        : 'Modifiable pendant une heure après la séance.'
+    )
+
     const wellnessComplet = computed(() => Object.values(wellnessForm.value).every(v => v !== null))
 
     const envoyerWellness = async () => {
@@ -344,7 +352,7 @@ export default {
     })
 
     return {
-      stats, ressenti, rpeForm, dureeForm, labelRpe, envoyerRessenti,
+      stats, ressenti, rpeForm, dureeForm, labelRpe, envoyerRessenti, noteRessenti,
       wellnessFait, wellnessForm, itemsWellness, wellnessComplet, envoyerWellness,
       erreurRessenti, erreurWellness,
       performances, exerciceChoisiId, exerciceChoisi, courbeExerciceChoisi,
