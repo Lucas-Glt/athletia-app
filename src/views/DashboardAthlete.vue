@@ -15,8 +15,20 @@
       </div>
     </template>
 
+    <!-- Une seule bannière à la fois : elles sont toutes fixées en bas
+         d'écran et se superposeraient -->
     <PopupBanniere
-      v-if="popupRessenti"
+      v-if="brouillonPropose"
+      icone="ti-player-play"
+      titre="Reprendre la séance là où vous l'avez quittée ?"
+      :sous-titre="sousTitreBrouillon"
+      texte-oui="Reprendre"
+      texte-non="Abandonner"
+      @oui="reprendreBrouillon"
+      @non="abandonnerBrouillon"
+    />
+    <PopupBanniere
+      v-else-if="popupRessenti"
       icone="ti-mood-smile"
       titre="Noter son ressenti de séance ?"
       texte-oui="Oui"
@@ -25,7 +37,7 @@
       @non="popupRessenti = false"
     />
     <PopupBanniere
-      v-if="popupWellness"
+      v-else-if="popupWellness"
       icone="ti-heart-rate-monitor"
       titre="Remplir mon wellness du jour ?"
       sous-titre="4 questions, moins de 20 secondes"
@@ -657,6 +669,9 @@
 <script>
 import { ref, computed, onMounted, watch } from 'vue'
 import { useApi } from '../services/api'
+// utilisé uniquement pour cloisonner le brouillon de saisie par athlète
+// (téléphone partagé, changement de compte)
+import { useAuthStore } from '../stores/auth'
 import AppLayout from '../components/AppLayout.vue'
 import CourbeProgression from '../components/athlete/CourbeProgression.vue'
 import MesStats from '../components/athlete/MesStats.vue'
@@ -672,6 +687,15 @@ const SEUIL_SWIPE = 80
 // une exception et l'écran ne s'ouvrait pas du tout.
 const nouvelIdSession = () =>
   crypto.randomUUID?.() ?? `s-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+
+// Brouillon de séance : ce qui est tapé pendant une séance ne part au serveur
+// qu'au moment de « Valider la séance ». Fermer l'app avant — ou une mise à
+// jour du service worker — faisait tout perdre. On garde donc la saisie en
+// cours en local et on propose de la reprendre au lancement suivant.
+const CLE_BROUILLON = 'athletia:seance-en-cours'
+// Au-delà, une séance interrompue n'a plus de sens à reprendre : le brouillon
+// est ignoré puis effacé plutôt que de proposer une reprise vieille d'une semaine.
+const DUREE_BROUILLON_MS = 48 * 60 * 60 * 1000
 
 export default {
   components: { AppLayout, CourbeProgression, MesStats, PopupBanniere, ExerciceImage },
@@ -709,6 +733,71 @@ export default {
       if (quoi === 'wellness') focusWellness.value = false
     }
     const api = useApi()
+    const authStore = useAuthStore()
+
+    // --- Brouillon de saisie (local, jamais envoyé au serveur) ---
+    // Proposition de reprise affichée au lancement, null sinon.
+    const brouillonPropose = ref(null)
+
+    const effacerBrouillon = () => {
+      try {
+        localStorage.removeItem(CLE_BROUILLON)
+      } catch (e) {
+        console.error('Erreur effacement brouillon:', e)
+      }
+    }
+
+    const lireBrouillon = () => {
+      try {
+        const brut = localStorage.getItem(CLE_BROUILLON)
+        if (!brut) return null
+        const brouillon = JSON.parse(brut)
+        // brouillon d'un autre compte (téléphone partagé) ou trop ancien
+        if (brouillon?.userId !== (authStore.user?.id ?? null)) return null
+        if (!brouillon.horodatage || Date.now() - brouillon.horodatage > DUREE_BROUILLON_MS) {
+          effacerBrouillon()
+          return null
+        }
+        return brouillon
+      } catch {
+        effacerBrouillon()
+        return null
+      }
+    }
+
+    // getLogs() crée une entrée vide au simple affichage d'une série : sans ce
+    // filtre, ouvrir une séance suffirait à créer un brouillon et à proposer
+    // de « reprendre » une saisie où rien n'a été tapé.
+    const saisieNonVide = (parExercice) =>
+      Object.values(parExercice || {}).some(series =>
+        Object.values(series || {}).some(l => l.fait || l.reps_realisees || l.poids_realise)
+      )
+
+    // Début de la saisie en cours : conservé d'une sauvegarde à l'autre pour
+    // que la bannière annonce l'heure de début réelle, pas celle de la
+    // dernière frappe ni celle de la reprise.
+    const debutSaisie = ref(null)
+
+    const enregistrerBrouillon = () => {
+      if (!seanceActive.value || !programmeActif.value) return
+      if (!saisieNonVide(logs.value)) return
+      if (!debutSaisie.value) debutSaisie.value = Date.now()
+      try {
+        localStorage.setItem(CLE_BROUILLON, JSON.stringify({
+          userId: authStore.user?.id ?? null,
+          programmeId: programmeActif.value.id,
+          seanceId: seanceActive.value.id,
+          seanceNom: seanceActive.value.nom,
+          sessionSaisieId: sessionSaisieId.value,
+          logs: logs.value,
+          horodatage: debutSaisie.value
+        }))
+      } catch (e) {
+        // quota dépassé ou stockage refusé (navigation privée) : la saisie
+        // continue normalement, elle ne sera juste pas rattrapable
+        console.error('Erreur sauvegarde brouillon:', e)
+      }
+    }
 
     const labelType = (t) => {
       const map = { musculation: 'Musculation', natation: 'Natation', athletisme: 'Athlétisme', pliometrie: 'Pliométrie' }
@@ -1230,6 +1319,8 @@ export default {
         return
       }
       if (programmes.value.length > 0) await selectProgramme(programmes.value[0])
+      // une fois les séances chargées : la reprise a besoin de les retrouver
+      proposerReprise()
     }
 
     const selectProgramme = async (p) => {
@@ -1255,6 +1346,62 @@ export default {
       fetchHistorique()
     }
 
+    // Reprise proposée au lancement : la séance est rouverte telle qu'elle
+    // était, avec le même identifiant de tentative — l'historique verra donc
+    // une seule séance, pas deux moitiés.
+    const reprendreBrouillon = async () => {
+      const brouillon = brouillonPropose.value
+      brouillonPropose.value = null
+      if (!brouillon) return
+
+      if (programmeActif.value?.id !== brouillon.programmeId) {
+        const programme = programmes.value.find(p => p.id === brouillon.programmeId)
+        if (!programme) { effacerBrouillon(); return }
+        await selectProgramme(programme)
+      }
+
+      // séance supprimée ou remaniée par le prépa entre-temps : rien à reprendre
+      const seance = seances.value.find(s => s.id === brouillon.seanceId)
+      if (!seance) { effacerBrouillon(); return }
+
+      // posé avant demarrerSeance, qui repartirait d'une saisie vierge s'il
+      // voyait une séance différente de celle en cours
+      seanceEnCoursId.value = seance.id
+      sessionSaisieId.value = brouillon.sessionSaisieId
+      debutSaisie.value = brouillon.horodatage
+      logs.value = brouillon.logs || {}
+      onglet.value = 'programme'
+      demarrerSeance(seance)
+    }
+
+    const abandonnerBrouillon = () => {
+      brouillonPropose.value = null
+      effacerBrouillon()
+      logs.value = {}
+      seanceEnCoursId.value = null
+      sessionSaisieId.value = null
+      debutSaisie.value = null
+    }
+
+    // « Push Lundi · commencée hier à 18:32 »
+    const sousTitreBrouillon = computed(() => {
+      const brouillon = brouillonPropose.value
+      if (!brouillon) return ''
+      const debut = new Date(brouillon.horodatage)
+      const hier = new Date()
+      hier.setDate(hier.getDate() - 1)
+      let jour = formatDateCourt(debut)
+      if (debut.toDateString() === new Date().toDateString()) jour = "aujourd'hui"
+      else if (debut.toDateString() === hier.toDateString()) jour = 'hier'
+      const heure = debut.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+      return `${brouillon.seanceNom} · commencée ${jour} à ${heure}`
+    })
+
+    const proposerReprise = () => {
+      const brouillon = lireBrouillon()
+      if (brouillon) brouillonPropose.value = brouillon
+    }
+
     const demarrerSeance = (seance) => {
       seanceActive.value = seance
 
@@ -1268,6 +1415,7 @@ export default {
         sessionSaisieId.value = nouvelIdSession()
         logs.value = {}
         seanceEnCoursId.value = seance.id
+        debutSaisie.value = null
       }
 
       // Recharge l'historique à chaque (re)démarrage : sinon il reste figé
@@ -1303,6 +1451,9 @@ export default {
       seancesCompletees.value.add(seanceActive.value.id)
       seanceEnCoursId.value = null
       logs.value = {}
+      // la saisie est partie au serveur : le brouillon n'a plus lieu d'être
+      effacerBrouillon()
+      debutSaisie.value = null
       seanceActive.value = null
       popupRessenti.value = true
       // seancesAffichees recalcule alors automatiquement : ce créneau montrera
@@ -1479,6 +1630,10 @@ export default {
       }
     }
 
+    // Sauvegarde à chaque frappe : c'est la seule copie de la saisie tant que
+    // la séance n'est pas validée.
+    watch(logs, enregistrerBrouillon, { deep: true })
+
     watch(onglet, (v) => {
       if (v === 'performances') fetchPerformances()
       if (v === 'poids') chargerPoids()
@@ -1566,7 +1721,8 @@ export default {
       labelMois, joursGrille, courbePoids, moisPrecedent, moisSuivant, formatDateLongue,
       ouvrirSaisiePoids, fermerSaisiePoids, enregistrerPoids, supprimerPoids,
       popupRessenti, popupWellness, focusRessenti, focusWellness,
-      repondreRessenti, repondreWellness, onFocusConsomme
+      repondreRessenti, repondreWellness, onFocusConsomme,
+      brouillonPropose, sousTitreBrouillon, reprendreBrouillon, abandonnerBrouillon
     }
   }
 }
