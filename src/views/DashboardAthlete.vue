@@ -79,197 +79,26 @@
               <p v-if="programmeActif.description">{{ programmeActif.description }}</p>
             </div>
 
-            <!-- Sous-vues du programme : les séances à faire, l'historique de
-                 tout ce qui a été saisi, les courbes par exercice -->
-            <div class="prog-switcher" @pointerdown.stop>
-              <button
-                v-for="v in VUES_PROGRAMME"
-                :key="v.cle"
-                class="prog-chip"
-                :class="{ active: vueProgramme === v.cle }"
-                @click="ouvrirVueProgramme(v.cle)"
-              >
-                <i class="ti" :class="v.icone"></i> {{ v.label }}
-              </button>
-            </div>
-
             <div v-if="loadingSeances" class="empty">Chargement...</div>
 
-            <!-- SOUS-VUE SÉANCES -->
-            <template v-else-if="vueProgramme === 'seances'">
-              <button
-                v-for="seance in seancesAffichees"
-                :key="seance.id"
-                class="seance-card"
-                @click="demarrerSeance(seance)"
-              >
-                <div class="seance-card-main">
-                  <div class="seance-card-titre">{{ seance.nom }}</div>
-                  <div class="seance-card-meta">
-                    <span class="type-badge" :class="`type-badge-${seance.type_seance || 'musculation'}`">
-                      {{ labelType(seance.type_seance) }}
-                    </span>
-                    <span class="badge badge-purple" v-if="seance.jour">{{ seance.jour }}</span>
-                    <span class="seance-card-count">{{ seance.exercices?.length || 0 }} exercices</span>
-                  </div>
-                </div>
-                <i class="ti ti-chevron-right seance-card-chevron"></i>
-              </button>
-            </template>
-
-            <!-- SOUS-VUE HISTORIQUE : une séance passée à la fois, flèches pour
-                 remonter dans le temps, écarts colorés vs la fois précédente -->
-            <template v-else-if="vueProgramme === 'historique'">
-              <div v-if="!tentativeAffichee" class="empty">
-                Aucune séance enregistrée pour l'instant.
-              </div>
-              <template v-else>
-                <div class="histo-nav">
-                  <button
-                    class="btn btn-icon"
-                    :disabled="!tentativeAncienne"
-                    @click="histoPlusAncienne"
-                    aria-label="Séance plus ancienne"
-                  >
-                    <i class="ti ti-chevron-left"></i>
-                  </button>
-                  <div class="histo-nav-info">
-                    <div class="histo-nav-titre">{{ tentativeAffichee.creneau }}</div>
-                    <div class="histo-nav-meta">
-                      <span class="type-badge" :class="`type-badge-${tentativeAffichee.type}`">
-                        {{ labelType(tentativeAffichee.type) }}
-                      </span>
-                      <span class="histo-nav-pager">{{ histoIndex + 1 }}/{{ tentativesProgramme.length }}</span>
-                    </div>
-                  </div>
-                  <button
-                    class="btn btn-icon"
-                    :disabled="!tentativeRecente"
-                    @click="histoPlusRecente"
-                    aria-label="Séance plus récente"
-                  >
-                    <i class="ti ti-chevron-right"></i>
-                  </button>
-                </div>
-
-                <!-- Roulette des dates : la séance consultée au centre, un
-                     aperçu de la précédente et de la suivante de part et
-                     d'autre (cliquables pour y aller directement), petites
-                     flèches, et swipe horizontal pour dérouler. -->
-                <div
-                  class="histo-roulette"
-                  role="group"
-                  aria-label="Dates des séances enregistrées"
-                  @pointerdown.stop="onHistoSwipeStart"
-                  @pointerup="onHistoSwipeEnd"
-                  @pointercancel="onHistoSwipeCancel"
-                >
-                  <button
-                    class="histo-fleche"
-                    :disabled="!tentativeAncienne"
-                    @click="histoPlusAncienne"
-                    aria-label="Séance plus ancienne"
-                  >
-                    <i class="ti ti-chevron-left"></i>
-                  </button>
-
-                  <button
-                    v-if="tentativeAncienne"
-                    class="histo-date-cote"
-                    @click="histoPlusAncienne"
-                    :aria-label="`Voir la séance du ${formatDateLongue(tentativeAncienne.date)}`"
-                  >
-                    {{ formatDateCourt(tentativeAncienne.date) }}
-                  </button>
-                  <span v-else class="histo-date-cote is-vide" aria-hidden="true"></span>
-
-                  <span class="histo-date-slot">
-                    <Transition :name="`roulette-${sensHisto}`">
-                      <span
-                        class="histo-date-active"
-                        :key="tentativeAffichee.cle"
-                        aria-current="date"
-                      >
-                        {{ formatDateNumerique(tentativeAffichee.date) }}
-                      </span>
-                    </Transition>
+            <button
+              v-for="seance in seancesAffichees"
+              :key="seance.id"
+              class="seance-card"
+              @click="demarrerSeance(seance)"
+            >
+              <div class="seance-card-main">
+                <div class="seance-card-titre">{{ seance.nom }}</div>
+                <div class="seance-card-meta">
+                  <span class="type-badge" :class="`type-badge-${seance.type_seance || 'musculation'}`">
+                    {{ labelType(seance.type_seance) }}
                   </span>
-
-                  <button
-                    v-if="tentativeRecente"
-                    class="histo-date-cote"
-                    @click="histoPlusRecente"
-                    :aria-label="`Voir la séance du ${formatDateLongue(tentativeRecente.date)}`"
-                  >
-                    {{ formatDateCourt(tentativeRecente.date) }}
-                  </button>
-                  <span v-else class="histo-date-cote is-vide" aria-hidden="true"></span>
-
-                  <button
-                    class="histo-fleche"
-                    :disabled="!tentativeRecente"
-                    @click="histoPlusRecente"
-                    aria-label="Séance plus récente"
-                  >
-                    <i class="ti ti-chevron-right"></i>
-                  </button>
+                  <span class="badge badge-purple" v-if="seance.jour">{{ seance.jour }}</span>
+                  <span class="seance-card-count">{{ seance.exercices?.length || 0 }} exercices</span>
                 </div>
-
-                <div class="histo-ref">
-                  <template v-if="tentativePrecedente">
-                    <i class="ti ti-git-compare"></i>
-                    Comparé au {{ formatDateNumerique(tentativePrecedente.date) }}
-                  </template>
-                  <template v-else>
-                    <i class="ti ti-info-circle"></i>
-                    Première fois sur cette séance : rien à comparer.
-                  </template>
-                </div>
-
-                <div v-for="exo in tentativeAffichee.exercices" :key="exo.cle" class="histo-exo">
-                  <div class="histo-exo-nom">{{ exo.nom }}</div>
-                  <div
-                    v-for="(log, i) in exo.series"
-                    :key="log.id"
-                    class="histo-serie"
-                    :class="{ 'non-fait': !log.fait }"
-                  >
-                    <span class="histo-serie-label">S{{ i + 1 }}</span>
-                    <span v-if="!log.fait" class="histo-nf">Non fait</span>
-                    <template v-else>
-                      <span
-                        v-for="v in valeursHistorique(exo.nom, i, log, tentativeAffichee.type)"
-                        :key="v.champ"
-                        class="histo-val"
-                      >
-                        {{ v.valeur }}<span v-if="v.unite" class="histo-unite">{{ v.unite }}</span>
-                        <span v-if="v.diff" class="histo-diff" :class="v.diff.classe">{{ v.diff.texte }}</span>
-                      </span>
-                    </template>
-                  </div>
-                </div>
-              </template>
-            </template>
-
-            <!-- SOUS-VUE COURBES : une courbe par exercice, moyenne des charges
-                 de toutes ses séries, un point par séance réalisée -->
-            <template v-else>
-              <div class="info-note">
-                <i class="ti ti-info-circle"></i>
-                Moyenne de la charge sur toutes les séries de l'exercice, un point par séance réalisée.
               </div>
-              <div v-if="courbesProgramme.length === 0" class="empty">
-                Pas encore assez de données : il faut au moins deux séances enregistrées.
-              </div>
-              <div v-for="courbe in courbesProgramme" :key="courbe.nom" class="progression-exo-bloc">
-                <CourbeProgression
-                  :points="courbe.points"
-                  :label="courbe.nom"
-                  :unite="courbe.unite"
-                  :axe-x="courbe.points.length > 8 ? 'dates' : 'tentatives'"
-                />
-              </div>
-            </template>
+              <i class="ti ti-chevron-right seance-card-chevron"></i>
+            </button>
           </div>
         </template>
 
@@ -290,7 +119,21 @@
             </div>
           </div>
 
-          <div class="screen feuille">
+          <!-- Onglets de la séance : la feuille de saisie, l'historique de ses
+               tentatives passées, les courbes de ses exercices -->
+          <div class="seance-onglets" @pointerdown.stop>
+            <button
+              v-for="v in VUES_SEANCE"
+              :key="v.cle"
+              class="prog-chip"
+              :class="{ active: vueSeance === v.cle }"
+              @click="ouvrirVueSeance(v.cle)"
+            >
+              <i class="ti" :class="v.icone"></i> {{ v.label }}
+            </button>
+          </div>
+
+          <div class="screen feuille" v-if="vueSeance === 'seance'">
             <div
               v-for="groupe in grouperExercices(seanceActive.exercices)"
               :key="groupe.key"
@@ -359,6 +202,129 @@
                   </div>
                 </template>
               </div>
+            </div>
+          </div>
+
+          <!-- ONGLET HISTORIQUE : une tentative passée de CETTE séance à la
+               fois, choisie dans la roulette de dates, avec l'écart coloré de
+               chaque série par rapport à la fois précédente. -->
+          <div class="screen" v-else-if="vueSeance === 'historique'">
+            <div v-if="!tentativeAffichee" class="empty">
+              Cette séance n'a pas encore été enregistrée.
+            </div>
+            <template v-else>
+              <!-- Roulette des dates : la tentative consultée au centre, un
+                   aperçu de la précédente et de la suivante de part et d'autre
+                   (cliquables), petites flèches, et swipe horizontal. -->
+              <div
+                class="histo-roulette"
+                role="group"
+                aria-label="Dates enregistrées pour cette séance"
+                @pointerdown.stop="onHistoSwipeStart"
+                @pointerup="onHistoSwipeEnd"
+                @pointercancel="onHistoSwipeCancel"
+              >
+                <button
+                  class="histo-fleche"
+                  :disabled="!tentativeAncienne"
+                  @click="histoPlusAncienne"
+                  aria-label="Date plus ancienne"
+                >
+                  <i class="ti ti-chevron-left"></i>
+                </button>
+
+                <button
+                  v-if="tentativeAncienne"
+                  class="histo-date-cote"
+                  @click="histoPlusAncienne"
+                  :aria-label="`Voir le ${formatDateLongue(tentativeAncienne.date)}`"
+                >
+                  {{ formatDateCourt(tentativeAncienne.date) }}
+                </button>
+                <span v-else class="histo-date-cote is-vide" aria-hidden="true"></span>
+
+                <span class="histo-date-slot">
+                  <Transition :name="`roulette-${sensHisto}`">
+                    <span class="histo-date-active" :key="tentativeAffichee.cle" aria-current="date">
+                      {{ formatDateNumerique(tentativeAffichee.date) }}
+                    </span>
+                  </Transition>
+                </span>
+
+                <button
+                  v-if="tentativeRecente"
+                  class="histo-date-cote"
+                  @click="histoPlusRecente"
+                  :aria-label="`Voir le ${formatDateLongue(tentativeRecente.date)}`"
+                >
+                  {{ formatDateCourt(tentativeRecente.date) }}
+                </button>
+                <span v-else class="histo-date-cote is-vide" aria-hidden="true"></span>
+
+                <button
+                  class="histo-fleche"
+                  :disabled="!tentativeRecente"
+                  @click="histoPlusRecente"
+                  aria-label="Date plus récente"
+                >
+                  <i class="ti ti-chevron-right"></i>
+                </button>
+              </div>
+
+              <div class="histo-ref">
+                <span class="histo-pager">{{ histoIndex + 1 }}/{{ tentativesSeance.length }}</span>
+                <template v-if="tentativeAncienne">
+                  <i class="ti ti-git-compare"></i>
+                  Comparé au {{ formatDateNumerique(tentativeAncienne.date) }}
+                </template>
+                <template v-else>
+                  <i class="ti ti-info-circle"></i>
+                  Première fois sur cette séance : rien à comparer.
+                </template>
+              </div>
+
+              <div v-for="exo in tentativeAffichee.exercices" :key="exo.cle" class="histo-exo">
+                <div class="histo-exo-nom">{{ exo.nom }}</div>
+                <div
+                  v-for="(log, i) in exo.series"
+                  :key="log.id"
+                  class="histo-serie"
+                  :class="{ 'non-fait': !log.fait }"
+                >
+                  <span class="histo-serie-label">S{{ i + 1 }}</span>
+                  <span v-if="!log.fait" class="histo-nf">Non fait</span>
+                  <template v-else>
+                    <span
+                      v-for="v in valeursHistorique(exo.nom, i, log, tentativeAffichee.type)"
+                      :key="v.champ"
+                      class="histo-val"
+                    >
+                      {{ v.valeur }}<span v-if="v.unite" class="histo-unite">{{ v.unite }}</span>
+                      <span v-if="v.diff" class="histo-diff" :class="v.diff.classe">{{ v.diff.texte }}</span>
+                    </span>
+                  </template>
+                </div>
+              </div>
+            </template>
+          </div>
+
+          <!-- ONGLET COURBE : un graphe par exercice de la séance, moyenne de
+               la charge sur toutes ses séries, un point par séance réalisée -->
+          <div class="screen" v-else>
+            <div class="info-note">
+              <i class="ti ti-info-circle"></i>
+              Moyenne de la charge sur toutes les séries de l'exercice, un point par séance réalisée.
+            </div>
+            <div v-if="courbesSeance.length === 0" class="empty">
+              Pas encore assez de données : il faut au moins deux séances enregistrées.
+            </div>
+            <div v-for="courbe in courbesSeance" :key="courbe.nom" class="progression-exo-bloc">
+              <CourbeProgression
+                :points="courbe.points"
+                :label="courbe.nom"
+                :unite="courbe.unite"
+                :axe-x="courbe.points.length > 8 ? 'dates' : 'tentatives'"
+              />
             </div>
           </div>
 
@@ -673,9 +639,11 @@
             </div>
           </div>
 
-          <!-- Barre de validation collante : toujours visible, la séance reste
-               modifiable même après validation (juste un rappel de progression) -->
-          <div class="valider-bar">
+          <!-- Barre de validation collante : visible sur la feuille de séance,
+               la séance reste modifiable même après validation (juste un rappel
+               de progression). Masquée sur l'historique et les courbes, qui ne
+               sont que de la consultation. -->
+          <div class="valider-bar" v-if="vueSeance === 'seance'">
             <div class="valider-progress">
               <div class="valider-progress-track">
                 <div
@@ -859,11 +827,11 @@ const SEUIL_SWIPE = 80
 const nouvelIdSession = () =>
   crypto.randomUUID?.() ?? `s-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
 
-// Sous-vues de l'écran programme (onglet Séances)
-const VUES_PROGRAMME = [
-  { cle: 'seances', label: 'Séances', icone: 'ti-barbell' },
+// Onglets disponibles dans une séance ouverte
+const VUES_SEANCE = [
+  { cle: 'seance', label: 'Séance', icone: 'ti-barbell' },
   { cle: 'historique', label: 'Historique', icone: 'ti-history' },
-  { cle: 'courbes', label: 'Courbes', icone: 'ti-chart-line' }
+  { cle: 'courbe', label: 'Courbe', icone: 'ti-chart-line' }
 ]
 
 // Dimension « charge » de l'effort selon le type de séance : c'est celle qu'on
@@ -1249,16 +1217,16 @@ export default {
     const courbeExo = (exo, champ) =>
       moyennesParTentative(historique.value.filter(l => l.exo_nom === exo.nom), champ)
 
-    // --- Sous-vues du programme : historique complet et courbes par exercice ---
-    const vueProgramme = ref('seances')
-    // Profondeur dans l'historique : 0 = la séance la plus récente.
+    // --- Onglets d'une séance : sa feuille de saisie, son historique, ses courbes ---
+    const vueSeance = ref('seance')
+    // Profondeur dans l'historique de la séance : 0 = la date la plus récente.
     const histoIndex = ref(0)
 
-    const ouvrirVueProgramme = (cle) => {
-      vueProgramme.value = cle
-      if (cle === 'seances') return
-      // L'historique est préchargé au choix du programme mais peut avoir vieilli
-      // (séance validée depuis) : on le rafraîchit à l'ouverture.
+    const ouvrirVueSeance = (cle) => {
+      vueSeance.value = cle
+      if (cle === 'seance') return
+      // L'historique est préchargé à l'ouverture de la séance mais peut avoir
+      // vieilli (séance validée depuis) : on le rafraîchit.
       histoIndex.value = 0
       fetchHistorique()
     }
@@ -1332,13 +1300,21 @@ export default {
         .sort((a, b) => new Date(b.date) - new Date(a.date))
     })
 
-    const tentativeAffichee = computed(() => tentativesProgramme.value[histoIndex.value] || null)
+    // Les tentatives de la séance ouverte uniquement : la roulette fait défiler
+    // les dates de CETTE séance, pas les autres entraînements du programme.
+    const tentativesSeance = computed(() => {
+      const creneau = seanceActive.value?.nom
+      if (!creneau) return []
+      return tentativesProgramme.value.filter(t => t.creneau === creneau)
+    })
+
+    const tentativeAffichee = computed(() => tentativesSeance.value[histoIndex.value] || null)
 
     // Voisins immédiats dans la roulette de dates. La liste est triée du plus
     // récent au plus ancien : remonter dans le temps, c'est avancer d'un index.
-    const tentativeAncienne = computed(() => tentativesProgramme.value[histoIndex.value + 1] || null)
+    const tentativeAncienne = computed(() => tentativesSeance.value[histoIndex.value + 1] || null)
     const tentativeRecente = computed(() =>
-      histoIndex.value > 0 ? tentativesProgramme.value[histoIndex.value - 1] : null
+      histoIndex.value > 0 ? tentativesSeance.value[histoIndex.value - 1] : null
     )
 
     // Sens du dernier déplacement : la date centrale glisse dans cette
@@ -1377,22 +1353,11 @@ export default {
       else if (dx <= -SEUIL_SWIPE) histoPlusRecente()
     }
 
-    // Référence de comparaison : la fois précédente sur le même créneau (n-1),
-    // pas simplement la séance d'avant qui serait souvent un autre entraînement.
-    const tentativePrecedente = computed(() => {
-      const courante = tentativeAffichee.value
-      if (!courante) return null
-      const liste = tentativesProgramme.value
-      for (let i = histoIndex.value + 1; i < liste.length; i++) {
-        if (liste[i].creneau === courante.creneau) return liste[i]
-      }
-      return null
-    })
-
     // Valeurs réalisées d'une série de l'historique, avec l'écart coloré par
-    // rapport à la même série de la fois précédente (vert = mieux, rouge = moins).
+    // rapport à la même série de la fois précédente — soit la date juste à
+    // gauche dans la roulette (vert = mieux, rouge = moins bien).
     const valeursHistorique = (exoNom, serieIdx, log, type) => {
-      const precedent = tentativePrecedente.value?.exercices
+      const precedent = tentativeAncienne.value?.exercices
         .find(e => e.nom === exoNom)?.series[serieIdx]
       return champsRealises(type)
         .filter(c => log[c.champ])
@@ -1404,30 +1369,25 @@ export default {
         }))
     }
 
-    // Une courbe par exercice du programme : moyenne de la charge sur toutes ses
-    // séries, un point par séance réalisée. Regroupé par nom d'exercice pour
-    // qu'un même exercice présent dans plusieurs séances (ou dupliqué d'une
-    // semaine à l'autre) ne donne qu'une seule courbe.
-    const courbesProgramme = computed(() => {
-      const parNom = {}
-      historique.value.forEach(l => {
-        if (!l.exo_nom) return
-        if (!parNom[l.exo_nom]) {
-          parNom[l.exo_nom] = {
-            nom: l.exo_nom,
-            type: typeParSeance.value[l.seance?.id] || 'musculation',
-            logs: []
-          }
-        }
-        parNom[l.exo_nom].logs.push(l)
-      })
-      return Object.values(parNom)
-        .map(e => {
-          const conf = champCharge(e.type)
-          return { nom: e.nom, unite: conf.unite, points: moyennesParTentative(e.logs, conf.champ) }
-        })
+    // Une courbe par exercice de la séance ouverte, dans l'ordre du programme :
+    // moyenne de la charge sur toutes ses séries, un point par séance réalisée.
+    // Les points viennent de tout l'historique de l'exercice (même exercice
+    // dupliqué d'une semaine à l'autre = une seule courbe continue).
+    const courbesSeance = computed(() => {
+      if (!seanceActive.value) return []
+      const conf = champCharge(seanceActive.value.type_seance)
+      const noms = [...new Set(
+        [...(seanceActive.value.exercices || [])]
+          .sort((a, b) => a.ordre - b.ordre)
+          .map(e => e.nom)
+      )]
+      return noms
+        .map(nom => ({
+          nom,
+          unite: conf.unite,
+          points: moyennesParTentative(historique.value.filter(l => l.exo_nom === nom), conf.champ)
+        }))
         .filter(c => c.points.length >= 2)
-        .sort((a, b) => a.nom.localeCompare(b.nom))
     })
 
     // Valeurs prescrites d'une série en une ligne compacte, selon le type de séance
@@ -1709,8 +1669,6 @@ export default {
     const selectProgramme = async (p) => {
       programmeActif.value = p
       seanceActive.value = null
-      // l'historique affiché appartenait à l'autre programme
-      histoIndex.value = 0
       loadingSeances.value = true
       try {
         seances.value = await api.get(`/programmes/${p.id}/seances/`)
@@ -1789,6 +1747,8 @@ export default {
 
     const demarrerSeance = (seance) => {
       seanceActive.value = seance
+      vueSeance.value = 'seance'
+      histoIndex.value = 0
 
       // Ressaisie de la séance déjà en cours (retour à la liste puis
       // réouverture sans avoir validé) : on reprend logs.value tel quel,
@@ -2101,10 +2061,9 @@ export default {
       onTabSwipeStart, onTabSwipeEnd, onTabSwipeCancel,
       historiqueSeriePourExo, n1SeriePourExo, formatDateCourt, formatDateNumerique, diffVsHistorique,
       champsGraphique, courbeExo,
-      VUES_PROGRAMME, vueProgramme, ouvrirVueProgramme,
-      tentativesProgramme, tentativeAffichee, tentativePrecedente,
-      histoIndex, histoPlusAncienne, histoPlusRecente, valeursHistorique, courbesProgramme,
-      tentativeAncienne, tentativeRecente, sensHisto,
+      VUES_SEANCE, vueSeance, ouvrirVueSeance,
+      tentativesSeance, tentativeAffichee, tentativeAncienne, tentativeRecente,
+      histoIndex, histoPlusAncienne, histoPlusRecente, sensHisto, valeursHistorique, courbesSeance,
       onHistoSwipeStart, onHistoSwipeEnd, onHistoSwipeCancel,
       performances, toggleSuivi, toggleSuiviPerformance, dateTentativeGroupe,
       sousOngletPoids, dateSaisiePoids, poidsSaisi, erreurPoids, poidsPourDate, entreeExistante, poidsValide,
@@ -2213,32 +2172,16 @@ export default {
 }
 .info-note .ti { font-size: var(--font-size-lg); flex-shrink: 0; }
 
-/* --- Sous-vue Historique du programme --- */
-.histo-nav {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
+/* --- Onglet Historique d'une séance --- */
+.histo-pager {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  background: var(--color-bg-tertiary);
+  padding: 1px 7px;
+  border-radius: var(--radius-full);
   flex-shrink: 0;
 }
-.histo-nav-info { flex: 1; min-width: 0; text-align: center; }
-.histo-nav-titre {
-  font-size: var(--font-size-base);
-  font-weight: 700;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.histo-nav-meta {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  flex-wrap: wrap;
-  margin-top: 3px;
-  font-size: var(--font-size-xs);
-  color: var(--color-text-secondary);
-}
-.histo-nav-pager { color: var(--color-text-muted); }
 
 /* Roulette des dates : dates voisines estompées, date consultée au centre */
 .histo-roulette {
@@ -2399,6 +2342,25 @@ export default {
   text-overflow: ellipsis;
 }
 .seance-topbar-meta { display: flex; gap: 6px; margin-top: 2px; flex-wrap: wrap; }
+
+/* --- Onglets d'une séance (feuille / historique / courbe) --- */
+.seance-onglets {
+  display: flex;
+  gap: var(--spacing-sm);
+  padding: 6px var(--spacing-lg);
+  background: var(--color-bg);
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+.seance-onglets .prog-chip {
+  flex: 1;
+  min-height: 38px;
+  padding: 0 var(--spacing-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
 
 /* --- Feuille de séance --- */
 .feuille { gap: var(--spacing-lg); padding-bottom: var(--spacing-lg); }
@@ -2867,7 +2829,7 @@ export default {
 @media (min-width: 769px) {
   .screen, .performances-page { padding: var(--spacing-2xl); }
   .valider-bar { padding: var(--spacing-md) var(--spacing-2xl); }
-  .valider-bar, .seance-topbar { padding-left: max(var(--spacing-2xl), calc((100% - 720px) / 2)); padding-right: max(var(--spacing-2xl), calc((100% - 720px) / 2)); }
+  .valider-bar, .seance-topbar, .seance-onglets { padding-left: max(var(--spacing-2xl), calc((100% - 720px) / 2)); padding-right: max(var(--spacing-2xl), calc((100% - 720px) / 2)); }
   .realise-inputs { max-width: 360px; }
 }
 
