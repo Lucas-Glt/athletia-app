@@ -127,7 +127,7 @@
                 <div class="histo-nav">
                   <button
                     class="btn btn-icon"
-                    :disabled="histoIndex >= tentativesProgramme.length - 1"
+                    :disabled="!tentativeAncienne"
                     @click="histoPlusAncienne"
                     aria-label="Séance plus ancienne"
                   >
@@ -139,13 +139,75 @@
                       <span class="type-badge" :class="`type-badge-${tentativeAffichee.type}`">
                         {{ labelType(tentativeAffichee.type) }}
                       </span>
-                      <span>{{ formatDateNumerique(tentativeAffichee.date) }}</span>
                       <span class="histo-nav-pager">{{ histoIndex + 1 }}/{{ tentativesProgramme.length }}</span>
                     </div>
                   </div>
                   <button
                     class="btn btn-icon"
-                    :disabled="histoIndex === 0"
+                    :disabled="!tentativeRecente"
+                    @click="histoPlusRecente"
+                    aria-label="Séance plus récente"
+                  >
+                    <i class="ti ti-chevron-right"></i>
+                  </button>
+                </div>
+
+                <!-- Roulette des dates : la séance consultée au centre, un
+                     aperçu de la précédente et de la suivante de part et
+                     d'autre (cliquables pour y aller directement), petites
+                     flèches, et swipe horizontal pour dérouler. -->
+                <div
+                  class="histo-roulette"
+                  role="group"
+                  aria-label="Dates des séances enregistrées"
+                  @pointerdown.stop="onHistoSwipeStart"
+                  @pointerup="onHistoSwipeEnd"
+                  @pointercancel="onHistoSwipeCancel"
+                >
+                  <button
+                    class="histo-fleche"
+                    :disabled="!tentativeAncienne"
+                    @click="histoPlusAncienne"
+                    aria-label="Séance plus ancienne"
+                  >
+                    <i class="ti ti-chevron-left"></i>
+                  </button>
+
+                  <button
+                    v-if="tentativeAncienne"
+                    class="histo-date-cote"
+                    @click="histoPlusAncienne"
+                    :aria-label="`Voir la séance du ${formatDateLongue(tentativeAncienne.date)}`"
+                  >
+                    {{ formatDateCourt(tentativeAncienne.date) }}
+                  </button>
+                  <span v-else class="histo-date-cote is-vide" aria-hidden="true"></span>
+
+                  <span class="histo-date-slot">
+                    <Transition :name="`roulette-${sensHisto}`">
+                      <span
+                        class="histo-date-active"
+                        :key="tentativeAffichee.cle"
+                        aria-current="date"
+                      >
+                        {{ formatDateNumerique(tentativeAffichee.date) }}
+                      </span>
+                    </Transition>
+                  </span>
+
+                  <button
+                    v-if="tentativeRecente"
+                    class="histo-date-cote"
+                    @click="histoPlusRecente"
+                    :aria-label="`Voir la séance du ${formatDateLongue(tentativeRecente.date)}`"
+                  >
+                    {{ formatDateCourt(tentativeRecente.date) }}
+                  </button>
+                  <span v-else class="histo-date-cote is-vide" aria-hidden="true"></span>
+
+                  <button
+                    class="histo-fleche"
+                    :disabled="!tentativeRecente"
                     @click="histoPlusRecente"
                     aria-label="Séance plus récente"
                   >
@@ -1271,11 +1333,48 @@ export default {
     })
 
     const tentativeAffichee = computed(() => tentativesProgramme.value[histoIndex.value] || null)
+
+    // Voisins immédiats dans la roulette de dates. La liste est triée du plus
+    // récent au plus ancien : remonter dans le temps, c'est avancer d'un index.
+    const tentativeAncienne = computed(() => tentativesProgramme.value[histoIndex.value + 1] || null)
+    const tentativeRecente = computed(() =>
+      histoIndex.value > 0 ? tentativesProgramme.value[histoIndex.value - 1] : null
+    )
+
+    // Sens du dernier déplacement : la date centrale glisse dans cette
+    // direction (cf. transitions .roulette-*).
+    const sensHisto = ref('ancien')
     const histoPlusAncienne = () => {
-      if (histoIndex.value < tentativesProgramme.value.length - 1) histoIndex.value += 1
+      if (!tentativeAncienne.value) return
+      sensHisto.value = 'ancien'
+      histoIndex.value += 1
     }
     const histoPlusRecente = () => {
-      if (histoIndex.value > 0) histoIndex.value -= 1
+      if (!tentativeRecente.value) return
+      sensHisto.value = 'recent'
+      histoIndex.value -= 1
+    }
+
+    // Swipe sur la roulette : vers la droite on remonte dans le temps, comme
+    // si on faisait défiler les dates de gauche à droite. Détection au relâché
+    // seulement, pour ne pas gêner le scroll vertical (cf. onSaisieSwipeEnd).
+    const histoSwipeState = { startX: 0, startY: 0, pointerId: null }
+    const onHistoSwipeStart = (e) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return
+      if (!e.isPrimary) return
+      histoSwipeState.startX = e.clientX
+      histoSwipeState.startY = e.clientY
+      histoSwipeState.pointerId = e.pointerId
+    }
+    const onHistoSwipeCancel = () => { histoSwipeState.pointerId = null }
+    const onHistoSwipeEnd = (e) => {
+      if (histoSwipeState.pointerId !== e.pointerId) return
+      histoSwipeState.pointerId = null
+      const dx = e.clientX - histoSwipeState.startX
+      const dy = e.clientY - histoSwipeState.startY
+      if (Math.abs(dy) > Math.abs(dx) + 10) return
+      if (dx >= SEUIL_SWIPE) histoPlusAncienne()
+      else if (dx <= -SEUIL_SWIPE) histoPlusRecente()
     }
 
     // Référence de comparaison : la fois précédente sur le même créneau (n-1),
@@ -2005,6 +2104,8 @@ export default {
       VUES_PROGRAMME, vueProgramme, ouvrirVueProgramme,
       tentativesProgramme, tentativeAffichee, tentativePrecedente,
       histoIndex, histoPlusAncienne, histoPlusRecente, valeursHistorique, courbesProgramme,
+      tentativeAncienne, tentativeRecente, sensHisto,
+      onHistoSwipeStart, onHistoSwipeEnd, onHistoSwipeCancel,
       performances, toggleSuivi, toggleSuiviPerformance, dateTentativeGroupe,
       sousOngletPoids, dateSaisiePoids, poidsSaisi, erreurPoids, poidsPourDate, entreeExistante, poidsValide,
       labelMois, joursGrille, courbePoids, moisPrecedent, moisSuivant, formatDateLongue,
@@ -2138,6 +2239,91 @@ export default {
   color: var(--color-text-secondary);
 }
 .histo-nav-pager { color: var(--color-text-muted); }
+
+/* Roulette des dates : dates voisines estompées, date consultée au centre */
+.histo-roulette {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  flex-shrink: 0;
+  touch-action: pan-y;
+  user-select: none;
+}
+.histo-fleche {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--radius-full);
+  background: none;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font-size: var(--font-size-base);
+}
+.histo-fleche:hover:not(:disabled) { color: var(--color-primary); }
+.histo-fleche:disabled { opacity: 0.25; cursor: default; }
+.histo-date-cote {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  padding: 0 2px;
+  border: none;
+  background: none;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  cursor: pointer;
+  opacity: 0.55;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: opacity 0.15s;
+}
+.histo-date-cote:hover { opacity: 1; color: var(--color-primary-text); }
+.histo-date-cote.is-vide { cursor: default; pointer-events: none; }
+/* Fenêtre de la roulette : la date sortante et l'entrante défilent dedans,
+   clippées, sans jamais déborder sur les dates voisines */
+.histo-date-slot {
+  position: relative;
+  width: 104px;
+  height: 28px;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: var(--radius-full);
+}
+.histo-date-active {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full);
+  background: var(--color-primary-light);
+  color: var(--color-primary-text);
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+/* La date sortante et la date entrante glissent dans le sens du déplacement */
+.roulette-ancien-enter-active,
+.roulette-ancien-leave-active,
+.roulette-recent-enter-active,
+.roulette-recent-leave-active {
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+.roulette-ancien-enter-from { opacity: 0; transform: translateX(-100%); }
+.roulette-ancien-leave-to { opacity: 0; transform: translateX(100%); }
+.roulette-recent-enter-from { opacity: 0; transform: translateX(100%); }
+.roulette-recent-leave-to { opacity: 0; transform: translateX(-100%); }
+
 .histo-ref {
   display: flex;
   align-items: center;
