@@ -79,26 +79,135 @@
               <p v-if="programmeActif.description">{{ programmeActif.description }}</p>
             </div>
 
+            <!-- Sous-vues du programme : les séances à faire, l'historique de
+                 tout ce qui a été saisi, les courbes par exercice -->
+            <div class="prog-switcher" @pointerdown.stop>
+              <button
+                v-for="v in VUES_PROGRAMME"
+                :key="v.cle"
+                class="prog-chip"
+                :class="{ active: vueProgramme === v.cle }"
+                @click="ouvrirVueProgramme(v.cle)"
+              >
+                <i class="ti" :class="v.icone"></i> {{ v.label }}
+              </button>
+            </div>
+
             <div v-if="loadingSeances" class="empty">Chargement...</div>
 
-            <button
-              v-for="seance in seancesAffichees"
-              :key="seance.id"
-              class="seance-card"
-              @click="demarrerSeance(seance)"
-            >
-              <div class="seance-card-main">
-                <div class="seance-card-titre">{{ seance.nom }}</div>
-                <div class="seance-card-meta">
-                  <span class="type-badge" :class="`type-badge-${seance.type_seance || 'musculation'}`">
-                    {{ labelType(seance.type_seance) }}
-                  </span>
-                  <span class="badge badge-purple" v-if="seance.jour">{{ seance.jour }}</span>
-                  <span class="seance-card-count">{{ seance.exercices?.length || 0 }} exercices</span>
+            <!-- SOUS-VUE SÉANCES -->
+            <template v-else-if="vueProgramme === 'seances'">
+              <button
+                v-for="seance in seancesAffichees"
+                :key="seance.id"
+                class="seance-card"
+                @click="demarrerSeance(seance)"
+              >
+                <div class="seance-card-main">
+                  <div class="seance-card-titre">{{ seance.nom }}</div>
+                  <div class="seance-card-meta">
+                    <span class="type-badge" :class="`type-badge-${seance.type_seance || 'musculation'}`">
+                      {{ labelType(seance.type_seance) }}
+                    </span>
+                    <span class="badge badge-purple" v-if="seance.jour">{{ seance.jour }}</span>
+                    <span class="seance-card-count">{{ seance.exercices?.length || 0 }} exercices</span>
+                  </div>
                 </div>
+                <i class="ti ti-chevron-right seance-card-chevron"></i>
+              </button>
+            </template>
+
+            <!-- SOUS-VUE HISTORIQUE : une séance passée à la fois, flèches pour
+                 remonter dans le temps, écarts colorés vs la fois précédente -->
+            <template v-else-if="vueProgramme === 'historique'">
+              <div v-if="!tentativeAffichee" class="empty">
+                Aucune séance enregistrée pour l'instant.
               </div>
-              <i class="ti ti-chevron-right seance-card-chevron"></i>
-            </button>
+              <template v-else>
+                <div class="histo-nav">
+                  <button
+                    class="btn btn-icon"
+                    :disabled="histoIndex >= tentativesProgramme.length - 1"
+                    @click="histoPlusAncienne"
+                    aria-label="Séance plus ancienne"
+                  >
+                    <i class="ti ti-chevron-left"></i>
+                  </button>
+                  <div class="histo-nav-info">
+                    <div class="histo-nav-titre">{{ tentativeAffichee.creneau }}</div>
+                    <div class="histo-nav-meta">
+                      <span class="type-badge" :class="`type-badge-${tentativeAffichee.type}`">
+                        {{ labelType(tentativeAffichee.type) }}
+                      </span>
+                      <span>{{ formatDateNumerique(tentativeAffichee.date) }}</span>
+                      <span class="histo-nav-pager">{{ histoIndex + 1 }}/{{ tentativesProgramme.length }}</span>
+                    </div>
+                  </div>
+                  <button
+                    class="btn btn-icon"
+                    :disabled="histoIndex === 0"
+                    @click="histoPlusRecente"
+                    aria-label="Séance plus récente"
+                  >
+                    <i class="ti ti-chevron-right"></i>
+                  </button>
+                </div>
+
+                <div class="histo-ref">
+                  <template v-if="tentativePrecedente">
+                    <i class="ti ti-git-compare"></i>
+                    Comparé au {{ formatDateNumerique(tentativePrecedente.date) }}
+                  </template>
+                  <template v-else>
+                    <i class="ti ti-info-circle"></i>
+                    Première fois sur cette séance : rien à comparer.
+                  </template>
+                </div>
+
+                <div v-for="exo in tentativeAffichee.exercices" :key="exo.cle" class="histo-exo">
+                  <div class="histo-exo-nom">{{ exo.nom }}</div>
+                  <div
+                    v-for="(log, i) in exo.series"
+                    :key="log.id"
+                    class="histo-serie"
+                    :class="{ 'non-fait': !log.fait }"
+                  >
+                    <span class="histo-serie-label">S{{ i + 1 }}</span>
+                    <span v-if="!log.fait" class="histo-nf">Non fait</span>
+                    <template v-else>
+                      <span
+                        v-for="v in valeursHistorique(exo.nom, i, log, tentativeAffichee.type)"
+                        :key="v.champ"
+                        class="histo-val"
+                      >
+                        {{ v.valeur }}<span v-if="v.unite" class="histo-unite">{{ v.unite }}</span>
+                        <span v-if="v.diff" class="histo-diff" :class="v.diff.classe">{{ v.diff.texte }}</span>
+                      </span>
+                    </template>
+                  </div>
+                </div>
+              </template>
+            </template>
+
+            <!-- SOUS-VUE COURBES : une courbe par exercice, moyenne des charges
+                 de toutes ses séries, un point par séance réalisée -->
+            <template v-else>
+              <div class="info-note">
+                <i class="ti ti-info-circle"></i>
+                Moyenne de la charge sur toutes les séries de l'exercice, un point par séance réalisée.
+              </div>
+              <div v-if="courbesProgramme.length === 0" class="empty">
+                Pas encore assez de données : il faut au moins deux séances enregistrées.
+              </div>
+              <div v-for="courbe in courbesProgramme" :key="courbe.nom" class="progression-exo-bloc">
+                <CourbeProgression
+                  :points="courbe.points"
+                  :label="courbe.nom"
+                  :unite="courbe.unite"
+                  :axe-x="courbe.points.length > 8 ? 'dates' : 'tentatives'"
+                />
+              </div>
+            </template>
           </div>
         </template>
 
@@ -561,7 +670,7 @@
 
       <!-- ONGLET POIDS -->
       <div v-if="onglet === 'poids'" class="poids-page">
-        <div class="poids-note">
+        <div class="info-note">
           <i class="ti ti-info-circle"></i>
           Conseil : pesez-vous le matin, à jeun, pour un suivi fiable.
         </div>
@@ -687,6 +796,34 @@ const SEUIL_SWIPE = 80
 // une exception et l'écran ne s'ouvrait pas du tout.
 const nouvelIdSession = () =>
   crypto.randomUUID?.() ?? `s-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+
+// Sous-vues de l'écran programme (onglet Séances)
+const VUES_PROGRAMME = [
+  { cle: 'seances', label: 'Séances', icone: 'ti-barbell' },
+  { cle: 'historique', label: 'Historique', icone: 'ti-history' },
+  { cle: 'courbes', label: 'Courbes', icone: 'ti-chart-line' }
+]
+
+// Dimension « charge » de l'effort selon le type de séance : c'est celle qu'on
+// trace en courbe (le poids en musculation, la distance en natation/athlé, les
+// bonds en pliométrie).
+const CHAMP_CHARGE = {
+  musculation: { champ: 'poids_realise', label: 'Charge', unite: 'kg' },
+  natation: { champ: 'reps_realisees', label: 'Distance', unite: 'm' },
+  athletisme: { champ: 'reps_realisees', label: 'Distance', unite: 'm' },
+  pliometrie: { champ: 'reps_realisees', label: 'Bonds', unite: '' }
+}
+const champCharge = (type) => CHAMP_CHARGE[type] || CHAMP_CHARGE.musculation
+
+// Les deux champs réalisés saisis par l'athlète, avec leur unité d'affichage.
+// Le second (intensité) n'est pas numérique hors musculation : pas d'unité.
+const CHAMPS_REALISES = {
+  musculation: [{ champ: 'reps_realisees', unite: 'reps' }, { champ: 'poids_realise', unite: 'kg' }],
+  natation: [{ champ: 'reps_realisees', unite: 'm' }, { champ: 'poids_realise', unite: '' }],
+  athletisme: [{ champ: 'reps_realisees', unite: 'm' }, { champ: 'poids_realise', unite: '' }],
+  pliometrie: [{ champ: 'reps_realisees', unite: 'bonds' }, { champ: 'poids_realise', unite: '' }]
+}
+const champsRealises = (type) => CHAMPS_REALISES[type] || CHAMPS_REALISES.musculation
 
 // Brouillon de séance : ce qui est tapé pendant une séance ne part au serveur
 // qu'au moment de « Valider la séance ». Fermer l'app avant — ou une mise à
@@ -999,53 +1136,200 @@ export default {
     const formatDateCourt = (d) => new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
     const formatDateNumerique = (d) => new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' })
 
+    // Écart chiffré entre deux valeurs réalisées, prêt à afficher : vert si en
+    // hausse, rouge si en baisse. Non numérique (intensité en texte) = pas de
+    // comparaison possible.
+    const ecartValeurs = (actuel, precedent) => {
+      const a = parseNombre(actuel)
+      const b = parseNombre(precedent)
+      if (isNaN(a) || isNaN(b)) return null
+      const ecart = Math.round((a - b) * 100) / 100
+      if (ecart === 0) return { texte: '=', classe: 'diff-neutre' }
+      return { texte: (ecart > 0 ? '+' : '') + ecart, classe: ecart > 0 ? 'diff-positif' : 'diff-negatif' }
+    }
+
     // Écart entre la saisie en cours et la dernière performance connue (n-1
     // toujours, indépendant de la pagination historique), pour un retour
     // immédiat sur la progression.
     const diffVsHistorique = (exo, serieIdx, champ) => {
       const tentative = tentativesExo(exo)[0]
       if (!tentative) return null
-      const actuel = parseFloat(getLogs(exo.id, serieIdx - 1)[champ])
-      const precedent = parseFloat(logTentativePourSerie(tentative, exo, serieIdx)[champ])
-      if (isNaN(actuel) || isNaN(precedent)) return null
-      const ecart = Math.round((actuel - precedent) * 100) / 100
-      if (ecart === 0) return { texte: '=', classe: 'diff-neutre' }
-      return { texte: (ecart > 0 ? '+' : '') + ecart, classe: ecart > 0 ? 'diff-positif' : 'diff-negatif' }
+      return ecartValeurs(
+        getLogs(exo.id, serieIdx - 1)[champ],
+        logTentativePourSerie(tentative, exo, serieIdx)[champ]
+      )
     }
 
     // Un seul champ tracé selon le type de séance : la dimension "charge" de
     // l'effort (poids en musculation, distance en natation/athlé, bonds en pliométrie).
-    const champsGraphique = computed(() => {
-      const t = seanceActive.value?.type_seance || 'musculation'
-      if (t === 'natation' || t === 'athletisme') {
-        return [{ champ: 'reps_realisees', label: 'Distance', unite: 'm' }]
-      }
-      if (t === 'pliometrie') {
-        return [{ champ: 'reps_realisees', label: 'Bonds', unite: '' }]
-      }
-      return [{ champ: 'poids_realise', label: 'Charge', unite: 'kg' }]
-    })
+    const champsGraphique = computed(() => [champCharge(seanceActive.value?.type_seance)])
 
-    // Série chronologique (une valeur par tentative, moyenne des séries de la
-    // tentative) pour la courbe de progression d'un exercice — tout
-    // l'historique confondu. Une tentative = une (re)saisie de la séance,
-    // donc deux tentatives le même jour donnent bien 2 points distincts.
-    const courbeExo = (exo, champ) => {
+    // Série chronologique d'un champ réalisé, une valeur par tentative (moyenne
+    // des séries de cette tentative), du plus ancien au plus récent. Une
+    // tentative = une (re)saisie de la séance, donc deux tentatives le même
+    // jour donnent bien 2 points distincts.
+    const moyennesParTentative = (logs, champ) => {
       const parTentative = {}
-      historique.value
-        .filter(l => l.exo_nom === exo.nom)
-        .forEach(l => {
-          const cle = cleTentative(l)
-          const valeur = parseFloat(l[champ])
-          if (isNaN(valeur)) return
-          if (!parTentative[cle]) parTentative[cle] = { date: l.date.split('T')[0], total: 0, n: 0 }
-          parTentative[cle].total += valeur
-          parTentative[cle].n += 1
-        })
+      logs.forEach(l => {
+        const valeur = parseNombre(l[champ])
+        if (isNaN(valeur)) return
+        const cle = cleTentative(l)
+        if (!parTentative[cle]) parTentative[cle] = { date: l.date.split('T')[0], total: 0, n: 0 }
+        parTentative[cle].total += valeur
+        parTentative[cle].n += 1
+      })
       return Object.values(parTentative)
         .map(t => ({ date: t.date, valeur: Math.round((t.total / t.n) * 100) / 100 }))
         .sort((a, b) => new Date(a.date) - new Date(b.date))
     }
+
+    // Courbe de progression d'un exercice, tout l'historique confondu.
+    const courbeExo = (exo, champ) =>
+      moyennesParTentative(historique.value.filter(l => l.exo_nom === exo.nom), champ)
+
+    // --- Sous-vues du programme : historique complet et courbes par exercice ---
+    const vueProgramme = ref('seances')
+    // Profondeur dans l'historique : 0 = la séance la plus récente.
+    const histoIndex = ref(0)
+
+    const ouvrirVueProgramme = (cle) => {
+      vueProgramme.value = cle
+      if (cle === 'seances') return
+      // L'historique est préchargé au choix du programme mais peut avoir vieilli
+      // (séance validée depuis) : on le rafraîchit à l'ouverture.
+      histoIndex.value = 0
+      fetchHistorique()
+    }
+
+    // Les logs ne portent pas le type de séance (cf. LogSerieDetail côté API) :
+    // on le retrouve via les séances du programme, déjà chargées.
+    const typeParSeance = computed(() => {
+      const map = {}
+      seances.value.forEach(s => { map[s.id] = s.type_seance || 'musculation' })
+      return map
+    })
+
+    // Position d'une série dans son exercice, pour numéroter (« S1 ») les logs
+    // de l'historique et apparier une série avec la même série de la fois
+    // précédente. Les identifiants ne suffisent pas : d'une semaine à l'autre,
+    // un même créneau est une séance dupliquée, donc des séries d'ids différents.
+    const indexSerieParId = computed(() => {
+      const map = {}
+      seances.value.forEach(s =>
+        (s.exercices || []).forEach(exo =>
+          (exo.series || []).forEach((serie, i) => { map[serie.id] = i })
+        )
+      )
+      return map
+    })
+    const ordreSerie = (log) => indexSerieParId.value[log.serie.id] ?? log.serie.id
+
+    // Toutes les séances enregistrées du programme, la plus récente en premier.
+    // Une entrée = une tentative (une saisie validée) d'un créneau, avec ses
+    // exercices et leurs séries dans l'ordre du programme. Le créneau est
+    // identifié par le nom de la séance, pas son id : un programme
+    // multi-semaines duplique la séance à chaque semaine, et c'est bien la même
+    // séance du point de vue de l'athlète.
+    const tentativesProgramme = computed(() => {
+      const parTentative = {}
+      historique.value.forEach(l => {
+        const creneau = l.seance?.nom || ''
+        const cle = `${creneau}||${cleTentative(l)}`
+        if (!parTentative[cle]) {
+          parTentative[cle] = {
+            cle,
+            creneau,
+            type: typeParSeance.value[l.seance?.id] || 'musculation',
+            date: l.date,
+            parExo: {}
+          }
+        }
+        const tentative = parTentative[cle]
+        // date de la tentative = celle de sa première série saisie
+        if (new Date(l.date) < new Date(tentative.date)) tentative.date = l.date
+        if (!tentative.parExo[l.exercice.id]) {
+          tentative.parExo[l.exercice.id] = {
+            cle: l.exercice.id,
+            nom: l.exo_nom,
+            ordre: l.exercice.ordre ?? 0,
+            series: []
+          }
+        }
+        tentative.parExo[l.exercice.id].series.push(l)
+      })
+      return Object.values(parTentative)
+        .map(t => ({
+          cle: t.cle,
+          creneau: t.creneau,
+          type: t.type,
+          date: t.date,
+          exercices: Object.values(t.parExo)
+            .sort((a, b) => a.ordre - b.ordre)
+            .map(e => ({ ...e, series: [...e.series].sort((a, b) => ordreSerie(a) - ordreSerie(b)) }))
+        }))
+        .sort((a, b) => new Date(b.date) - new Date(a.date))
+    })
+
+    const tentativeAffichee = computed(() => tentativesProgramme.value[histoIndex.value] || null)
+    const histoPlusAncienne = () => {
+      if (histoIndex.value < tentativesProgramme.value.length - 1) histoIndex.value += 1
+    }
+    const histoPlusRecente = () => {
+      if (histoIndex.value > 0) histoIndex.value -= 1
+    }
+
+    // Référence de comparaison : la fois précédente sur le même créneau (n-1),
+    // pas simplement la séance d'avant qui serait souvent un autre entraînement.
+    const tentativePrecedente = computed(() => {
+      const courante = tentativeAffichee.value
+      if (!courante) return null
+      const liste = tentativesProgramme.value
+      for (let i = histoIndex.value + 1; i < liste.length; i++) {
+        if (liste[i].creneau === courante.creneau) return liste[i]
+      }
+      return null
+    })
+
+    // Valeurs réalisées d'une série de l'historique, avec l'écart coloré par
+    // rapport à la même série de la fois précédente (vert = mieux, rouge = moins).
+    const valeursHistorique = (exoNom, serieIdx, log, type) => {
+      const precedent = tentativePrecedente.value?.exercices
+        .find(e => e.nom === exoNom)?.series[serieIdx]
+      return champsRealises(type)
+        .filter(c => log[c.champ])
+        .map(c => ({
+          champ: c.champ,
+          valeur: log[c.champ],
+          unite: c.unite,
+          diff: precedent?.fait ? ecartValeurs(log[c.champ], precedent[c.champ]) : null
+        }))
+    }
+
+    // Une courbe par exercice du programme : moyenne de la charge sur toutes ses
+    // séries, un point par séance réalisée. Regroupé par nom d'exercice pour
+    // qu'un même exercice présent dans plusieurs séances (ou dupliqué d'une
+    // semaine à l'autre) ne donne qu'une seule courbe.
+    const courbesProgramme = computed(() => {
+      const parNom = {}
+      historique.value.forEach(l => {
+        if (!l.exo_nom) return
+        if (!parNom[l.exo_nom]) {
+          parNom[l.exo_nom] = {
+            nom: l.exo_nom,
+            type: typeParSeance.value[l.seance?.id] || 'musculation',
+            logs: []
+          }
+        }
+        parNom[l.exo_nom].logs.push(l)
+      })
+      return Object.values(parNom)
+        .map(e => {
+          const conf = champCharge(e.type)
+          return { nom: e.nom, unite: conf.unite, points: moyennesParTentative(e.logs, conf.champ) }
+        })
+        .filter(c => c.points.length >= 2)
+        .sort((a, b) => a.nom.localeCompare(b.nom))
+    })
 
     // Valeurs prescrites d'une série en une ligne compacte, selon le type de séance
     const valeursSerie = (exo, idx) => {
@@ -1326,6 +1610,8 @@ export default {
     const selectProgramme = async (p) => {
       programmeActif.value = p
       seanceActive.value = null
+      // l'historique affiché appartenait à l'autre programme
+      histoIndex.value = 0
       loadingSeances.value = true
       try {
         seances.value = await api.get(`/programmes/${p.id}/seances/`)
@@ -1716,6 +2002,9 @@ export default {
       onTabSwipeStart, onTabSwipeEnd, onTabSwipeCancel,
       historiqueSeriePourExo, n1SeriePourExo, formatDateCourt, formatDateNumerique, diffVsHistorique,
       champsGraphique, courbeExo,
+      VUES_PROGRAMME, vueProgramme, ouvrirVueProgramme,
+      tentativesProgramme, tentativeAffichee, tentativePrecedente,
+      histoIndex, histoPlusAncienne, histoPlusRecente, valeursHistorique, courbesProgramme,
       performances, toggleSuivi, toggleSuiviPerformance, dateTentativeGroupe,
       sousOngletPoids, dateSaisiePoids, poidsSaisi, erreurPoids, poidsPourDate, entreeExistante, poidsValide,
       labelMois, joursGrille, courbePoids, moisPrecedent, moisSuivant, formatDateLongue,
@@ -1807,6 +2096,103 @@ export default {
 .seance-card-meta { display: flex; align-items: center; gap: var(--spacing-sm); flex-wrap: wrap; }
 .seance-card-count { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
 .seance-card-chevron { color: var(--color-text-muted); font-size: var(--font-size-lg); flex-shrink: 0; }
+
+/* Encart d'information (conseil de pesée, mode de calcul d'une courbe...) */
+.info-note {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--color-primary-text);
+  background: var(--color-primary-light);
+  padding: var(--spacing-md);
+  border-radius: var(--radius-md);
+  flex-shrink: 0;
+}
+.info-note .ti { font-size: var(--font-size-lg); flex-shrink: 0; }
+
+/* --- Sous-vue Historique du programme --- */
+.histo-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex-shrink: 0;
+}
+.histo-nav-info { flex: 1; min-width: 0; text-align: center; }
+.histo-nav-titre {
+  font-size: var(--font-size-base);
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.histo-nav-meta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 3px;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+.histo-nav-pager { color: var(--color-text-muted); }
+.histo-ref {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+}
+.histo-exo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--spacing-md);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  flex-shrink: 0;
+}
+.histo-exo-nom { font-size: var(--font-size-sm); font-weight: 600; color: var(--color-text); }
+.histo-serie {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
+  padding-top: 4px;
+  border-top: 1px dashed var(--color-border);
+}
+.histo-serie.non-fait { opacity: 0.6; }
+.histo-serie-label {
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  color: var(--color-superset-text);
+  min-width: 24px;
+}
+.histo-val {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  color: var(--color-text-body);
+  font-variant-numeric: tabular-nums;
+}
+.histo-unite { font-size: var(--font-size-xs); font-weight: 500; color: var(--color-text-secondary); }
+.histo-nf { font-size: var(--font-size-xs); font-weight: 600; color: var(--color-danger-text); }
+.histo-diff {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+  margin-left: 2px;
+}
+.histo-diff.diff-positif { background: var(--color-valid-bg); color: var(--color-valid-text-strong); }
+.histo-diff.diff-negatif { background: var(--color-danger-bg); color: var(--color-danger-text); }
+.histo-diff.diff-neutre { background: var(--color-bg-tertiary); color: var(--color-text-muted); }
 
 /* --- Barre haute de séance --- */
 .seance-topbar {
@@ -2312,19 +2698,6 @@ export default {
   margin: 0 auto;
   touch-action: pan-y;
 }
-.poids-note {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  font-size: var(--font-size-sm);
-  font-weight: 500;
-  color: var(--color-primary-text);
-  background: var(--color-primary-light);
-  padding: var(--spacing-md);
-  border-radius: var(--radius-md);
-}
-.poids-note .ti { font-size: var(--font-size-lg); flex-shrink: 0; }
-
 .poids-calendrier-head { display: flex; align-items: center; justify-content: space-between; }
 .poids-mois-label { font-size: var(--font-size-base); font-weight: 700; text-transform: capitalize; }
 
