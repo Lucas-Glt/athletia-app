@@ -364,7 +364,20 @@ export default {
 </script>
 
 <style scoped>
-.mes-stats { display: flex; flex-direction: column; gap: var(--spacing-lg); padding: var(--spacing-lg) var(--spacing-xl); overflow-y: auto; }
+/* flex/min-height : le volet est le conteneur de défilement de l'onglet.
+   touch-action : sans lui, un glissement horizontal était happé par le
+   navigateur (pointercancel) et le swipe entre onglets ne partait jamais
+   depuis l'accueil, contrairement aux autres onglets qui le déclarent. */
+.mes-stats {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+  padding: var(--spacing-lg) var(--spacing-xl);
+  overflow-y: auto;
+  min-height: 0;
+  touch-action: pan-y;
+}
 
 .stat-card {
   background: var(--color-bg);

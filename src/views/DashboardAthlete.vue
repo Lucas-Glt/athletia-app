@@ -47,7 +47,14 @@
       @non="popupWellness = false"
     />
 
-    <div class="dashboard-root" @pointerdown="onTabSwipeStart" @pointerup="onTabSwipeEnd" @pointercancel="onTabSwipeCancel">
+    <div
+      class="dashboard-root"
+      @click.capture="swipeOnglets.filtrerClic"
+      @pointerdown="swipeOnglets.start"
+      @pointermove="swipeOnglets.move"
+      @pointerup="swipeOnglets.end"
+      @pointercancel="swipeOnglets.cancel"
+    >
       <!-- Réservé à l'onglet Séances : les autres (Accueil, Poids) restent
            utilisables sans programme assigné -->
       <div class="empty-state" v-if="programmes.length === 0 && onglet === 'programme'">
@@ -57,7 +64,15 @@
       </div>
 
       <!-- ONGLET PROGRAMME -->
-      <div v-if="onglet === 'programme' && programmes.length > 0" class="content-body">
+      <div
+        v-if="onglet === 'programme' && programmes.length > 0"
+        class="content-body"
+        @click.capture="swipeVueSeance.filtrerClic"
+        @pointerdown="swipeVueSeance.start"
+        @pointermove="swipeVueSeance.move"
+        @pointerup="swipeVueSeance.end"
+        @pointercancel="swipeVueSeance.cancel"
+      >
         <!-- ÉCRAN 1 : liste des séances (une par créneau, semaine courante) -->
         <template v-if="!seanceActive">
           <div class="screen">
@@ -220,9 +235,10 @@
                 class="histo-roulette"
                 role="group"
                 aria-label="Dates enregistrées pour cette séance"
-                @pointerdown.stop="onHistoSwipeStart"
-                @pointerup="onHistoSwipeEnd"
-                @pointercancel="onHistoSwipeCancel"
+                @pointerdown="swipeRoulette.start"
+                @pointermove="swipeRoulette.move"
+                @pointerup="swipeRoulette.end"
+                @pointercancel="swipeRoulette.cancel"
               >
                 <button
                   class="histo-fleche"
@@ -336,6 +352,7 @@
             class="saisie-overlay"
             @click.self="fermerSaisie"
             @pointerdown.stop
+            @pointermove.stop
             @pointerup.stop
             @pointercancel.stop
           >
@@ -376,9 +393,10 @@
 
               <div
                 class="saisie-body"
-                @pointerdown="onSaisieSwipeStart"
-                @pointerup="onSaisieSwipeEnd"
-                @pointercancel="onSaisieSwipeCancel"
+                @pointerdown="swipeSaisie.start"
+                @pointermove="swipeSaisie.move"
+                @pointerup="swipeSaisie.end"
+                @pointercancel="swipeSaisie.cancel"
               >
               <div v-if="saisieVue !== 'saisie'" class="saisie-mode-banner">
                 <span v-if="saisieVue === 'historique'">
@@ -827,6 +845,72 @@ const SEUIL_SWIPE = 80
 const nouvelIdSession = () =>
   crypto.randomUUID?.() ?? `s-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
 
+// Swipe horizontal réutilisable : appelle onSwipe(+1) vers la gauche (page
+// suivante) et onSwipe(-1) vers la droite. La décision se prend au relâché, sans
+// suivi en direct, pour ne jamais interférer avec le scroll vertical ni les
+// clics sur les champs et boutons.
+//
+// `actif` désactive complètement le geste (le pointeur n'est même pas capté),
+// `stopper` empêche le geste de remonter à un swipe de plus haut niveau.
+const creerSwipeHorizontal = (onSwipe, { actif = () => true, stopper = false } = {}) => {
+  const etat = { startX: 0, startY: 0, dx: 0, dy: 0, pointerId: null }
+  // Horodatage du dernier swipe abouti, pour neutraliser le clic qui suit (cf.
+  // filtrerClic).
+  let dernierSwipe = 0
+
+  const appliquer = (dx, dy) => {
+    if (Math.abs(dy) > Math.abs(dx) + 10) return
+    if (dx > -SEUIL_SWIPE && dx < SEUIL_SWIPE) return
+    dernierSwipe = Date.now()
+    onSwipe(dx <= -SEUIL_SWIPE ? 1 : -1)
+  }
+
+  return {
+    // À poser en capture sur le conteneur : un glissement se termine aussi par
+    // un clic sur l'élément survolé (carte d'exercice, carte de séance), qui
+    // déclencherait son action en plus du changement de vue. On l'avale.
+    filtrerClic(e) {
+      if (Date.now() - dernierSwipe > 400) return
+      e.stopPropagation()
+      e.preventDefault()
+    },
+    start(e) {
+      if (!actif()) return
+      if (e.pointerType === 'mouse' && e.button !== 0) return
+      // un second doigt (pinch, paume posée sur l'écran) ne doit pas redéfinir
+      // l'origine du geste en cours : son relâché produirait un dx énorme
+      if (!e.isPrimary) return
+      if (stopper) e.stopPropagation()
+      etat.startX = e.clientX
+      etat.startY = e.clientY
+      etat.dx = 0
+      etat.dy = 0
+      etat.pointerId = e.pointerId
+    },
+    move(e) {
+      if (etat.pointerId !== e.pointerId) return
+      etat.dx = e.clientX - etat.startX
+      etat.dy = e.clientY - etat.startY
+    },
+    end(e) {
+      if (etat.pointerId !== e.pointerId) return
+      etat.pointerId = null
+      appliquer(e.clientX - etat.startX, e.clientY - etat.startY)
+    },
+    // Le navigateur annule le pointeur dès qu'il prend la main sur le geste
+    // (début de scroll, appui long, zoom) et dispatche pointercancel sans
+    // coordonnées utilisables — iOS envoie (0, 0), ce qui transformait un
+    // simple appui en swipe. On rejoue donc le dernier déplacement observé,
+    // lui fiable : le geste aboutit quand il était déjà franc, et un appui
+    // (dx nul) ne déclenche rien.
+    cancel(e) {
+      if (etat.pointerId !== e.pointerId) return
+      etat.pointerId = null
+      appliquer(etat.dx, etat.dy)
+    }
+  }
+}
+
 // Onglets disponibles dans une séance ouverte
 const VUES_SEANCE = [
   { cle: 'seance', label: 'Séance', icone: 'ti-barbell' },
@@ -1106,36 +1190,18 @@ export default {
     // Swipe droit/gauche dans le panneau de saisie : bascule entre la saisie
     // (centre), les tentatives passées (droite, paginable) et la courbe de
     // progression complète de l'exercice/superset (gauche).
-    // Détection au relâché uniquement (pas de suivi live) pour ne jamais
-    // interférer avec le scroll vertical ou les clics sur inputs/boutons.
-    const saisieSwipeState = { startX: 0, startY: 0, pointerId: null }
-    const onSaisieSwipeStart = (e) => {
-      if (e.pointerType === 'mouse' && e.button !== 0) return
-      if (!e.isPrimary) return
-      saisieSwipeState.startX = e.clientX
-      saisieSwipeState.startY = e.clientY
-      saisieSwipeState.pointerId = e.pointerId
-    }
-    // cf. onTabSwipeCancel : un pointercancel iOS ne doit jamais être lu
-    // comme une fin de geste
-    const onSaisieSwipeCancel = () => { saisieSwipeState.pointerId = null }
-    const onSaisieSwipeEnd = (e) => {
-      if (saisieSwipeState.pointerId !== e.pointerId) return
-      saisieSwipeState.pointerId = null
-      const dx = e.clientX - saisieSwipeState.startX
-      const dy = e.clientY - saisieSwipeState.startY
-      if (Math.abs(dy) > Math.abs(dx) + 10) return
-      if (dx >= SEUIL_SWIPE) {
+    const swipeSaisie = creerSwipeHorizontal((sens) => {
+      if (sens < 0) {
         if (saisieVue.value === 'progression') saisieVue.value = 'saisie'
         else if (saisieVue.value === 'saisie') { saisieVue.value = 'historique'; historiqueIndex.value = 0 }
         else if (historiqueIndex.value < nbTentativesGroupe.value - 1) historiqueIndex.value += 1
-      } else if (dx <= -SEUIL_SWIPE) {
+      } else {
         if (saisieVue.value === 'historique') {
           if (historiqueIndex.value > 0) historiqueIndex.value -= 1
           else saisieVue.value = 'saisie'
         } else if (saisieVue.value === 'saisie') saisieVue.value = 'progression'
       }
-    }
+    })
 
     // Log d'une tentative correspondant à une série précise de l'exercice.
     // Match par serie.id (stable) plutôt que par position dans le tableau :
@@ -1331,27 +1397,13 @@ export default {
       histoIndex.value -= 1
     }
 
-    // Swipe sur la roulette : vers la droite on remonte dans le temps, comme
-    // si on faisait défiler les dates de gauche à droite. Détection au relâché
-    // seulement, pour ne pas gêner le scroll vertical (cf. onSaisieSwipeEnd).
-    const histoSwipeState = { startX: 0, startY: 0, pointerId: null }
-    const onHistoSwipeStart = (e) => {
-      if (e.pointerType === 'mouse' && e.button !== 0) return
-      if (!e.isPrimary) return
-      histoSwipeState.startX = e.clientX
-      histoSwipeState.startY = e.clientY
-      histoSwipeState.pointerId = e.pointerId
-    }
-    const onHistoSwipeCancel = () => { histoSwipeState.pointerId = null }
-    const onHistoSwipeEnd = (e) => {
-      if (histoSwipeState.pointerId !== e.pointerId) return
-      histoSwipeState.pointerId = null
-      const dx = e.clientX - histoSwipeState.startX
-      const dy = e.clientY - histoSwipeState.startY
-      if (Math.abs(dy) > Math.abs(dx) + 10) return
-      if (dx >= SEUIL_SWIPE) histoPlusAncienne()
-      else if (dx <= -SEUIL_SWIPE) histoPlusRecente()
-    }
+    // Swipe sur la roulette : vers la droite on remonte dans le temps, comme si
+    // on faisait défiler la bande des dates de gauche à droite. Le geste ne
+    // remonte pas aux onglets de la séance, qui ont le leur.
+    const swipeRoulette = creerSwipeHorizontal(
+      (sens) => { if (sens < 0) histoPlusAncienne(); else histoPlusRecente() },
+      { stopper: true }
+    )
 
     // Valeurs réalisées d'une série de l'historique, avec l'écart coloré par
     // rapport à la même série de la fois précédente — soit la date juste à
@@ -1985,37 +2037,26 @@ export default {
     })
     watch(seanceActive, (s) => { if (!s) fermerSaisie() })
 
-    // Swipe horizontal entre onglets (Séances <-> Performances <-> Poids), sur
-    // tout le contenu du dashboard. Le panneau de saisie a son propre swipe
-    // interne qui stoppe la propagation, donc les deux ne se marchent pas dessus.
+    // Swipe horizontal entre onglets (Accueil <-> Séances <-> Performances <->
+    // Poids), sur tout le contenu du dashboard. Le panneau de saisie, la
+    // roulette de dates et les onglets d'une séance ont leur propre swipe et
+    // stoppent la propagation, donc aucun ne marche sur les pieds de l'autre.
     const ONGLETS = ['mes-stats', 'programme', 'performances', 'poids']
-    const tabSwipeState = { startX: 0, startY: 0, pointerId: null }
-    const onTabSwipeStart = (e) => {
-      if (e.pointerType === 'mouse' && e.button !== 0) return
-      // un second doigt (pinch, paume posée sur l'écran) ne doit pas redéfinir
-      // l'origine du geste en cours : son relâché produirait un dx énorme
-      if (!e.isPrimary) return
-      tabSwipeState.startX = e.clientX
-      tabSwipeState.startY = e.clientY
-      tabSwipeState.pointerId = e.pointerId
-    }
-    const onTabSwipeEnd = (e) => {
-      if (tabSwipeState.pointerId !== e.pointerId) return
-      tabSwipeState.pointerId = null
-      const dx = e.clientX - tabSwipeState.startX
-      const dy = e.clientY - tabSwipeState.startY
-      if (Math.abs(dy) > Math.abs(dx) + 10) return
-      const idx = ONGLETS.indexOf(onglet.value)
-      if (dx <= -SEUIL_SWIPE && idx < ONGLETS.length - 1) onglet.value = ONGLETS[idx + 1]
-      else if (dx >= SEUIL_SWIPE && idx > 0) onglet.value = ONGLETS[idx - 1]
-    }
-    // iOS annule le pointeur dès que le navigateur prend la main (début de
-    // scroll, appui long, zoom) et dispatche pointercancel sans coordonnées
-    // utilisables. L'évaluer comme une fin de geste transformait un simple
-    // appui en swipe : depuis (0, 0), dx vaut -startX, soit largement plus que
-    // le seuil pour un appui au centre de l'écran. Un pointeur annulé n'est
-    // jamais un geste : on abandonne, sans rien interpréter.
-    const onTabSwipeCancel = () => { tabSwipeState.pointerId = null }
+    const swipeOnglets = creerSwipeHorizontal((sens) => {
+      const cible = ONGLETS[ONGLETS.indexOf(onglet.value) + sens]
+      if (cible) onglet.value = cible
+    })
+
+    // Swipe entre les onglets d'une séance ouverte (Séance / Historique /
+    // Courbe). Inactif sur la liste des séances, où le geste doit continuer de
+    // changer d'onglet du dashboard.
+    const swipeVueSeance = creerSwipeHorizontal(
+      (sens) => {
+        const cible = VUES_SEANCE[VUES_SEANCE.findIndex(v => v.cle === vueSeance.value) + sens]
+        if (cible) ouvrirVueSeance(cible.cle)
+      },
+      { actif: () => !!seanceActive.value, stopper: true }
+    )
 
     onMounted(fetchProgrammes)
 
@@ -2057,14 +2098,12 @@ export default {
       progressionSeance,
       groupeSaisie, ouvrirSaisie, fermerSaisie, valeursSerie, resumeExo,
       saisieVue, historiqueIndex, nbTentativesGroupe, retourSaisie,
-      onSaisieSwipeStart, onSaisieSwipeEnd, onSaisieSwipeCancel,
-      onTabSwipeStart, onTabSwipeEnd, onTabSwipeCancel,
+      swipeOnglets, swipeVueSeance, swipeSaisie, swipeRoulette,
       historiqueSeriePourExo, n1SeriePourExo, formatDateCourt, formatDateNumerique, diffVsHistorique,
       champsGraphique, courbeExo,
       VUES_SEANCE, vueSeance, ouvrirVueSeance,
       tentativesSeance, tentativeAffichee, tentativeAncienne, tentativeRecente,
       histoIndex, histoPlusAncienne, histoPlusRecente, sensHisto, valeursHistorique, courbesSeance,
-      onHistoSwipeStart, onHistoSwipeEnd, onHistoSwipeCancel,
       performances, toggleSuivi, toggleSuiviPerformance, dateTentativeGroupe,
       sousOngletPoids, dateSaisiePoids, poidsSaisi, erreurPoids, poidsPourDate, entreeExistante, poidsValide,
       labelMois, joursGrille, courbePoids, moisPrecedent, moisSuivant, formatDateLongue,
