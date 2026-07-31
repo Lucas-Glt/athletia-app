@@ -96,11 +96,16 @@
       <div v-for="p in programmesAssignes" :key="p.id" class="prog-block">
         <button type="button" class="prog-head" @click="basculerProgramme(p)">
           <i class="ti prog-chevron" :class="programmesOuverts.has(p.id) ? 'ti-chevron-up' : 'ti-chevron-down'"></i>
-          <span class="prog-nom">{{ p.nom }}</span>
-          <span class="badge" :class="p.statut === 'actif' ? 'badge-green' : 'badge-gray'">{{ p.statut }}</span>
-          <span class="prog-compte" v-if="seancesParProgramme[p.id]">
-            {{ seancesParProgramme[p.id].length }} séance{{ seancesParProgramme[p.id].length > 1 ? 's' : '' }}
-            · {{ semainesDuProgramme(p.id).length }} semaine{{ semainesDuProgramme(p.id).length > 1 ? 's' : '' }}
+          <span class="bloc-info">
+            <span class="bloc-titre">
+              <span class="prog-nom">{{ p.nom }}</span>
+              <span class="badge" :class="p.statut === 'actif' ? 'badge-green' : 'badge-gray'">{{ p.statut }}</span>
+            </span>
+            <span class="bloc-meta" v-if="seancesParProgramme[p.id]">
+              <span>{{ seancesParProgramme[p.id].length }} séance{{ seancesParProgramme[p.id].length > 1 ? 's' : '' }}</span>
+              <span class="meta-sep">·</span>
+              <span>{{ semainesDuProgramme(p.id).length }} semaine{{ semainesDuProgramme(p.id).length > 1 ? 's' : '' }}</span>
+            </span>
           </span>
         </button>
 
@@ -119,10 +124,16 @@
             <div v-for="seance in semaine.seances" :key="seance.id" class="seance-prog-block">
               <button type="button" class="seance-prog-head" @click="basculerSeanceProg(seance.id)">
                 <i class="ti seance-prog-chevron" :class="seancesOuvertes.has(seance.id) ? 'ti-chevron-up' : 'ti-chevron-down'"></i>
-                <span class="badge badge-purple">{{ labelType(seance.type_seance) }}</span>
-                <span class="badge badge-gray" v-if="seance.jour">{{ seance.jour }}</span>
-                <span class="seance-prog-nom">{{ seance.nom }}</span>
-                <span class="exo-count-badge">{{ seance.exercices.length }} exo{{ seance.exercices.length > 1 ? 's' : '' }}</span>
+                <span class="bloc-info">
+                  <span class="bloc-titre">
+                    <span class="seance-prog-nom">{{ seance.nom }}</span>
+                    <span class="exo-count-badge">{{ seance.exercices.length }} exo{{ seance.exercices.length > 1 ? 's' : '' }}</span>
+                  </span>
+                  <span class="bloc-meta">
+                    <span class="type-badge" :class="`type-badge-${seance.type_seance || 'musculation'}`">{{ labelType(seance.type_seance) }}</span>
+                    <span class="meta-jour" v-if="seance.jour">{{ seance.jour }}</span>
+                  </span>
+                </span>
               </button>
 
               <div class="seance-prog-body" v-if="seancesOuvertes.has(seance.id)">
@@ -228,12 +239,18 @@
           <template v-else>
             <div v-for="session in sessionsFiltrees" :key="session.key" class="session-block">
               <button type="button" class="session-head" @click="basculerSession(session.key)">
-                <span class="session-date">{{ formatDateCourte(session.date) }}</span>
-                <span class="session-nom">{{ session.seanceNom }}</span>
-                <span class="badge badge-gray" v-if="session.semaine">S{{ session.semaine }}</span>
-                <span class="badge badge-purple">{{ labelType(session.typeSeance) }}</span>
-                <span class="taux-badge" :class="classeTaux(session.taux)">{{ session.faites }}/{{ session.total }} séries</span>
                 <i class="ti session-chevron" :class="sessionsOuvertes.has(session.key) ? 'ti-chevron-up' : 'ti-chevron-down'"></i>
+                <span class="bloc-info">
+                  <span class="bloc-titre">
+                    <span class="session-nom">{{ session.seanceNom }}</span>
+                    <span class="taux-badge" :class="classeTaux(session.taux)">{{ session.faites }}/{{ session.total }} séries</span>
+                  </span>
+                  <span class="bloc-meta">
+                    <span class="session-date">{{ formatDateCourte(session.date) }}</span>
+                    <span class="type-badge" :class="`type-badge-${session.typeSeance || 'musculation'}`">{{ labelType(session.typeSeance) }}</span>
+                    <span v-if="session.semaine">Semaine {{ session.semaine }}</span>
+                  </span>
+                </span>
               </button>
               <div class="session-body" v-if="sessionsOuvertes.has(session.key)">
                 <div
@@ -937,16 +954,15 @@ export default {
 .prog-block { border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-bg); overflow: hidden; }
 .prog-head {
   width: 100%;
-  display: flex; align-items: center; gap: var(--spacing-sm); flex-wrap: wrap;
+  display: flex; align-items: center; gap: var(--spacing-md);
   padding: var(--spacing-md) var(--spacing-lg);
   background: var(--color-bg-secondary);
   border: none; font-family: inherit; color: inherit; text-align: left; cursor: pointer;
   font-size: var(--font-size-sm);
 }
 .prog-head:hover { background: var(--color-bg-tertiary); }
-.prog-chevron { color: var(--color-text-secondary); }
-.prog-nom { font-weight: 700; font-size: var(--font-size-base); }
-.prog-compte { font-size: var(--font-size-xs); color: var(--color-text-secondary); margin-left: auto; }
+.prog-chevron { color: var(--color-text-secondary); flex-shrink: 0; }
+.prog-nom { font-weight: 700; font-size: var(--font-size-base); overflow-wrap: anywhere; }
 .prog-actions {
   display: flex; justify-content: flex-end; gap: var(--spacing-sm); flex-wrap: wrap;
   padding: var(--spacing-sm) var(--spacing-lg);
@@ -965,21 +981,25 @@ export default {
 .seance-prog-block { border: 1px solid var(--color-border); border-radius: var(--radius-md); overflow: hidden; }
 .seance-prog-head {
   width: 100%;
-  display: flex; align-items: center; gap: var(--spacing-sm); flex-wrap: wrap;
-  padding: var(--spacing-sm) var(--spacing-md);
+  display: flex; align-items: center; gap: var(--spacing-md);
+  padding: var(--spacing-md);
   background: var(--color-bg-secondary);
   border: none; font-family: inherit; color: inherit; text-align: left; cursor: pointer;
   font-size: var(--font-size-sm);
 }
 .seance-prog-head:hover { background: var(--color-bg-tertiary); }
-.seance-prog-chevron { color: var(--color-text-secondary); }
-.seance-prog-nom { font-weight: 600; flex: 1; min-width: 0; }
+.seance-prog-chevron { color: var(--color-text-secondary); flex-shrink: 0; }
+.seance-prog-nom { font-weight: 600; overflow-wrap: anywhere; }
 .exo-count-badge {
-  font-size: var(--font-size-xs); font-weight: 600;
+  font-size: var(--font-size-xs); font-weight: 600; white-space: nowrap; flex-shrink: 0;
   padding: 2px 8px; border-radius: var(--radius-full);
   background: var(--color-bg-tertiary); color: var(--color-text-secondary);
 }
 .seance-prog-body { padding: var(--spacing-md); display: flex; flex-direction: column; gap: var(--spacing-md); }
+.seance-prog-body .exo-groupe-log + .exo-groupe-log:not(.is-superset) {
+  padding-top: var(--spacing-md);
+  border-top: 1px solid var(--color-border);
+}
 
 .series-chips { display: flex; flex-wrap: wrap; gap: 4px; padding-left: 34px; }
 .serie-chip {
@@ -1028,6 +1048,18 @@ export default {
 }
 .histo-chip.active { background: var(--color-primary-light); border-color: var(--color-primary); color: var(--color-primary-text); font-weight: 600; }
 
+/* En-tête repliable commun (programme, séance, séance réalisée) : un titre qui
+   peut s'allonger et une ligne de méta qui s'enroule dessous, pour qu'aucun
+   badge ne vienne écraser le nom sur un écran étroit. */
+.bloc-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.bloc-titre { display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-sm); }
+.bloc-meta {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  font-size: var(--font-size-xs); color: var(--color-text-secondary);
+}
+.meta-sep { color: var(--color-text-muted); }
+.meta-jour { text-transform: capitalize; }
+
 .session-block { border: 1px solid var(--color-border); border-radius: var(--radius-lg); overflow: hidden; flex-shrink: 0; background: var(--color-bg); }
 .session-head {
   width: 100%;
@@ -1035,10 +1067,8 @@ export default {
   background: var(--color-bg-secondary);
   display: flex;
   align-items: center;
-  gap: var(--spacing-sm);
+  gap: var(--spacing-md);
   font-size: var(--font-size-sm);
-  font-weight: 500;
-  flex-wrap: wrap;
   border: none;
   border-bottom: 1px solid var(--color-border);
   font-family: inherit;
@@ -1047,12 +1077,11 @@ export default {
   cursor: pointer;
 }
 .session-head:hover { background: var(--color-bg-tertiary); }
-.session-nom { flex: 1; font-weight: 600; min-width: 0; }
-.session-date { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+.session-nom { font-weight: 600; overflow-wrap: anywhere; }
 .session-date::first-letter { text-transform: uppercase; }
-.session-chevron { color: var(--color-text-secondary); }
+.session-chevron { color: var(--color-text-secondary); flex-shrink: 0; }
 .taux-badge {
-  font-size: var(--font-size-xs); font-weight: 700;
+  font-size: var(--font-size-xs); font-weight: 700; white-space: nowrap; flex-shrink: 0;
   padding: 3px 9px; border-radius: var(--radius-full);
   background: var(--color-bg-tertiary); color: var(--color-text-secondary);
 }
@@ -1113,7 +1142,7 @@ export default {
   flex-shrink: 0;
 }
 .exo-letter { background: var(--color-primary); color: var(--color-on-primary); }
-.exo-name { font-size: var(--font-size-base); font-weight: 600; flex: 1; }
+.exo-name { font-size: var(--font-size-base); font-weight: 600; flex: 1; min-width: 0; overflow-wrap: anywhere; }
 
 .comparatif-grid { display: flex; flex-direction: column; gap: 4px; }
 .comparatif-header {
@@ -1162,5 +1191,9 @@ export default {
   .detail-grid { grid-template-columns: 1fr; }
   .comparatif-header, .comparatif-row { grid-template-columns: 30px 1fr 16px 1fr 20px; gap: 6px; }
   .prescrit-cell, .non-fait { font-size: var(--font-size-xs); }
+  /* L'écran est trop étroit pour aligner les séries sous le nom de l'exercice */
+  .series-chips { padding-left: 0; }
+  .prog-head, .prog-body, .prog-actions { padding-left: var(--spacing-md); padding-right: var(--spacing-md); }
+  .session-head { padding: var(--spacing-md); }
 }
 </style>
