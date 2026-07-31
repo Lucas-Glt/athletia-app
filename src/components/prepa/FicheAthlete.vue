@@ -41,7 +41,7 @@
     <div class="tabs">
       <div :ref="(el) => setTabRef('apercu', el)" class="tab" :class="{ active: sousOnglet === 'apercu' }" @click="allerA('apercu')">Aperçu</div>
       <div :ref="(el) => setTabRef('programme', el)" class="tab" :class="{ active: sousOnglet === 'programme' }" @click="allerA('programme')">Programme</div>
-      <div :ref="(el) => setTabRef('seances', el)" class="tab" :class="{ active: sousOnglet === 'seances' }" @click="allerA('seances')">Séances</div>
+      <div :ref="(el) => setTabRef('historique', el)" class="tab" :class="{ active: sousOnglet === 'historique' }" @click="allerA('historique')">Historique</div>
       <div :ref="(el) => setTabRef('poids', el)" class="tab" :class="{ active: sousOnglet === 'poids' }" @click="allerA('poids')">Poids</div>
     </div>
 
@@ -102,98 +102,208 @@
       </div>
     </div>
 
-    <!-- SÉANCES : logs prescrit vs réalisé -->
-    <div v-if="sousOnglet === 'seances'" class="tab-content">
+    <!-- HISTORIQUE : séances réalisées (prescrit vs réalisé) et courbes -->
+    <div v-if="sousOnglet === 'historique'" class="tab-content">
       <div v-if="programmesAssignes.length === 0" class="empty">Aucun programme assigné à cet athlète.</div>
       <template v-else>
-        <select v-if="programmesAssignes.length > 1" v-model="programmeLogsId" class="select-programme-logs">
-          <option v-for="p in programmesAssignes" :key="p.id" :value="p.id">{{ p.nom }}</option>
-        </select>
-        <div v-if="loadingLogs" class="empty">Chargement...</div>
-        <div v-else-if="logsGroupes.length === 0" class="empty">Aucun log enregistré pour cet athlète.</div>
-        <div v-else>
-          <div v-for="session in logsGroupes" :key="session.key" class="session-block">
-            <div class="session-head">
-              <span class="badge badge-purple" v-if="session.jour">{{ session.jour }}</span>
-              <span class="session-nom">{{ session.seanceNom }}</span>
-              <span class="session-date">{{ formatDate(session.date) }}</span>
-            </div>
-            <div class="session-body">
-              <div
-                v-for="groupe in grouperExosSession(session.exercices)"
-                :key="groupe.key"
-                class="exo-groupe-log"
-                :class="{ 'is-superset': groupe.exercices.length > 1 }"
-              >
-                <div v-if="groupe.exercices.length > 1" class="superset-banner">
-                  <i class="ti ti-link"></i>
-                  <span>Superset/Biset · {{ groupe.exercices.length }} exercices</span>
-                </div>
+        <div class="histo-filtres">
+          <select v-if="programmesAssignes.length > 1" v-model="programmeLogsId" class="select-histo">
+            <option v-for="p in programmesAssignes" :key="p.id" :value="p.id">{{ p.nom }}</option>
+          </select>
+          <select v-if="nomsSeances.length > 1" v-model="seanceFiltre" class="select-histo">
+            <option value="toutes">Toutes les séances</option>
+            <option v-for="nom in nomsSeances" :key="nom" :value="nom">{{ nom }}</option>
+          </select>
+        </div>
 
-                <div v-for="(exo, eidx) in groupe.exercices" :key="exo.id" class="exo-bloc">
-                  <div class="exo-header">
-                    <span class="exo-letter" v-if="groupe.exercices.length > 1">{{ letterFor(eidx) }}</span>
-                    <div class="exo-num" v-else>{{ exo.ordre }}</div>
-                    <span class="exo-name">{{ exo.nom }}</span>
+        <div v-if="loadingLogs" class="empty">Chargement...</div>
+        <div v-else-if="logsGroupes.length === 0" class="empty">Aucune séance réalisée par cet athlète sur ce programme.</div>
+        <template v-else>
+          <div class="histo-resume">
+            <div class="histo-stat">
+              <span class="histo-stat-valeur">{{ resumeHistorique.nbSessions }}</span>
+              <span class="histo-stat-label">séances réalisées</span>
+            </div>
+            <div class="histo-stat">
+              <span class="histo-stat-valeur" :class="classeTaux(resumeHistorique.taux)">{{ resumeHistorique.taux }}%</span>
+              <span class="histo-stat-label">séries réalisées ({{ resumeHistorique.faites }}/{{ resumeHistorique.total }})</span>
+            </div>
+            <div class="histo-stat">
+              <span class="histo-stat-valeur histo-stat-periode">{{ resumeHistorique.periode }}</span>
+              <span class="histo-stat-label">période couverte</span>
+            </div>
+          </div>
+
+          <div class="histo-switcher">
+            <button class="histo-chip" :class="{ active: vueHistorique === 'seances' }" @click="vueHistorique = 'seances'">
+              <i class="ti ti-list-details"></i> Séances
+            </button>
+            <button class="histo-chip" :class="{ active: vueHistorique === 'courbes' }" @click="vueHistorique = 'courbes'">
+              <i class="ti ti-chart-line"></i> Courbes
+            </button>
+          </div>
+
+          <div v-if="sessionsFiltrees.length === 0" class="empty">Aucune séance réalisée pour ce filtre.</div>
+
+          <!-- VUE COURBES : progression par exercice sur tout l'historique filtré -->
+          <template v-else-if="vueHistorique === 'courbes'">
+            <div v-if="courbesHistorique.length === 0" class="empty">
+              Il faut au moins deux séances réalisées avec le même exercice pour tracer une courbe.
+            </div>
+            <div class="stat-card" v-for="courbe in courbesHistorique" :key="courbe.nom">
+              <CourbeProgression
+                :points="courbe.points"
+                :label="`${courbe.nom} — ${courbe.label}`"
+                :unite="courbe.unite"
+                :axe-x="courbe.points.length > 8 ? 'dates' : 'tentatives'"
+              />
+            </div>
+          </template>
+
+          <!-- VUE SÉANCES : une carte repliable par séance réalisée -->
+          <template v-else>
+            <div v-for="session in sessionsFiltrees" :key="session.key" class="session-block">
+              <button type="button" class="session-head" @click="basculerSession(session.key)">
+                <span class="session-date">{{ formatDateCourte(session.date) }}</span>
+                <span class="session-nom">{{ session.seanceNom }}</span>
+                <span class="badge badge-gray" v-if="session.semaine">S{{ session.semaine }}</span>
+                <span class="badge badge-purple">{{ labelType(session.typeSeance) }}</span>
+                <span class="taux-badge" :class="classeTaux(session.taux)">{{ session.faites }}/{{ session.total }} séries</span>
+                <i class="ti session-chevron" :class="sessionsOuvertes.has(session.key) ? 'ti-chevron-up' : 'ti-chevron-down'"></i>
+              </button>
+              <div class="session-body" v-if="sessionsOuvertes.has(session.key)">
+                <div
+                  v-for="groupe in grouperExosSession(session.exercices)"
+                  :key="groupe.key"
+                  class="exo-groupe-log"
+                  :class="{ 'is-superset': groupe.exercices.length > 1 }"
+                >
+                  <div v-if="groupe.exercices.length > 1" class="superset-banner">
+                    <i class="ti ti-link"></i>
+                    <span>Superset/Biset · {{ groupe.exercices.length }} exercices</span>
                   </div>
-                  <div class="comparatif-grid">
-                    <div class="comparatif-header">
-                      <span>Série</span><span>Prescrit</span><span></span><span>Réalisé</span><span></span>
+
+                  <div v-for="(exo, eidx) in groupe.exercices" :key="exo.id" class="exo-bloc">
+                    <div class="exo-header">
+                      <span class="exo-letter" v-if="groupe.exercices.length > 1">{{ letterFor(eidx) }}</span>
+                      <div class="exo-num" v-else>{{ exo.ordre }}</div>
+                      <span class="exo-name">{{ exo.nom }}</span>
                     </div>
-                    <div v-for="(log, i) in exo.logs" :key="log.id" class="comparatif-row" :class="getStatutClasse(log, session.typeSeance)">
-                      <span class="serie-num">{{ i + 1 }}</span>
-                      <div class="prescrit-cell">
-                        <template v-if="session.typeSeance === 'natation' || session.typeSeance === 'athletisme'">
-                          <span v-if="log.serie.metres">{{ log.serie.metres }} m</span>
-                          <span v-if="log.serie.intensite"> · {{ log.serie.intensite }}</span>
-                        </template>
-                        <template v-else-if="session.typeSeance === 'pliometrie'">
-                          <span v-if="log.serie.bonds">{{ log.serie.bonds }} bonds</span>
-                          <span v-if="log.serie.intensite"> · {{ log.serie.intensite }}</span>
-                        </template>
-                        <template v-else>
-                          <span v-if="log.serie.nb_reps">{{ log.serie.nb_reps }} reps</span>
-                          <span v-if="log.serie.poids_cible"> · {{ log.serie.poids_cible }}</span>
-                          <span v-if="log.serie.rm"> · {{ log.serie.rm }}</span>
-                        </template>
+                    <div class="comparatif-grid">
+                      <div class="comparatif-header">
+                        <span>Série</span><span>Prescrit</span><span></span><span>Réalisé</span><span></span>
                       </div>
-                      <i class="ti ti-arrow-right comparatif-arrow"></i>
-                      <div class="realise-cell">
-                        <template v-if="log.fait">
+                      <div v-for="(log, i) in exo.logs" :key="log.id" class="comparatif-row" :class="getStatutClasse(log, session.typeSeance)">
+                        <span class="serie-num">{{ i + 1 }}</span>
+                        <div class="prescrit-cell">
                           <template v-if="session.typeSeance === 'natation' || session.typeSeance === 'athletisme'">
-                            <span v-if="log.reps_realisees">{{ log.reps_realisees }} m</span>
-                            <span v-if="log.poids_realise"> · {{ log.poids_realise }}</span>
+                            <span v-if="log.serie.metres">{{ log.serie.metres }} m</span>
+                            <span v-if="log.serie.intensite"> · {{ log.serie.intensite }}</span>
                           </template>
                           <template v-else-if="session.typeSeance === 'pliometrie'">
-                            <span v-if="log.reps_realisees">{{ log.reps_realisees }} bonds</span>
-                            <span v-if="log.poids_realise"> · {{ log.poids_realise }}</span>
+                            <span v-if="log.serie.bonds">{{ log.serie.bonds }} bonds</span>
+                            <span v-if="log.serie.intensite"> · {{ log.serie.intensite }}</span>
                           </template>
                           <template v-else>
-                            <span v-if="log.reps_realisees">{{ log.reps_realisees }} reps</span>
-                            <span v-if="log.poids_realise"> · {{ log.poids_realise }}</span>
+                            <span v-if="log.serie.nb_reps">{{ log.serie.nb_reps }} reps</span>
+                            <span v-if="log.serie.poids_cible"> · {{ log.serie.poids_cible }}</span>
+                            <span v-if="log.serie.rm"> · {{ log.serie.rm }}</span>
                           </template>
-                          <span v-if="!log.reps_realisees && !log.poids_realise">—</span>
-                        </template>
-                        <span v-else class="non-fait"><i class="ti ti-x"></i> non réalisée</span>
+                        </div>
+                        <i class="ti ti-arrow-right comparatif-arrow"></i>
+                        <div class="realise-cell">
+                          <template v-if="log.fait">
+                            <template v-if="session.typeSeance === 'natation' || session.typeSeance === 'athletisme'">
+                              <span v-if="log.reps_realisees">{{ log.reps_realisees }} m</span>
+                              <span v-if="log.poids_realise"> · {{ log.poids_realise }}</span>
+                            </template>
+                            <template v-else-if="session.typeSeance === 'pliometrie'">
+                              <span v-if="log.reps_realisees">{{ log.reps_realisees }} bonds</span>
+                              <span v-if="log.poids_realise"> · {{ log.poids_realise }}</span>
+                            </template>
+                            <template v-else>
+                              <span v-if="log.reps_realisees">{{ log.reps_realisees }} reps</span>
+                              <span v-if="log.poids_realise"> · {{ log.poids_realise }}</span>
+                            </template>
+                            <span v-if="!log.reps_realisees && !log.poids_realise">—</span>
+                          </template>
+                          <span v-else class="non-fait"><i class="ti ti-x"></i> non réalisée</span>
+                        </div>
+                        <span class="statut-icon"><i :class="getStatutIcon(log, session.typeSeance)"></i></span>
                       </div>
-                      <span class="statut-icon"><i :class="getStatutIcon(log, session.typeSeance)"></i></span>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
-        </div>
+          </template>
+        </template>
       </template>
     </div>
 
-    <!-- POIDS : lecture seule -->
+    <!-- POIDS : calendrier des pesées + courbe, lecture seule -->
     <div v-if="sousOnglet === 'poids'" class="tab-content">
       <div v-if="loadingPoids" class="empty">Chargement...</div>
-      <div v-else-if="courbePoids.length === 0" class="empty">Aucune pesée enregistrée pour cet athlète.</div>
-      <div v-else class="stat-card">
-        <CourbeProgression :points="courbePoids" label="Poids" unite="kg" axe-x="dates" />
-      </div>
+      <div v-else-if="entriesPoids.length === 0" class="empty">Aucune pesée enregistrée pour cet athlète.</div>
+      <template v-else>
+        <div class="histo-resume">
+          <div class="histo-stat">
+            <span class="histo-stat-valeur">{{ resumePoids.dernier }} kg</span>
+            <span class="histo-stat-label">dernière pesée — {{ formatDateCourte(resumePoids.dateDernier) }}</span>
+          </div>
+          <div class="histo-stat">
+            <span class="histo-stat-valeur" :class="resumePoids.classeVariation">{{ resumePoids.variation }}</span>
+            <span class="histo-stat-label">sur 30 jours</span>
+          </div>
+          <div class="histo-stat">
+            <span class="histo-stat-valeur">{{ resumePoids.nbMois }}</span>
+            <span class="histo-stat-label">pesées sur {{ labelMois.toLowerCase() }}</span>
+          </div>
+        </div>
+
+        <div class="histo-switcher">
+          <button class="histo-chip" :class="{ active: vuePoids === 'calendrier' }" @click="vuePoids = 'calendrier'">
+            <i class="ti ti-calendar"></i> Calendrier
+          </button>
+          <button class="histo-chip" :class="{ active: vuePoids === 'courbe' }" @click="vuePoids = 'courbe'">
+            <i class="ti ti-chart-line"></i> Courbe
+          </button>
+        </div>
+
+        <div v-if="vuePoids === 'calendrier'" class="stat-card">
+          <div class="poids-calendrier-head">
+            <button class="btn btn-sm" @click="moisPrecedent" aria-label="Mois précédent"><i class="ti ti-chevron-left"></i></button>
+            <span class="poids-mois-label">{{ labelMois }}</span>
+            <button class="btn btn-sm" @click="moisSuivant" aria-label="Mois suivant"><i class="ti ti-chevron-right"></i></button>
+          </div>
+          <div class="poids-calendrier-grille">
+            <span v-for="(j, idx) in ['L', 'M', 'M', 'J', 'V', 'S', 'D']" :key="'lbl' + idx" class="poids-jour-label">{{ j }}</span>
+            <div
+              v-for="(jour, idx) in joursGrille"
+              :key="idx"
+              class="poids-jour-case"
+              :class="{
+                vide: !jour,
+                'a-une-valeur': jour && poidsPourDate(jour.date),
+                'est-aujourdhui': jour && jour.estAujourdhui
+              }"
+            >
+              <template v-if="jour">
+                <span class="poids-jour-num">{{ jour.numero }}</span>
+                <span v-if="poidsPourDate(jour.date)" class="poids-jour-val">{{ poidsPourDate(jour.date) }}</span>
+              </template>
+            </div>
+          </div>
+          <div class="poids-legende">
+            <span><i class="poids-dot"></i> jour pesé</span>
+            <span>{{ resumePoids.nbMois }} pesée(s) ce mois-ci</span>
+          </div>
+        </div>
+
+        <div v-else class="stat-card">
+          <CourbeProgression :points="courbePoids" label="Poids" unite="kg" axe-x="dates" />
+        </div>
+      </template>
     </div>
   </div>
 </template>
@@ -211,6 +321,21 @@ import GroupesManagerModal from './GroupesManagerModal.vue'
 // Distance horizontale minimale pour valider un swipe. Volontairement haute :
 // un doigt qui ripe sur un simple appui ne doit jamais changer d'onglet.
 const SEUIL_SWIPE = 80
+
+// Dimension « charge » de l'effort selon le type de séance : c'est celle qu'on
+// trace en courbe (même convention que le tableau de bord athlète).
+const CHAMP_CHARGE = {
+  musculation: { champ: 'poids_realise', label: 'charge moyenne par série', unite: 'kg' },
+  natation: { champ: 'reps_realisees', label: 'distance moyenne par série', unite: 'm' },
+  athletisme: { champ: 'reps_realisees', label: 'distance moyenne par série', unite: 'm' },
+  pliometrie: { champ: 'reps_realisees', label: 'bonds moyens par série', unite: '' }
+}
+const champCharge = (type) => CHAMP_CHARGE[type] || CHAMP_CHARGE.musculation
+
+const LABELS_TYPE = { musculation: 'Musculation', natation: 'Natation', athletisme: 'Athlétisme', pliometrie: 'Pliométrie' }
+
+const parseNombre = (v) => parseFloat(String(v).replace(',', '.'))
+const pad2 = (n) => String(n).padStart(2, '0')
 
 export default {
   components: { CourbeProgression, GraphiqueDouble, GraphiqueAcwrZones, GraphiqueBarres, GroupesManagerModal },
@@ -287,11 +412,14 @@ export default {
       }
     }
 
-    // --- Séances : logs prescrit vs réalisé (repris de l'ex-onglet "Logs athlètes") ---
+    // --- Historique : séances réalisées (prescrit vs réalisé) et courbes ---
     const programmesAssignes = computed(() => props.programmes.filter(p => estAssigne(p)))
     const programmeLogsId = ref(null)
     const logs = ref([])
     const loadingLogs = ref(false)
+    const vueHistorique = ref('seances')
+    const seanceFiltre = ref('toutes')
+    const sessionsOuvertes = ref(new Set())
 
     const fetchLogs = async () => {
       if (!programmeLogsId.value) { logs.value = []; return }
@@ -300,13 +428,13 @@ export default {
       loadingLogs.value = false
     }
 
-    const ouvrirSeances = () => {
-      sousOnglet.value = 'seances'
+    const ouvrirHistorique = () => {
+      sousOnglet.value = 'historique'
       if (!programmeLogsId.value && programmesAssignes.value.length > 0) {
         programmeLogsId.value = programmesAssignes.value[0].id
       }
     }
-    watch(programmeLogsId, fetchLogs)
+    watch(programmeLogsId, () => { seanceFiltre.value = 'toutes'; fetchLogs() })
 
     // L'API renvoie les logs triés par date décroissante (dernière tentative
     // en tête) — un ordre qui reflète QUAND chaque série a été loguée, pas SA
@@ -319,8 +447,15 @@ export default {
       const sessions = {}
       logs.value.forEach(log => {
         const dateStr = log.date.split('T')[0]
-        const key = `${dateStr}__${log.seance.id}`
-        if (!sessions[key]) sessions[key] = { key, date: dateStr, seanceNom: log.seance.nom, jour: log.seance.jour, typeSeance: log.seance.type_seance, exercices: {} }
+        // session_id = une validation de séance : deux tentatives d'une même
+        // séance le même jour restent deux entrées distinctes dans l'historique.
+        const key = log.session_id || `${dateStr}__${log.seance.id}`
+        if (!sessions[key]) {
+          sessions[key] = {
+            key, date: dateStr, seanceNom: log.seance.nom, jour: log.seance.jour,
+            semaine: log.seance.semaine, typeSeance: log.seance.type_seance, exercices: {}
+          }
+        }
         if (!sessions[key].exercices[log.exercice.id]) {
           sessions[key].exercices[log.exercice.id] = { id: log.exercice.id, nom: log.exercice.nom, ordre: log.exercice.ordre, groupe: log.exercice.groupe, logs: [] }
         }
@@ -328,13 +463,76 @@ export default {
       })
       return Object.values(sessions)
         .sort((a, b) => b.date.localeCompare(a.date))
-        .map(s => ({
-          ...s,
-          exercices: Object.values(s.exercices)
+        .map(s => {
+          const exercices = Object.values(s.exercices)
             .sort((a, b) => a.ordre - b.ordre)
             .map(e => ({ ...e, logs: [...e.logs].sort((a, b) => a.serie.id - b.serie.id) }))
-        }))
+          const total = exercices.reduce((n, e) => n + e.logs.length, 0)
+          const faites = exercices.reduce((n, e) => n + e.logs.filter(l => l.fait).length, 0)
+          return { ...s, exercices, total, faites, taux: total ? Math.round((faites / total) * 100) : 0 }
+        })
     })
+
+    const nomsSeances = computed(() => [...new Set(logsGroupes.value.map(s => s.seanceNom))].sort((a, b) => a.localeCompare(b)))
+
+    const sessionsFiltrees = computed(() =>
+      seanceFiltre.value === 'toutes'
+        ? logsGroupes.value
+        : logsGroupes.value.filter(s => s.seanceNom === seanceFiltre.value)
+    )
+
+    const resumeHistorique = computed(() => {
+      const sessions = sessionsFiltrees.value
+      const total = sessions.reduce((n, s) => n + s.total, 0)
+      const faites = sessions.reduce((n, s) => n + s.faites, 0)
+      const dates = sessions.map(s => s.date)
+      const periode = dates.length === 0
+        ? '—'
+        : dates.length === 1
+          ? formatDateCourte(dates[0])
+          : `${formatDateCourte(dates[dates.length - 1])} → ${formatDateCourte(dates[0])}`
+      return {
+        nbSessions: sessions.length,
+        total,
+        faites,
+        taux: total ? Math.round((faites / total) * 100) : 0,
+        periode
+      }
+    })
+
+    // Une courbe par exercice de l'historique filtré : un point par séance
+    // réalisée, moyenne du champ « charge » sur ses séries.
+    const courbesHistorique = computed(() => {
+      const parExo = {}
+      sessionsFiltrees.value.forEach(session => {
+        const conf = champCharge(session.typeSeance)
+        session.exercices.forEach(exo => {
+          const valeurs = exo.logs.map(l => parseNombre(l[conf.champ])).filter(v => !isNaN(v))
+          if (valeurs.length === 0) return
+          if (!parExo[exo.nom]) parExo[exo.nom] = { nom: exo.nom, label: conf.label, unite: conf.unite, points: [] }
+          const moyenne = valeurs.reduce((a, b) => a + b, 0) / valeurs.length
+          parExo[exo.nom].points.push({ date: session.date, valeur: Math.round(moyenne * 100) / 100 })
+        })
+      })
+      return Object.values(parExo)
+        .map(c => ({ ...c, points: [...c.points].reverse() })) // sessions triées du plus récent au plus ancien
+        .filter(c => c.points.length >= 2)
+        .sort((a, b) => a.nom.localeCompare(b.nom))
+    })
+
+    const basculerSession = (key) => {
+      if (sessionsOuvertes.value.has(key)) sessionsOuvertes.value.delete(key)
+      else sessionsOuvertes.value.add(key)
+    }
+
+    // À chaque (re)chargement de l'historique, seule la séance la plus récente
+    // est dépliée : le prépa voit d'abord la dernière séance en détail.
+    watch(logsGroupes, (sessions) => {
+      sessionsOuvertes.value = new Set(sessions.length > 0 ? [sessions[0].key] : [])
+    })
+
+    const classeTaux = (taux) => (taux >= 90 ? 'taux-done' : taux >= 60 ? 'taux-warn' : 'taux-skip')
+    const labelType = (t) => LABELS_TYPE[t] || LABELS_TYPE.musculation
 
     // Regroupe les exercices d'une session en supersets/bisets (même logique
     // que grouperExercices côté édition de programme) pour un affichage plus
@@ -359,6 +557,7 @@ export default {
     const letterFor = (idx) => String.fromCharCode(65 + idx)
 
     const formatDate = (d) => new Date(d).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
+    const formatDateCourte = (d) => new Date(d).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })
 
     const getStatutClasse = (log, typeSeance) => {
       if (!log.fait) return 'statut-skip'
@@ -379,10 +578,13 @@ export default {
       return getStatutClasse(log, typeSeance) === 'statut-warn' ? 'ti ti-alert-triangle' : 'ti ti-check'
     }
 
-    // --- Poids : lecture seule ---
+    // --- Poids : calendrier des pesées + courbe, lecture seule ---
     const entriesPoids = ref([])
     const loadingPoids = ref(false)
     const poidsCharge = ref(false)
+    const vuePoids = ref('calendrier')
+    const moisAffiche = ref(new Date(new Date().getFullYear(), new Date().getMonth(), 1))
+
     const fetchPoids = async () => {
       loadingPoids.value = true
       try {
@@ -402,8 +604,67 @@ export default {
       if (!poidsCharge.value) fetchPoids()
     }
 
+    const poidsParDate = computed(() => {
+      const map = {}
+      entriesPoids.value.forEach(e => { map[e.date] = e })
+      return map
+    })
+    const poidsPourDate = (date) => poidsParDate.value[date]?.poids ?? null
+
+    const labelMois = computed(() => {
+      const texte = moisAffiche.value.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
+      return texte.charAt(0).toUpperCase() + texte.slice(1)
+    })
+
+    // Grille lundi -> dimanche, complétée par des cases vides pour aligner le
+    // premier jour du mois et compléter la dernière semaine (même grille que
+    // celle où l'athlète saisit ses pesées, en lecture seule).
+    const joursGrille = computed(() => {
+      const annee = moisAffiche.value.getFullYear()
+      const mois = moisAffiche.value.getMonth()
+      const nbJours = new Date(annee, mois + 1, 0).getDate()
+      const decalage = (new Date(annee, mois, 1).getDay() + 6) % 7 // 0 = lundi
+      const aujourdhui = new Date()
+      const todayISO = `${aujourdhui.getFullYear()}-${pad2(aujourdhui.getMonth() + 1)}-${pad2(aujourdhui.getDate())}`
+
+      const jours = []
+      for (let i = 0; i < decalage; i++) jours.push(null)
+      for (let n = 1; n <= nbJours; n++) {
+        const iso = `${annee}-${pad2(mois + 1)}-${pad2(n)}`
+        jours.push({ date: iso, numero: n, estAujourdhui: iso === todayISO })
+      }
+      while (jours.length % 7 !== 0) jours.push(null)
+      return jours
+    })
+
+    const moisPrecedent = () => {
+      moisAffiche.value = new Date(moisAffiche.value.getFullYear(), moisAffiche.value.getMonth() - 1, 1)
+    }
+    const moisSuivant = () => {
+      moisAffiche.value = new Date(moisAffiche.value.getFullYear(), moisAffiche.value.getMonth() + 1, 1)
+    }
+
+    const resumePoids = computed(() => {
+      const points = courbePoids.value
+      const dernier = points[points.length - 1]
+      // Repère le plus ancien relevé encore dans la fenêtre de 30 jours pour
+      // mesurer la variation sur le mois écoulé.
+      const limite = new Date()
+      limite.setDate(limite.getDate() - 30)
+      const reference = points.find(p => new Date(p.date) >= limite)
+      const ecart = reference && dernier ? Math.round((dernier.valeur - reference.valeur) * 10) / 10 : null
+      const prefixeMois = `${moisAffiche.value.getFullYear()}-${pad2(moisAffiche.value.getMonth() + 1)}`
+      return {
+        dernier: dernier ? dernier.valeur : '—',
+        dateDernier: dernier ? dernier.date : null,
+        variation: ecart === null || ecart === 0 ? '=' : `${ecart > 0 ? '+' : ''}${ecart} kg`,
+        classeVariation: ecart === null || ecart === 0 ? '' : ecart > 0 ? 'variation-hausse' : 'variation-baisse',
+        nbMois: entriesPoids.value.filter(e => e.date.startsWith(prefixeMois)).length
+      }
+    })
+
     // --- Navigation par onglet (clic ou swipe) ---
-    const ONGLETS_FICHE = ['apercu', 'programme', 'seances', 'poids']
+    const ONGLETS_FICHE = ['apercu', 'programme', 'historique', 'poids']
 
     // Recentre l'onglet actif dans la barre (qui peut déborder sur mobile) :
     // au swipe comme au clic, l'onglet qui devient actif se replace bien en
@@ -416,7 +677,7 @@ export default {
     }
 
     const allerA = (tab) => {
-      if (tab === 'seances') ouvrirSeances()
+      if (tab === 'historique') ouvrirHistorique()
       else if (tab === 'poids') ouvrirPoids()
       else sousOnglet.value = tab
       centrerOnglet(tab)
@@ -464,10 +725,13 @@ export default {
       detail, loadingApercu, pointsAcwr, pointsAigueChronique, pointsMonotonie, pointsContrainte,
       pointsHooper, dernierWellness, barresDernierWellness, formatDateCourt,
       enCours, estAssigne, assignerProgramme, retirerProgramme,
-      programmesAssignes, programmeLogsId, loadingLogs, logsGroupes, ouvrirSeances,
+      programmesAssignes, programmeLogsId, loadingLogs, logsGroupes, ouvrirHistorique,
+      vueHistorique, seanceFiltre, nomsSeances, sessionsFiltrees, resumeHistorique, courbesHistorique,
+      sessionsOuvertes, basculerSession, classeTaux, labelType,
       grouperExosSession, letterFor,
-      formatDate, getStatutClasse, getStatutIcon,
-      loadingPoids, courbePoids, ouvrirPoids,
+      formatDate, formatDateCourte, getStatutClasse, getStatutIcon,
+      loadingPoids, entriesPoids, courbePoids, ouvrirPoids,
+      vuePoids, labelMois, joursGrille, poidsPourDate, moisPrecedent, moisSuivant, resumePoids,
       allerA, onSwipeStart, onSwipeEnd, onSwipeCancel, setTabRef
     }
   }
@@ -547,30 +811,100 @@ export default {
 .programme-assign-nom { font-size: var(--font-size-sm); font-weight: 600; }
 .programme-assign-actions { display: flex; gap: var(--spacing-sm); }
 
-.select-programme-logs {
-  align-self: flex-start;
+.histo-filtres { display: flex; gap: var(--spacing-sm); flex-wrap: wrap; }
+.select-histo {
   min-height: var(--tap-min);
   padding: 0 var(--spacing-md);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   font-size: var(--font-size-base);
   background: var(--color-bg);
+  flex: 1;
+  min-width: 160px;
 }
+
+.histo-resume { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--spacing-sm); }
+.histo-stat {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  padding: var(--spacing-md) var(--spacing-sm);
+  border: 1px solid var(--color-border); border-radius: var(--radius-lg);
+  background: var(--color-bg); text-align: center;
+}
+.histo-stat-valeur { font-size: var(--font-size-xl); font-weight: 700; }
+.histo-stat-valeur.histo-stat-periode { font-size: var(--font-size-sm); }
+.histo-stat-valeur.taux-done { color: var(--color-valid-text-strong); }
+.histo-stat-valeur.taux-warn { color: var(--color-warning-text-strong); }
+.histo-stat-valeur.taux-skip { color: var(--color-danger-text); }
+.histo-stat-valeur.variation-hausse { color: var(--color-warning-text-strong); }
+.histo-stat-valeur.variation-baisse { color: var(--color-valid-text-strong); }
+.histo-stat-label { font-size: var(--font-size-xs); color: var(--color-text-secondary); line-height: 1.3; }
+
+.histo-switcher { display: flex; gap: var(--spacing-sm); flex-wrap: wrap; }
+.histo-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: 36px; padding: 0 var(--spacing-lg);
+  border: 1px solid var(--color-border); border-radius: var(--radius-full);
+  background: var(--color-bg); color: var(--color-text-secondary);
+  font-size: var(--font-size-sm); font-weight: 500; cursor: pointer;
+}
+.histo-chip.active { background: var(--color-primary-light); border-color: var(--color-primary); color: var(--color-primary-text); font-weight: 600; }
 
 .session-block { border: 1px solid var(--color-border); border-radius: var(--radius-lg); overflow: hidden; flex-shrink: 0; background: var(--color-bg); }
 .session-head {
+  width: 100%;
   padding: var(--spacing-md) var(--spacing-lg);
   background: var(--color-bg-secondary);
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
-  border-bottom: 1px solid var(--color-border);
   font-size: var(--font-size-sm);
   font-weight: 500;
   flex-wrap: wrap;
+  border: none;
+  border-bottom: 1px solid var(--color-border);
+  font-family: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
 }
-.session-nom { flex: 1; font-weight: 600; }
-.session-date { font-size: var(--font-size-xs); color: var(--color-text-secondary); text-transform: capitalize; }
+.session-head:hover { background: var(--color-bg-tertiary); }
+.session-nom { flex: 1; font-weight: 600; min-width: 0; }
+.session-date { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+.session-date::first-letter { text-transform: uppercase; }
+.session-chevron { color: var(--color-text-secondary); }
+.taux-badge {
+  font-size: var(--font-size-xs); font-weight: 700;
+  padding: 3px 9px; border-radius: var(--radius-full);
+  background: var(--color-bg-tertiary); color: var(--color-text-secondary);
+}
+.taux-badge.taux-done { background: var(--color-valid-bg); color: var(--color-valid-text-strong); }
+.taux-badge.taux-warn { background: var(--color-warning-bg); color: var(--color-warning-text-strong); }
+.taux-badge.taux-skip { background: var(--color-danger-bg); color: var(--color-danger-text); }
+
+.poids-calendrier-head { display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-sm); }
+.poids-mois-label { font-size: var(--font-size-base); font-weight: 700; text-transform: capitalize; }
+.poids-calendrier-grille { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.poids-jour-label { text-align: center; font-size: var(--font-size-xs); font-weight: 600; color: var(--color-text-muted); padding-bottom: 4px; }
+.poids-jour-case {
+  aspect-ratio: 1;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  border: 1px solid var(--color-border); border-radius: var(--radius-md);
+  background: var(--color-bg); font-size: var(--font-size-xs); padding: 2px;
+}
+.poids-jour-case.vide { visibility: hidden; border: none; }
+.poids-jour-case.est-aujourdhui { border-color: var(--color-primary); border-width: 2px; }
+.poids-jour-case.a-une-valeur { background: var(--color-valid-bg-soft); border-color: var(--color-valid-border); }
+.poids-jour-num { font-weight: 600; }
+.poids-jour-val { font-size: 10px; font-weight: 700; color: var(--color-valid-text-strong); }
+.poids-legende {
+  display: flex; align-items: center; gap: var(--spacing-md); flex-wrap: wrap;
+  font-size: var(--font-size-xs); color: var(--color-text-muted);
+}
+.poids-legende span { display: inline-flex; align-items: center; gap: 4px; }
+.poids-dot {
+  width: 9px; height: 9px; border-radius: 3px;
+  background: var(--color-valid-bg-soft); border: 1px solid var(--color-valid-border);
+}
 .session-body { padding: var(--spacing-md) var(--spacing-lg); display: flex; flex-direction: column; gap: var(--spacing-lg); }
 
 .exo-groupe-log { display: flex; flex-direction: column; gap: var(--spacing-md); }

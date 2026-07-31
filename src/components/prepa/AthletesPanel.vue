@@ -12,30 +12,31 @@
         </div>
       </div>
 
-      <div class="resume-cercle-grid" v-if="!loading && resumes.length > 0">
-        <div class="resume-tile">
-          <div class="resume-valeur">{{ resumeCercle.total }}</div>
-          <div class="resume-label">Athlètes suivis</div>
+      <div class="resume-cercle" v-if="!loading && resumes.length > 0">
+        <div class="resume-groupe" v-for="groupe in GROUPES_INDICATEURS" :key="groupe.titre">
+          <div class="resume-groupe-titre">{{ groupe.titre }}</div>
+          <div class="resume-grid">
+            <button
+              v-for="cle in groupe.cles"
+              :key="cle"
+              type="button"
+              class="resume-tile"
+              :class="[compteurs[cle] > 0 ? `resume-tile-${INDICATEURS[cle].ton}` : '', { active: indicateurFiltre === cle }]"
+              :disabled="cle !== 'tous' && compteurs[cle] === 0"
+              @click="filtrerPar(cle)"
+            >
+              <div class="resume-valeur">
+                {{ compteurs[cle] }}<span v-if="INDICATEURS[cle].surTotal" class="resume-total">/{{ compteurs.tous }}</span>
+              </div>
+              <div class="resume-label">{{ INDICATEURS[cle].label }}</div>
+              <div class="resume-aide">{{ INDICATEURS[cle].aide }}</div>
+            </button>
+          </div>
         </div>
-        <div class="resume-tile resume-tile-optimale">
-          <div class="resume-valeur">{{ resumeCercle.zones.optimale }}</div>
-          <div class="resume-label">Zone optimale</div>
-        </div>
-        <div class="resume-tile resume-tile-vigilance">
-          <div class="resume-valeur">{{ resumeCercle.zones.vigilance }}</div>
-          <div class="resume-label">Vigilance</div>
-        </div>
-        <div class="resume-tile resume-tile-surcharge">
-          <div class="resume-valeur">{{ resumeCercle.zones.surcharge }}</div>
-          <div class="resume-label">Surcharge</div>
-        </div>
-        <div class="resume-tile" :class="{ 'resume-tile-vigilance': resumeCercle.signalants > 0 }">
-          <div class="resume-valeur">{{ resumeCercle.signalants }}</div>
-          <div class="resume-label">Signaux actifs</div>
-        </div>
-        <div class="resume-tile">
-          <div class="resume-valeur">{{ resumeCercle.wellnessRepondu }}/{{ resumeCercle.total }}</div>
-          <div class="resume-label">Wellness aujourd'hui</div>
+        <div class="filtre-actif" v-if="indicateurFiltre !== 'tous'">
+          <i class="ti ti-filter"></i>
+          <span>{{ INDICATEURS[indicateurFiltre].label }} — {{ INDICATEURS[indicateurFiltre].aide }}</span>
+          <button class="btn-effacer-filtre" @click="filtrerPar('tous')"><i class="ti ti-x"></i> Tout afficher</button>
         </div>
       </div>
 
@@ -84,7 +85,10 @@
                 </div>
                 <div class="amc-infos-recentes" v-if="a.resume">
                   <span><i class="ti ti-run"></i> Dernière séance : <strong>{{ formatDateRecente(a.resume.derniere_seance) }}</strong></span>
-                  <span><i class="ti ti-mood-check"></i> Wellness : <strong>{{ formatDateRecente(a.resume.dernier_wellness) }}</strong></span>
+                  <span>
+                    <i class="ti ti-mood-check"></i> Wellness : <strong>{{ formatDateRecente(a.resume.dernier_wellness) }}</strong>
+                    <span v-if="a.resume.hooper_dernier" class="hooper-badge" :class="'wellness-' + a.resume.wellness_zone">{{ a.resume.hooper_dernier }}/28</span>
+                  </span>
                   <span><i class="ti ti-weight"></i> Poids : <strong>{{ a.resume.dernier_poids ? `${a.resume.dernier_poids.poids}kg (${formatDateRecente(a.resume.dernier_poids.date)})` : '—' }}</strong></span>
                 </div>
                 <div class="groupes-badges" v-if="groupesDe(a.id).length > 0">
@@ -100,9 +104,15 @@
                 {{ a.resume.acwr.valeur !== null ? a.resume.acwr.valeur.toFixed(2) : '—' }}
               </span>
             </div>
-            <div class="amc-signaux" v-if="a.resume && a.resume.signaux.length > 0">
+            <div class="amc-signaux" v-if="a.resume">
               <span class="signal-badge" v-for="(s, i) in a.resume.signaux" :key="i">
                 <i class="ti ti-alert-triangle"></i> {{ s }}
+              </span>
+              <span class="signal-badge signal-ras" v-if="estRAS(a.resume)">
+                <i class="ti ti-circle-check"></i> RAS
+              </span>
+              <span class="signal-badge signal-attente" v-else-if="a.resume.signaux.length === 0">
+                <i class="ti ti-hourglass"></i> ACWR pas encore calculable
               </span>
             </div>
           </div>
@@ -158,6 +168,16 @@
         </div>
         <div class="modal-body">
           <div class="aide-section">
+            <h4>Les indicateurs du tableau de bord</h4>
+            <p>Chaque indicateur est cliquable : il filtre la liste sur les athlètes qu'il compte.</p>
+            <ul class="aide-indicateurs">
+              <li v-for="cle in CLES_INDICATEURS" :key="cle">
+                <span class="aide-pastille" :class="`resume-tile-${INDICATEURS[cle].ton}`">{{ compteurs[cle] }}</span>
+                <span><strong>{{ INDICATEURS[cle].label }}</strong> — {{ INDICATEURS[cle].definition }}</span>
+              </li>
+            </ul>
+          </div>
+          <div class="aide-section">
             <h4>Charge de séance (sRPE)</h4>
             <p>Chaque séance validée par l'athlète donne une charge en UA (unités arbitraires) = <strong>ressenti d'effort (RPE, 0 à 10) × durée en minutes</strong>. C'est la brique de base de tous les indicateurs ci-dessous.</p>
           </div>
@@ -181,8 +201,9 @@
             <p>L'athlète note chaque jour 4 critères de 1 à 7 : sommeil, fatigue, courbatures, stress. Le total va de <strong>4 (forme parfaite) à 28 (très dégradé)</strong> — plus bas = mieux. Un signal se déclenche si l'indice se dégrade 3 jours de suite.</p>
           </div>
           <div class="aide-section">
-            <h4>Signaux</h4>
-            <p>Générés automatiquement, sans action du prépa : zone de vigilance ou surcharge sur l'ACWR, ou wellness dégradé 3 jours de suite. Un athlète sans signal n'a pas forcément 0 problème — surtout si son ACWR est encore indisponible (moins de 28 jours de données).</p>
+            <h4>Signaux &amp; RAS</h4>
+            <p>Les signaux sont générés automatiquement, sans action du prépa : zone de vigilance ou surcharge sur l'ACWR, ou wellness dégradé 3 jours de suite.</p>
+            <p>Un athlète est marqué <strong>RAS</strong> quand il n'a aucun signal <em>et</em> que son ACWR est calculable. Sans signal mais avec moins de 28 jours de données, il porte le badge <strong>« ACWR pas encore calculable »</strong> : rien ne le signale, mais rien ne prouve non plus que tout va bien.</p>
           </div>
         </div>
       </div>
@@ -196,6 +217,72 @@ import { useApi } from '../../services/api'
 import { useAuthStore } from '../../stores/auth'
 import FicheAthlete from './FicheAthlete.vue'
 import GroupesManagerModal from './GroupesManagerModal.vue'
+
+// Au-delà, un relevé wellness ne dit plus rien de l'état actuel de l'athlète :
+// on ne le compte plus comme « wellness bon ».
+const FRAICHEUR_WELLNESS_JOURS = 3
+const joursDepuis = (date) => Math.floor((Date.now() - new Date(date).getTime()) / 86400000)
+
+// « Rien à signaler » : aucun signal ET assez d'historique pour que l'ACWR soit
+// calculable — sans ça, l'absence de signal ne prouve rien.
+const estRAS = (r) => r.signaux.length === 0 && !!r.acwr.zone
+
+// Source unique des tuiles du bandeau, de leur définition (aide affichée sous
+// le libellé + modale) et du filtre appliqué au clic.
+const INDICATEURS = {
+  tous: {
+    label: 'Athlètes suivis', ton: 'neutre', aide: 'tout le cercle',
+    definition: 'tous les athlètes de votre cercle.',
+    test: () => true
+  },
+  ras: {
+    label: 'RAS', ton: 'optimale', aide: 'rien à signaler',
+    definition: "aucun signal actif et ACWR calculable : l'athlète est dans la norme.",
+    test: estRAS
+  },
+  signaux: {
+    label: 'Signaux actifs', ton: 'vigilance', aide: 'à regarder en priorité',
+    definition: 'au moins une alerte automatique (ACWR en vigilance ou surcharge, wellness dégradé 3 jours de suite).',
+    test: (r) => r.signaux.length > 0
+  },
+  optimale: {
+    label: 'Zone optimale', ton: 'optimale', aide: 'ACWR 0,8 à 1,3',
+    definition: 'charge des 7 derniers jours cohérente avec la moyenne des 28 derniers.',
+    test: (r) => r.acwr.zone === 'optimale'
+  },
+  vigilance: {
+    label: 'Vigilance', ton: 'vigilance', aide: 'ACWR 1,3 à 1,5',
+    definition: 'montée de charge à surveiller sur la semaine.',
+    test: (r) => r.acwr.zone === 'vigilance'
+  },
+  surcharge: {
+    label: 'Surcharge', ton: 'surcharge', aide: 'ACWR > 1,5',
+    definition: 'montée de charge trop rapide, risque de blessure accru.',
+    test: (r) => r.acwr.zone === 'surcharge'
+  },
+  sous_charge: {
+    label: 'Sous-charge', ton: 'neutre', aide: 'ACWR < 0,8',
+    definition: "s'entraîne nettement moins que sur ses 4 dernières semaines.",
+    test: (r) => r.acwr.zone === 'sous_charge'
+  },
+  wellness_jour: {
+    label: 'Wellness du jour', ton: 'neutre', aide: "ont répondu aujourd'hui", surTotal: true,
+    definition: "ont rempli le questionnaire wellness aujourd'hui.",
+    test: (r) => r.wellness_repondu_aujourdhui
+  },
+  wellness_bon: {
+    label: 'Wellness bon', ton: 'optimale', aide: 'Hooper ≤ 10 / 28',
+    definition: `dernier relevé au vert (Hooper 10 ou moins) et datant de moins de ${FRAICHEUR_WELLNESS_JOURS} jours.`,
+    test: (r) => r.wellness_zone === 'bon' && r.dernier_wellness && joursDepuis(r.dernier_wellness) <= FRAICHEUR_WELLNESS_JOURS
+  }
+}
+
+const GROUPES_INDICATEURS = [
+  { titre: "Vue d'ensemble", cles: ['tous', 'ras', 'signaux'] },
+  { titre: 'Charge — ACWR', cles: ['optimale', 'vigilance', 'surcharge', 'sous_charge'] },
+  { titre: 'Wellness', cles: ['wellness_jour', 'wellness_bon'] }
+]
+const CLES_INDICATEURS = GROUPES_INDICATEURS.flatMap(g => g.cles)
 
 export default {
   components: { FicheAthlete, GroupesManagerModal },
@@ -216,6 +303,7 @@ export default {
     const rechercheNom = ref('')
     const groupeFiltre = ref('tous')
     const organisationFiltre = ref('toutes')
+    const indicateurFiltre = ref('tous')
     const aideOuverte = ref(false)
 
     // On ne garde que l'id sélectionné : l'objet athlète est relu depuis
@@ -251,28 +339,26 @@ export default {
     )
 
     const athletesFiltres = computed(() => {
+      const indicateur = INDICATEURS[indicateurFiltre.value]
       return athletesEnrichis.value.filter(a => {
         if (rechercheNom.value && !a.nom.toLowerCase().includes(rechercheNom.value.toLowerCase())) return false
         if (groupeFiltre.value !== 'tous' && !groupesDe(a.id).find(g => g.id === groupeFiltre.value)) return false
         if (organisationFiltre.value === 'independant' && a.organisation_id) return false
         if (organisationFiltre.value !== 'toutes' && organisationFiltre.value !== 'independant' && a.organisation_id !== organisationFiltre.value) return false
+        if (indicateurFiltre.value !== 'tous' && !(a.resume && indicateur.test(a.resume))) return false
         return true
       })
     })
 
     // Vue d'ensemble du cercle entier (indépendante des filtres de la liste,
     // pour garder un instantané stable de tout le groupe).
-    const resumeCercle = computed(() => {
-      const zones = { optimale: 0, vigilance: 0, surcharge: 0, sous_charge: 0 }
-      let signalants = 0
-      let wellnessRepondu = 0
-      resumes.value.forEach(r => {
-        if (r.acwr.zone && zones[r.acwr.zone] !== undefined) zones[r.acwr.zone]++
-        if (r.signaux.length > 0) signalants++
-        if (r.wellness_repondu_aujourdhui) wellnessRepondu++
-      })
-      return { total: resumes.value.length, zones, signalants, wellnessRepondu }
-    })
+    const compteurs = computed(() =>
+      Object.fromEntries(CLES_INDICATEURS.map(cle => [cle, resumes.value.filter(r => INDICATEURS[cle].test(r)).length]))
+    )
+
+    // Une tuile à 0 est désactivée côté template : filtrer dessus n'aurait
+    // aucun sens. Recliquer la tuile active revient à tout afficher.
+    const filtrerPar = (cle) => { indicateurFiltre.value = indicateurFiltre.value === cle ? 'tous' : cle }
 
     const fetchResumes = async () => {
       loading.value = true
@@ -321,8 +407,9 @@ export default {
     onMounted(() => { if (props.actif) fetchResumes() })
 
     return {
+      INDICATEURS, GROUPES_INDICATEURS, CLES_INDICATEURS, compteurs, indicateurFiltre, filtrerPar, estRAS,
       resumes, loading, rechercheNom, groupeFiltre, organisationFiltre, organisationsCercle, athletesFiltres,
-      estSuperPrepa, athleteSelectionneId, athleteSelectionne, ouvrirFiche, aideOuverte, resumeCercle,
+      estSuperPrepa, athleteSelectionneId, athleteSelectionne, ouvrirFiche, aideOuverte,
       modalGroupes, athleteFocusGroupes, ouvrirGestionGroupes, groupesDe,
       searchEmail, athleteTrouve, searchError, rechercherAthlète, ajouterAuCercle, retirerDuCercle,
       onModifie, iconeTendance, initiales, formatDateRecente
@@ -346,15 +433,27 @@ export default {
 }
 .btn-aide:hover { background: var(--color-bg-secondary); }
 
-.resume-cercle-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: var(--spacing-sm); }
+.resume-cercle { display: flex; flex-direction: column; gap: var(--spacing-md); }
+.resume-groupe { display: flex; flex-direction: column; gap: 6px; }
+.resume-groupe-titre {
+  font-size: var(--font-size-xs); font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.4px; color: var(--color-text-muted);
+}
+.resume-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: var(--spacing-sm); }
 .resume-tile {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
   padding: var(--spacing-md) var(--spacing-sm);
   border: 1px solid var(--color-border); border-radius: var(--radius-lg);
-  background: var(--color-bg); text-align: center;
+  background: var(--color-bg); text-align: center; cursor: pointer;
+  font-family: inherit; color: inherit;
 }
+.resume-tile:hover:not(:disabled) { border-color: var(--color-primary); }
+.resume-tile.active { box-shadow: 0 0 0 2px var(--color-primary); border-color: var(--color-primary); }
+.resume-tile:disabled { opacity: 0.5; cursor: default; }
 .resume-valeur { font-size: var(--font-size-xl); font-weight: 700; }
-.resume-label { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+.resume-total { font-size: var(--font-size-sm); font-weight: 600; color: var(--color-text-muted); }
+.resume-label { font-size: var(--font-size-xs); font-weight: 600; color: var(--color-text-secondary); }
+.resume-aide { font-size: 10px; color: var(--color-text-muted); line-height: 1.3; }
 .resume-tile-optimale { border-color: var(--color-valid-text-strong); background: var(--color-valid-bg); }
 .resume-tile-optimale .resume-valeur { color: var(--color-valid-text-strong); }
 .resume-tile-vigilance { border-color: var(--color-warning-text-strong); background: var(--color-warning-bg); }
@@ -362,7 +461,35 @@ export default {
 .resume-tile-surcharge { border-color: var(--color-danger-text); background: var(--color-danger-bg); }
 .resume-tile-surcharge .resume-valeur { color: var(--color-danger-text); }
 
+.filtre-actif {
+  display: flex; align-items: center; gap: var(--spacing-sm); flex-wrap: wrap;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid var(--color-primary); border-radius: var(--radius-md);
+  background: var(--color-primary-light); color: var(--color-primary-text);
+  font-size: var(--font-size-sm); font-weight: 600;
+}
+.filtre-actif span { flex: 1; min-width: 0; }
+.btn-effacer-filtre {
+  display: inline-flex; align-items: center; gap: 4px;
+  min-height: 32px; padding: 0 var(--spacing-md);
+  border: 1px solid var(--color-primary); border-radius: var(--radius-full);
+  background: var(--color-bg); color: var(--color-primary-text);
+  font-size: var(--font-size-xs); font-weight: 600; cursor: pointer;
+}
+
 .modal-large { max-width: 640px; }
+.aide-indicateurs { list-style: none; margin: var(--spacing-sm) 0 0; padding: 0; display: flex; flex-direction: column; gap: var(--spacing-sm); }
+.aide-indicateurs li { display: flex; align-items: center; gap: var(--spacing-sm); font-size: var(--font-size-sm); color: var(--color-text-secondary); }
+.aide-indicateurs strong { color: var(--color-text); }
+.aide-pastille {
+  flex-shrink: 0; min-width: 30px; padding: 2px 6px;
+  border: 1px solid var(--color-border); border-radius: var(--radius-md);
+  background: var(--color-bg); text-align: center;
+  font-size: var(--font-size-xs); font-weight: 700;
+}
+.aide-pastille.resume-tile-optimale { color: var(--color-valid-text-strong); }
+.aide-pastille.resume-tile-vigilance { color: var(--color-warning-text-strong); }
+.aide-pastille.resume-tile-surcharge { color: var(--color-danger-text); }
 .aide-section h4 { margin: 0 0 4px; font-size: var(--font-size-sm); font-weight: 700; }
 .aide-section p { margin: 0 0 var(--spacing-xs); font-size: var(--font-size-sm); color: var(--color-text-secondary); line-height: 1.5; }
 .aide-section + .aide-section { margin-top: var(--spacing-md); padding-top: var(--spacing-md); border-top: 1px solid var(--color-border); }
@@ -451,6 +578,15 @@ export default {
   padding: 3px 9px; border-radius: var(--radius-full);
   background: var(--color-warning-bg); color: var(--color-warning-text-strong);
 }
+.signal-badge.signal-ras { background: var(--color-valid-bg); color: var(--color-valid-text-strong); }
+.signal-badge.signal-attente { background: var(--color-bg-tertiary); color: var(--color-text-muted); }
+.hooper-badge {
+  margin-left: 4px; padding: 1px 6px; border-radius: var(--radius-full);
+  font-size: 10px; font-weight: 700;
+  background: var(--color-bg-tertiary); color: var(--color-text-secondary);
+}
+.hooper-badge.wellness-bon { background: var(--color-valid-bg); color: var(--color-valid-text-strong); }
+.hooper-badge.wellness-degrade { background: var(--color-danger-bg); color: var(--color-danger-text); }
 .amc-actions { display: flex; justify-content: flex-end; align-items: center; gap: var(--spacing-sm); }
 .btn-icon-tiny {
   width: 28px; height: 28px; padding: 0;
@@ -478,6 +614,6 @@ export default {
 
 @media (max-width: 768px) {
   .athletes-panel { padding: var(--spacing-md) var(--spacing-lg); }
-  .resume-cercle-grid { grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); }
+  .resume-grid { grid-template-columns: repeat(auto-fit, minmax(105px, 1fr)); }
 }
 </style>
