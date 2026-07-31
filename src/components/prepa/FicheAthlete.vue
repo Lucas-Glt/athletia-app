@@ -82,24 +82,88 @@
       </template>
     </div>
 
-    <!-- PROGRAMME : assignation -->
+    <!-- PROGRAMME : programmes assignés, dépliables jusqu'aux exercices -->
     <div v-if="sousOnglet === 'programme'" class="tab-content">
-      <div v-if="programmes.length === 0" class="empty">Aucun programme créé pour l'instant.</div>
-      <div class="programme-assign-list" v-else>
-        <div class="programme-assign-row" v-for="p in programmes" :key="p.id">
-          <div class="programme-assign-info">
-            <span class="programme-assign-nom">{{ p.nom }}</span>
-            <span class="badge" :class="p.statut === 'actif' ? 'badge-green' : 'badge-gray'">{{ p.statut }}</span>
-          </div>
-          <div class="programme-assign-actions">
-            <template v-if="estAssigne(p)">
-              <button class="btn btn-sm" @click="$emit('ouvrir-programme', p)">Voir / éditer</button>
-              <button class="btn btn-sm btn-danger" :disabled="enCours.has(p.id)" @click="retirerProgramme(p)">Retirer</button>
-            </template>
-            <button v-else class="btn btn-sm btn-primary" :disabled="enCours.has(p.id)" @click="assignerProgramme(p)">Assigner</button>
+      <div class="prog-topbar">
+        <span class="prog-topbar-titre">{{ programmesAssignes.length }} programme{{ programmesAssignes.length > 1 ? 's' : '' }} assigné{{ programmesAssignes.length > 1 ? 's' : '' }}</span>
+        <button class="btn btn-sm btn-primary" @click="modalAjoutProgramme = true"><i class="ti ti-plus"></i> Ajouter</button>
+      </div>
+
+      <div v-if="programmesAssignes.length === 0" class="empty">
+        Aucun programme assigné à cet athlète. Utilisez « Ajouter » pour lui en attribuer un.
+      </div>
+
+      <div v-for="p in programmesAssignes" :key="p.id" class="prog-block">
+        <button type="button" class="prog-head" @click="basculerProgramme(p)">
+          <i class="ti prog-chevron" :class="programmesOuverts.has(p.id) ? 'ti-chevron-up' : 'ti-chevron-down'"></i>
+          <span class="prog-nom">{{ p.nom }}</span>
+          <span class="badge" :class="p.statut === 'actif' ? 'badge-green' : 'badge-gray'">{{ p.statut }}</span>
+          <span class="prog-compte" v-if="seancesParProgramme[p.id]">
+            {{ seancesParProgramme[p.id].length }} séance{{ seancesParProgramme[p.id].length > 1 ? 's' : '' }}
+            · {{ semainesDuProgramme(p.id).length }} semaine{{ semainesDuProgramme(p.id).length > 1 ? 's' : '' }}
+          </span>
+        </button>
+
+        <div class="prog-actions">
+          <button class="btn btn-sm" @click="$emit('ouvrir-programme', p)"><i class="ti ti-pencil"></i> Voir / éditer</button>
+          <button class="btn btn-sm btn-danger" :disabled="enCours.has(p.id)" @click="retirerProgramme(p)">Retirer</button>
+        </div>
+
+        <div class="prog-body" v-if="programmesOuverts.has(p.id)">
+          <div v-if="loadingSeances.has(p.id) && !seancesParProgramme[p.id]" class="empty">Chargement...</div>
+          <div v-else-if="semainesDuProgramme(p.id).length === 0" class="empty">Ce programme ne contient aucune séance.</div>
+
+          <div v-for="semaine in semainesDuProgramme(p.id)" :key="semaine.numero" class="prog-semaine">
+            <div class="prog-semaine-titre">Semaine {{ semaine.numero }}</div>
+
+            <div v-for="seance in semaine.seances" :key="seance.id" class="seance-prog-block">
+              <button type="button" class="seance-prog-head" @click="basculerSeanceProg(seance.id)">
+                <i class="ti seance-prog-chevron" :class="seancesOuvertes.has(seance.id) ? 'ti-chevron-up' : 'ti-chevron-down'"></i>
+                <span class="badge badge-purple">{{ labelType(seance.type_seance) }}</span>
+                <span class="badge badge-gray" v-if="seance.jour">{{ seance.jour }}</span>
+                <span class="seance-prog-nom">{{ seance.nom }}</span>
+                <span class="exo-count-badge">{{ seance.exercices.length }} exo{{ seance.exercices.length > 1 ? 's' : '' }}</span>
+              </button>
+
+              <div class="seance-prog-body" v-if="seancesOuvertes.has(seance.id)">
+                <div v-if="seance.exercices.length === 0" class="empty">Aucun exercice.</div>
+                <div
+                  v-for="groupe in grouperExosSession(seance.exercices)"
+                  :key="groupe.key"
+                  class="exo-groupe-log"
+                  :class="{ 'is-superset': groupe.exercices.length > 1 }"
+                >
+                  <div v-if="groupe.exercices.length > 1" class="superset-banner">
+                    <i class="ti ti-link"></i>
+                    <span>Superset/Biset · {{ groupe.exercices.length }} exercices</span>
+                  </div>
+                  <div v-for="(exo, eidx) in groupe.exercices" :key="exo.id" class="exo-bloc">
+                    <div class="exo-header">
+                      <span class="exo-letter" v-if="groupe.exercices.length > 1">{{ letterFor(eidx) }}</span>
+                      <div class="exo-num" v-else>{{ exo.ordre }}</div>
+                      <span class="exo-name">{{ exo.nom }}</span>
+                      <span class="exo-count-badge">{{ exo.series.length }} série{{ exo.series.length > 1 ? 's' : '' }}</span>
+                    </div>
+                    <div class="series-chips" v-if="exo.series.length > 0">
+                      <span class="serie-chip" v-for="(serie, sidx) in exo.series" :key="serie.id">
+                        <span class="serie-chip-num">S{{ sidx + 1 }}</span>{{ resumeSerie(serie, seance.type_seance) }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
+
+      <AssignerProgrammeModal
+        v-if="modalAjoutProgramme"
+        :programmes="programmesDisponibles"
+        :enCours="enCours"
+        @fermer="modalAjoutProgramme = false"
+        @assigner="assignerProgramme"
+      />
     </div>
 
     <!-- HISTORIQUE : séances réalisées (prescrit vs réalisé) et courbes -->
@@ -317,6 +381,7 @@ import GraphiqueDouble from '../monitoring/GraphiqueDouble.vue'
 import GraphiqueAcwrZones from '../monitoring/GraphiqueAcwrZones.vue'
 import GraphiqueBarres from '../monitoring/GraphiqueBarres.vue'
 import GroupesManagerModal from './GroupesManagerModal.vue'
+import AssignerProgrammeModal from './AssignerProgrammeModal.vue'
 
 // Distance horizontale minimale pour valider un swipe. Volontairement haute :
 // un doigt qui ripe sur un simple appui ne doit jamais changer d'onglet.
@@ -338,7 +403,7 @@ const parseNombre = (v) => parseFloat(String(v).replace(',', '.'))
 const pad2 = (n) => String(n).padStart(2, '0')
 
 export default {
-  components: { CourbeProgression, GraphiqueDouble, GraphiqueAcwrZones, GraphiqueBarres, GroupesManagerModal },
+  components: { CourbeProgression, GraphiqueDouble, GraphiqueAcwrZones, GraphiqueBarres, GroupesManagerModal, AssignerProgrammeModal },
   emits: ['fermer', 'modifie', 'ouvrir-programme'],
   props: {
     athlete: { type: Object, required: true },
@@ -390,9 +455,17 @@ export default {
     })
     const formatDateCourt = (d) => new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
 
-    // --- Programme : assigner/retirer cet athlète ---
+    // --- Programme : contenu des programmes assignés, assigner/retirer ---
     const enCours = ref(new Set())
+    const modalAjoutProgramme = ref(false)
+    const programmesOuverts = ref(new Set())
+    const seancesOuvertes = ref(new Set())
+    const seancesParProgramme = ref({})
+    const loadingSeances = ref(new Set())
+
     const estAssigne = (p) => p.athletes.some(a => a.id === props.athlete.id)
+    const programmesDisponibles = computed(() => props.programmes.filter(p => !estAssigne(p)))
+
     const assignerProgramme = async (p) => {
       enCours.value.add(p.id)
       try {
@@ -409,7 +482,67 @@ export default {
         emit('modifie')
       } finally {
         enCours.value.delete(p.id)
+        programmesOuverts.value.delete(p.id)
+        delete seancesParProgramme.value[p.id]
       }
+    }
+
+    // Le contenu d'un programme n'est chargé qu'au dépliage, puis rechargé à
+    // chaque réouverture : le prépa peut l'avoir édité entre-temps. L'ancienne
+    // version reste affichée pendant le rechargement pour éviter le clignotement.
+    const chargerSeances = async (programmeId) => {
+      loadingSeances.value.add(programmeId)
+      try {
+        seancesParProgramme.value[programmeId] = await api.get(`/programmes/${programmeId}/seances/`)
+      } finally {
+        loadingSeances.value.delete(programmeId)
+      }
+    }
+
+    const basculerProgramme = (p) => {
+      if (programmesOuverts.value.has(p.id)) {
+        programmesOuverts.value.delete(p.id)
+        return
+      }
+      programmesOuverts.value.add(p.id)
+      chargerSeances(p.id)
+    }
+
+    const basculerSeanceProg = (seanceId) => {
+      if (seancesOuvertes.value.has(seanceId)) seancesOuvertes.value.delete(seanceId)
+      else seancesOuvertes.value.add(seanceId)
+    }
+
+    const semainesDuProgramme = (programmeId) => {
+      const parSemaine = {}
+      ;(seancesParProgramme.value[programmeId] || []).forEach(s => {
+        const numero = s.semaine || 1
+        if (!parSemaine[numero]) parSemaine[numero] = []
+        parSemaine[numero].push(s)
+      })
+      return Object.keys(parSemaine)
+        .map(Number)
+        .sort((a, b) => a - b)
+        .map(numero => ({ numero, seances: [...parSemaine[numero]].sort((a, b) => a.ordre - b.ordre) }))
+    }
+
+    // Prescription d'une série en une ligne, selon le type de séance.
+    const resumeSerie = (serie, typeSeance) => {
+      const parts = []
+      if (typeSeance === 'natation' || typeSeance === 'athletisme') {
+        if (serie.metres) parts.push(`${serie.metres} m`)
+        if (serie.intensite) parts.push(serie.intensite)
+      } else if (typeSeance === 'pliometrie') {
+        if (serie.bonds) parts.push(`${serie.bonds} bonds`)
+        if (serie.intensite) parts.push(serie.intensite)
+      } else {
+        if (serie.nb_reps) parts.push(`${serie.nb_reps} reps`)
+        if (serie.poids_cible) parts.push(serie.poids_cible)
+        if (serie.rm) parts.push(serie.rm)
+        if (serie.tempo) parts.push(serie.tempo)
+      }
+      if (serie.temps_repos) parts.push(`repos ${serie.temps_repos}`)
+      return parts.length > 0 ? parts.join(' · ') : '—'
     }
 
     // --- Historique : séances réalisées (prescrit vs réalisé) et courbes ---
@@ -725,6 +858,9 @@ export default {
       detail, loadingApercu, pointsAcwr, pointsAigueChronique, pointsMonotonie, pointsContrainte,
       pointsHooper, dernierWellness, barresDernierWellness, formatDateCourt,
       enCours, estAssigne, assignerProgramme, retirerProgramme,
+      modalAjoutProgramme, programmesDisponibles, programmesOuverts, seancesOuvertes,
+      seancesParProgramme, loadingSeances, basculerProgramme, basculerSeanceProg,
+      semainesDuProgramme, resumeSerie,
       programmesAssignes, programmeLogsId, loadingLogs, logsGroupes, ouvrirHistorique,
       vueHistorique, seanceFiltre, nomsSeances, sessionsFiltrees, resumeHistorique, courbesHistorique,
       sessionsOuvertes, basculerSession, classeTaux, labelType,
@@ -795,21 +931,64 @@ export default {
 .stat-card-titre-sm { font-size: var(--font-size-xs); color: var(--color-text-secondary); font-weight: 600; margin-top: var(--spacing-xs); }
 .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-lg); }
 
-.programme-assign-list { display: flex; flex-direction: column; gap: 6px; }
-.programme-assign-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--spacing-md);
+.prog-topbar { display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-md); flex-wrap: wrap; }
+.prog-topbar-titre { font-size: var(--font-size-sm); font-weight: 600; color: var(--color-text-secondary); }
+
+.prog-block { border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-bg); overflow: hidden; }
+.prog-head {
+  width: 100%;
+  display: flex; align-items: center; gap: var(--spacing-sm); flex-wrap: wrap;
+  padding: var(--spacing-md) var(--spacing-lg);
+  background: var(--color-bg-secondary);
+  border: none; font-family: inherit; color: inherit; text-align: left; cursor: pointer;
+  font-size: var(--font-size-sm);
+}
+.prog-head:hover { background: var(--color-bg-tertiary); }
+.prog-chevron { color: var(--color-text-secondary); }
+.prog-nom { font-weight: 700; font-size: var(--font-size-base); }
+.prog-compte { font-size: var(--font-size-xs); color: var(--color-text-secondary); margin-left: auto; }
+.prog-actions {
+  display: flex; justify-content: flex-end; gap: var(--spacing-sm); flex-wrap: wrap;
+  padding: var(--spacing-sm) var(--spacing-lg);
+}
+.prog-body {
+  padding: var(--spacing-md) var(--spacing-lg);
+  display: flex; flex-direction: column; gap: var(--spacing-lg);
+  border-top: 1px solid var(--color-border);
+}
+.prog-semaine { display: flex; flex-direction: column; gap: 6px; }
+.prog-semaine-titre {
+  font-size: var(--font-size-xs); font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.4px; color: var(--color-text-muted);
+}
+
+.seance-prog-block { border: 1px solid var(--color-border); border-radius: var(--radius-md); overflow: hidden; }
+.seance-prog-head {
+  width: 100%;
+  display: flex; align-items: center; gap: var(--spacing-sm); flex-wrap: wrap;
   padding: var(--spacing-sm) var(--spacing-md);
   background: var(--color-bg-secondary);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  flex-wrap: wrap;
+  border: none; font-family: inherit; color: inherit; text-align: left; cursor: pointer;
+  font-size: var(--font-size-sm);
 }
-.programme-assign-info { display: flex; align-items: center; gap: var(--spacing-sm); }
-.programme-assign-nom { font-size: var(--font-size-sm); font-weight: 600; }
-.programme-assign-actions { display: flex; gap: var(--spacing-sm); }
+.seance-prog-head:hover { background: var(--color-bg-tertiary); }
+.seance-prog-chevron { color: var(--color-text-secondary); }
+.seance-prog-nom { font-weight: 600; flex: 1; min-width: 0; }
+.exo-count-badge {
+  font-size: var(--font-size-xs); font-weight: 600;
+  padding: 2px 8px; border-radius: var(--radius-full);
+  background: var(--color-bg-tertiary); color: var(--color-text-secondary);
+}
+.seance-prog-body { padding: var(--spacing-md); display: flex; flex-direction: column; gap: var(--spacing-md); }
+
+.series-chips { display: flex; flex-wrap: wrap; gap: 4px; padding-left: 34px; }
+.serie-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: var(--font-size-xs); color: var(--color-text-secondary);
+  padding: 3px 9px; border-radius: var(--radius-full);
+  background: var(--color-bg-secondary); border: 1px solid var(--color-border);
+}
+.serie-chip-num { font-weight: 700; color: var(--color-text-muted); }
 
 .histo-filtres { display: flex; gap: var(--spacing-sm); flex-wrap: wrap; }
 .select-histo {
@@ -908,6 +1087,7 @@ export default {
 .session-body { padding: var(--spacing-md) var(--spacing-lg); display: flex; flex-direction: column; gap: var(--spacing-lg); }
 
 .exo-groupe-log { display: flex; flex-direction: column; gap: var(--spacing-md); }
+.superset-banner { display: flex; align-items: center; gap: 6px; font-size: var(--font-size-xs); color: var(--color-superset-text); font-weight: 600; }
 .exo-groupe-log.is-superset {
   padding: var(--spacing-md);
   background: var(--color-superset-bg);
