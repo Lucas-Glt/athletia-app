@@ -195,7 +195,17 @@
 
                     <div v-if="groupe.exercices.length > 1" class="superset-banner">
                       <i class="ti ti-link"></i>
-                      <span>Superset/Biset · {{ groupe.exercices.length }} exercices</span>
+                      <select
+                        v-if="editMode"
+                        class="type-groupe-select"
+                        :value="typeGroupe(groupe)"
+                        @click.stop
+                        @change="changerTypeGroupe(groupe, $event.target.value)"
+                      >
+                        <option v-for="t in TYPES_GROUPE" :key="t.valeur" :value="t.valeur">{{ t.label }}</option>
+                      </select>
+                      <span v-else>{{ labelTypeGroupe(typeGroupe(groupe)) }}</span>
+                      <span>· {{ groupe.exercices.length }} exercices</span>
                     </div>
 
                     <div class="exo-list">
@@ -440,6 +450,7 @@ import AthletesPanel from '../components/prepa/AthletesPanel.vue'
 import TestsPanel from '../components/prepa/TestsPanel.vue'
 import ExerciceAutocomplete from '../components/prepa/ExerciceAutocomplete.vue'
 import ExerciceImage from '../components/ExerciceImage.vue'
+import { TYPES_GROUPE, TYPE_GROUPE_DEFAUT, typeGroupe, labelTypeGroupe } from '../data/typesGroupe'
 
 // Distance horizontale minimale pour valider un swipe. Volontairement haute :
 // un doigt qui ripe sur un simple appui ne doit jamais changer d'onglet.
@@ -638,10 +649,11 @@ export default {
         const maxGroupe = Math.max(0, ...seance.exercices.map(e => e.groupe || 0))
         numGroupe = maxGroupe + 1
         const premierExo = groupe.exercices[0]
-        await api.patch(`/exercices/${premierExo.id}`, { nom: premierExo.nom, ordre: premierExo.ordre, groupe: numGroupe, optionnel: premierExo.optionnel || false, catalogue_id: premierExo.catalogue_id })
         premierExo.groupe = numGroupe
+        premierExo.type_groupe = TYPE_GROUPE_DEFAUT
+        await mettreAJourExercice(premierExo)
       }
-      const data = await api.post(`/seances/${seance.id}/exercices/`, { nom: form._nouvelExoNom, ordre: seance.exercices.length + 1, groupe: numGroupe, catalogue_id: form._nouvelExoCatalogueId })
+      const data = await api.post(`/seances/${seance.id}/exercices/`, { nom: form._nouvelExoNom, ordre: seance.exercices.length + 1, groupe: numGroupe, type_groupe: typeGroupe(groupe), catalogue_id: form._nouvelExoCatalogueId })
       seance.exercices.push({ ...data, series: [] })
       form._nouvelExoNom = ''
       form._nouvelExoCatalogueId = null
@@ -823,12 +835,23 @@ export default {
         nom: exo.nom,
         ordre: exo.ordre,
         groupe: exo.groupe || null,
+        type_groupe: exo.type_groupe || null,
         optionnel: exo.optionnel || false,
         catalogue_id: exo.catalogue_id
       })
       // la vignette suit immédiatement le choix dans le catalogue (ou son
       // retrait quand le nom est retapé à la main), sans recharger les séances
       exo.image_url = data.image_url
+    }
+
+    // Le type est porté par chaque exercice du groupe (le champ `groupe`
+    // n'est qu'un numéro, sans entité propre côté backend) : on les met tous
+    // à jour pour que supprimer un exercice ne fasse pas perdre le type.
+    const changerTypeGroupe = async (groupe, valeur) => {
+      for (const exo of groupe.exercices) {
+        exo.type_groupe = valeur
+        await mettreAJourExercice(exo)
+      }
     }
 
     const onFocusSeanceChamp = (seance) => {
@@ -880,6 +903,7 @@ export default {
       onTabSwipeStart, onTabSwipeEnd, onTabSwipeCancel,
       editMode, editNom, editDesc,
       nouvelleSeance, jours, labelType, letterFor, grouperExercices,
+      TYPES_GROUPE, typeGroupe, labelTypeGroupe, changerTypeGroupe,
       semaineActive, semainesDisponibles, seancesFiltrees,
       groupeForms, getGroupeForm, genererSeriesGroupeEdit,
       ajouterSerieGroupe, supprimerSerieIndex,
@@ -1082,6 +1106,17 @@ export default {
 }
 .exo-group.is-superset { background: var(--color-superset-bg); border: 1px solid var(--color-superset-border); border-left: 4px solid var(--color-primary); }
 .superset-banner { display: flex; align-items: center; gap: 6px; font-size: var(--font-size-xs); color: var(--color-superset-text); font-weight: 600; }
+.type-groupe-select {
+  min-height: 32px;
+  padding: 0 var(--spacing-sm);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  color: var(--color-superset-text);
+  background: var(--color-bg);
+  border: 1px solid var(--color-superset-border);
+  border-radius: var(--radius-sm);
+}
+.type-groupe-select:focus { outline: none; border-color: var(--color-primary); }
 .exo-group-toolbar { display: flex; align-items: center; gap: 4px; }
 .exo-group-toolbar-label { font-size: var(--font-size-xs); color: var(--color-text-muted); margin-left: 2px; }
 .exo-group-toolbar .btn-icon-tiny:disabled { opacity: 0.25; cursor: not-allowed; }

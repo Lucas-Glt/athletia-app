@@ -49,7 +49,14 @@
         >
           <div v-if="groupe.exercices.length > 1" class="superset-banner">
             <i class="ti ti-link"></i>
-            <span>Superset/Biset · {{ groupe.exercices.length }} exercices</span>
+            <select
+              class="type-groupe-select"
+              :value="typeGroupe(groupe)"
+              @change="changerTypeGroupe(groupe, $event.target.value)"
+            >
+              <option v-for="t in TYPES_GROUPE" :key="t.valeur" :value="t.valeur">{{ t.label }}</option>
+            </select>
+            <span>· {{ groupe.exercices.length }} exercices</span>
           </div>
 
           <!-- Pour chaque exo du groupe : nom + ses propres champs -->
@@ -207,6 +214,7 @@ import { ref } from 'vue'
 import { useApi } from '../../services/api'
 import ExerciceAutocomplete from './ExerciceAutocomplete.vue'
 import ExerciceImage from '../ExerciceImage.vue'
+import { TYPES_GROUPE, TYPE_GROUPE_DEFAUT, typeGroupe } from '../../data/typesGroupe'
 
 export default {
   components: { ExerciceAutocomplete, ExerciceImage },
@@ -294,20 +302,16 @@ export default {
         const maxGroupe = Math.max(0, ...seance.exercices.map(e => e.groupe || 0))
         groupe.groupeNum = maxGroupe + 1
         const premierExo = groupe.exercices[0]
-        await api.patch(`/exercices/${premierExo.id}`, {
-          nom: premierExo.nom,
-          ordre: premierExo.ordre,
-          groupe: groupe.groupeNum,
-          optionnel: premierExo.optionnel || false,
-          catalogue_id: premierExo.catalogue_id
-        })
         premierExo.groupe = groupe.groupeNum
+        premierExo.type_groupe = TYPE_GROUPE_DEFAUT
+        await patchExercice(premierExo)
       }
 
       const data = await api.post(`/seances/${seance.id}/exercices/`, {
         nom: groupe._nouvelExoNom,
         ordre: seance.exercices.length + 1,
         groupe: groupe.groupeNum,
+        type_groupe: typeGroupe(groupe),
         catalogue_id: groupe._nouvelExoCatalogueId
       })
       const exo = { ...data, series: [], _params: paramsVides() }
@@ -328,14 +332,27 @@ export default {
       }
     }
 
-    const toggleOptionnel = async (exo) => {
-      await api.patch(`/exercices/${exo.id}`, {
-        nom: exo.nom,
-        ordre: exo.ordre,
-        groupe: exo.groupe || null,
-        optionnel: exo.optionnel,
-        catalogue_id: exo.catalogue_id
-      })
+    // PATCH complet : la route remplace tous les champs, en omettre un le
+    // remettrait à sa valeur par défaut.
+    const patchExercice = (exo) => api.patch(`/exercices/${exo.id}`, {
+      nom: exo.nom,
+      ordre: exo.ordre,
+      groupe: exo.groupe || null,
+      type_groupe: exo.type_groupe || null,
+      optionnel: exo.optionnel || false,
+      catalogue_id: exo.catalogue_id
+    })
+
+    const toggleOptionnel = (exo) => patchExercice(exo)
+
+    // Le type est porté par chaque exercice du groupe (le champ `groupe`
+    // n'est qu'un numéro, sans entité propre côté backend) : on les met tous
+    // à jour pour que supprimer un exercice ne fasse pas perdre le type.
+    const changerTypeGroupe = async (groupe, valeur) => {
+      for (const exo of groupe.exercices) {
+        exo.type_groupe = valeur
+        await patchExercice(exo)
+      }
     }
 
     // Génère N séries en utilisant les params PROPRES de chaque exo + repos commun
@@ -415,6 +432,7 @@ export default {
     return {
       etape, jours, programme, seances, nouvelleSeance,
       labelType, letterFor,
+      TYPES_GROUPE, typeGroupe, changerTypeGroupe,
       creerProgramme, ajouterSeance, supprimerSeance,
       ajouterExercice, ajouterAuSuperset, supprimerExercice,
       genererSeriesGroupe, mettreAJourSerie, resetSeriesGroupe,
@@ -462,6 +480,17 @@ h2 { font-size: var(--font-size-xl); font-weight: 700; margin: 0; }
 }
 .exo-group.is-superset { background: var(--color-superset-bg); border: 1px solid var(--color-superset-border); border-left: 4px solid var(--color-primary); }
 .superset-banner { display: flex; align-items: center; gap: 6px; font-size: var(--font-size-xs); color: var(--color-superset-text); font-weight: 600; }
+.type-groupe-select {
+  min-height: 32px;
+  padding: 0 var(--spacing-sm);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  color: var(--color-superset-text);
+  background: var(--color-bg);
+  border: 1px solid var(--color-superset-border);
+  border-radius: var(--radius-sm);
+}
+.type-groupe-select:focus { outline: none; border-color: var(--color-primary); }
 .exo-config-list { display: flex; flex-direction: column; gap: var(--spacing-sm); }
 .exo-config {
   display: flex;

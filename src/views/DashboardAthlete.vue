@@ -16,9 +16,13 @@
     </template>
 
     <!-- Une seule bannière à la fois : elles sont toutes fixées en bas
-         d'écran et se superposeraient -->
+         d'écran et se superposeraient.
+         La reprise, elle, est bloquante : tant qu'on n'a pas tranché, la
+         saisie en attente et celle qu'on démarrerait s'écraseraient l'une
+         l'autre — il faut donc répondre avant de toucher à l'app. -->
     <PopupBanniere
       v-if="brouillonPropose"
+      bloquant
       icone="ti-player-play"
       titre="Reprendre la séance là où vous l'avez quittée ?"
       :sous-titre="sousTitreBrouillon"
@@ -177,22 +181,47 @@
                   <i v-if="isGroupeComplete(groupe)" class="ti ti-circle-check-filled groupe-check"></i>
                 </div>
 
+                <span v-if="groupe.exercices.length > 1" class="type-groupe-badge">
+                  <i class="ti ti-link"></i> {{ labelTypeGroupe(typeGroupe(groupe)) }}
+                </span>
+
                 <div v-if="groupe.exercices[0].series.length === 0" class="empty-series">
                   Aucune série définie.
                 </div>
 
                 <!-- Résumé compact : tout le prescrit lisible, la saisie s'ouvre à la demande -->
                 <template v-else>
-                  <div class="resume-exo" v-for="(exo, eidx) in groupe.exercices" :key="'r' + exo.id">
-                    <span class="exo-letter-mini" v-if="groupe.exercices.length > 1">{{ letterFor(eidx) }}</span>
-                    <span v-if="resumeExo(exo).uniforme" class="resume-texte">{{ resumeExo(exo).texte }}</span>
-                    <div v-else class="resume-series-list">
-                      <div v-for="(s, i) in exo.series" :key="s.id" class="resume-ligne">
-                        <span class="resume-s">S{{ i + 1 }}</span>
-                        <span>{{ valeursSerie(exo, i) || '—' }}</span>
+                  <!-- Complexe : déroulé série par série (A S1, B S1, puis
+                       A S2…) — on enchaîne tous les exercices avant de passer
+                       à la série suivante, l'affichage doit le montrer. -->
+                  <div v-if="estComplexe(groupe)" class="resume-series-list">
+                    <div
+                      v-for="serieIdx in groupe.exercices[0].series.length"
+                      :key="'c' + serieIdx"
+                      class="resume-ligne resume-ligne-complexe"
+                    >
+                      <span class="resume-s">S{{ serieIdx }}</span>
+                      <div class="resume-complexe-exos">
+                        <div v-for="(exo, eidx) in groupe.exercices" :key="exo.id" class="resume-complexe-exo">
+                          <span class="exo-letter-mini">{{ letterFor(eidx) }}</span>
+                          <span>{{ valeursSerie(exo, serieIdx - 1) || '—' }}</span>
+                        </div>
                       </div>
                     </div>
                   </div>
+
+                  <template v-else>
+                    <div class="resume-exo" v-for="(exo, eidx) in groupe.exercices" :key="'r' + exo.id">
+                      <span class="exo-letter-mini" v-if="groupe.exercices.length > 1">{{ letterFor(eidx) }}</span>
+                      <span v-if="resumeExo(exo).uniforme" class="resume-texte">{{ resumeExo(exo).texte }}</span>
+                      <div v-else class="resume-series-list">
+                        <div v-for="(s, i) in exo.series" :key="s.id" class="resume-ligne">
+                          <span class="resume-s">S{{ i + 1 }}</span>
+                          <span>{{ valeursSerie(exo, i) || '—' }}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </template>
 
                   <div class="exo-group-foot">
                     <span class="serie-repos" v-if="groupe.exercices[0].series[0]?.temps_repos">
@@ -723,62 +752,42 @@
           Conseil : pesez-vous le matin, à jeun, pour un suivi fiable.
         </div>
 
-        <div class="prog-switcher">
-          <button
-            class="prog-chip"
-            :class="{ active: sousOngletPoids === 'calendrier' }"
-            @click="sousOngletPoids = 'calendrier'"
-          >
-            <i class="ti ti-calendar"></i> Calendrier
+        <div class="poids-calendrier-head">
+          <button class="btn btn-icon" @click="moisPrecedent" aria-label="Mois précédent">
+            <i class="ti ti-chevron-left"></i>
           </button>
-          <button
-            class="prog-chip"
-            :class="{ active: sousOngletPoids === 'courbe' }"
-            @click="sousOngletPoids = 'courbe'"
-          >
-            <i class="ti ti-chart-line"></i> Courbe
+          <span class="poids-mois-label">{{ labelMois }}</span>
+          <button class="btn btn-icon" @click="moisSuivant" aria-label="Mois suivant">
+            <i class="ti ti-chevron-right"></i>
           </button>
         </div>
 
-        <template v-if="sousOngletPoids === 'calendrier'">
-          <div class="poids-calendrier-head">
-            <button class="btn btn-icon" @click="moisPrecedent" aria-label="Mois précédent">
-              <i class="ti ti-chevron-left"></i>
-            </button>
-            <span class="poids-mois-label">{{ labelMois }}</span>
-            <button class="btn btn-icon" @click="moisSuivant" aria-label="Mois suivant">
-              <i class="ti ti-chevron-right"></i>
-            </button>
-          </div>
+        <div class="poids-calendrier-grille">
+          <span v-for="(j, idx) in ['L', 'M', 'M', 'J', 'V', 'S', 'D']" :key="'lbl' + idx" class="poids-jour-label">{{ j }}</span>
+          <button
+            v-for="(jour, idx) in joursGrille"
+            :key="idx"
+            type="button"
+            class="poids-jour-case"
+            :class="{
+              vide: !jour,
+              'a-une-valeur': jour && poidsPourDate(jour.date),
+              'est-aujourdhui': jour && jour.estAujourdhui
+            }"
+            :disabled="!jour || jour.estFutur"
+            @click="jour && ouvrirSaisiePoids(jour.date)"
+          >
+            <template v-if="jour">
+              <span class="poids-jour-num">{{ jour.numero }}</span>
+              <span v-if="poidsPourDate(jour.date)" class="poids-jour-val">{{ poidsPourDate(jour.date) }}</span>
+            </template>
+          </button>
+        </div>
 
-          <div class="poids-calendrier-grille">
-            <span v-for="(j, idx) in ['L', 'M', 'M', 'J', 'V', 'S', 'D']" :key="'lbl' + idx" class="poids-jour-label">{{ j }}</span>
-            <button
-              v-for="(jour, idx) in joursGrille"
-              :key="idx"
-              type="button"
-              class="poids-jour-case"
-              :class="{
-                vide: !jour,
-                'a-une-valeur': jour && poidsPourDate(jour.date),
-                'est-aujourdhui': jour && jour.estAujourdhui
-              }"
-              :disabled="!jour || jour.estFutur"
-              @click="jour && ouvrirSaisiePoids(jour.date)"
-            >
-              <template v-if="jour">
-                <span class="poids-jour-num">{{ jour.numero }}</span>
-                <span v-if="poidsPourDate(jour.date)" class="poids-jour-val">{{ poidsPourDate(jour.date) }}</span>
-              </template>
-            </button>
-          </div>
-        </template>
-
-        <template v-else>
-          <!-- axe-x="dates" : une pesée par jour dépasse vite la dizaine de
-               points, un label « S1…Sn » par point déborderait de l'écran -->
-          <CourbeProgression :points="courbePoids" label="Poids" unite="kg" axe-x="dates" />
-        </template>
+        <!-- Courbe sous le calendrier : la tendance se lit d'un coup d'œil
+             sans changer de vue. axe-x="dates" — une pesée par jour dépasse
+             vite la dizaine de points, un label « S1…Sn » déborderait. -->
+        <CourbeProgression :points="courbePoids" label="Poids" unite="kg" axe-x="dates" />
 
         <!-- Modale de saisie du poids d'un jour -->
         <div v-if="dateSaisiePoids" class="modal-overlay" @click.self="fermerSaisiePoids">
@@ -834,6 +843,7 @@ import CourbeProgression from '../components/athlete/CourbeProgression.vue'
 import MesStats from '../components/athlete/MesStats.vue'
 import PopupBanniere from '../components/athlete/PopupBanniere.vue'
 import ExerciceImage from '../components/ExerciceImage.vue'
+import { typeGroupe, labelTypeGroupe, estComplexe } from '../data/typesGroupe'
 
 // Distance horizontale minimale pour valider un swipe. Volontairement haute :
 // un doigt qui ripe sur un simple appui ne doit jamais changer d'écran.
@@ -1904,7 +1914,6 @@ export default {
 
     // --- Suivi de poids ---
     const entriesPoids = ref([]) // [{ id, date: 'YYYY-MM-DD', poids }]
-    const sousOngletPoids = ref('calendrier')
     const moisAffiche = ref(new Date(new Date().getFullYear(), new Date().getMonth(), 1))
     const dateSaisiePoids = ref(null)
     const poidsSaisi = ref('')
@@ -2097,6 +2106,7 @@ export default {
       isGroupeComplete,
       progressionSeance,
       groupeSaisie, ouvrirSaisie, fermerSaisie, valeursSerie, resumeExo,
+      typeGroupe, labelTypeGroupe, estComplexe,
       saisieVue, historiqueIndex, nbTentativesGroupe, retourSaisie,
       swipeOnglets, swipeVueSeance, swipeSaisie, swipeRoulette,
       historiqueSeriePourExo, n1SeriePourExo, formatDateCourt, formatDateNumerique, diffVsHistorique,
@@ -2105,7 +2115,7 @@ export default {
       tentativesSeance, tentativeAffichee, tentativeAncienne, tentativeRecente,
       histoIndex, histoPlusAncienne, histoPlusRecente, sensHisto, valeursHistorique, courbesSeance,
       performances, toggleSuivi, toggleSuiviPerformance, dateTentativeGroupe,
-      sousOngletPoids, dateSaisiePoids, poidsSaisi, erreurPoids, poidsPourDate, entreeExistante, poidsValide,
+      dateSaisiePoids, poidsSaisi, erreurPoids, poidsPourDate, entreeExistante, poidsValide,
       labelMois, joursGrille, courbePoids, moisPrecedent, moisSuivant, formatDateLongue,
       ouvrirSaisiePoids, fermerSaisiePoids, enregistrerPoids, supprimerPoids,
       popupRessenti, popupWellness, focusRessenti, focusWellness,
@@ -2660,6 +2670,24 @@ export default {
   align-items: baseline;
 }
 .resume-s { font-size: var(--font-size-xs); font-weight: 700; color: var(--color-superset-text); min-width: 24px; }
+
+/* Complexe : une ligne par série, tous les exercices du groupe dedans */
+.resume-ligne-complexe { align-items: flex-start; }
+.resume-ligne-complexe + .resume-ligne-complexe { padding-top: 4px; border-top: 1px dashed var(--color-superset-border); }
+.resume-complexe-exos { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.resume-complexe-exo { display: flex; align-items: center; gap: var(--spacing-sm); }
+
+.type-groupe-badge {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--color-superset-text);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
 
 .exo-group-foot {
   display: flex;

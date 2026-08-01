@@ -146,7 +146,7 @@
                 >
                   <div v-if="groupe.exercices.length > 1" class="superset-banner">
                     <i class="ti ti-link"></i>
-                    <span>Superset/Biset · {{ groupe.exercices.length }} exercices</span>
+                    <span>{{ labelTypeGroupe(typeGroupe(groupe)) }} · {{ groupe.exercices.length }} exercices</span>
                   </div>
                   <div v-for="(exo, eidx) in groupe.exercices" :key="exo.id" class="exo-bloc">
                     <div class="exo-header">
@@ -261,7 +261,7 @@
                 >
                   <div v-if="groupe.exercices.length > 1" class="superset-banner">
                     <i class="ti ti-link"></i>
-                    <span>Superset/Biset · {{ groupe.exercices.length }} exercices</span>
+                    <span>{{ labelTypeGroupe(typeGroupe(groupe)) }} · {{ groupe.exercices.length }} exercices</span>
                   </div>
 
                   <div v-for="(exo, eidx) in groupe.exercices" :key="exo.id" class="exo-bloc">
@@ -399,6 +399,7 @@ import GraphiqueAcwrZones from '../monitoring/GraphiqueAcwrZones.vue'
 import GraphiqueBarres from '../monitoring/GraphiqueBarres.vue'
 import GroupesManagerModal from './GroupesManagerModal.vue'
 import AssignerProgrammeModal from './AssignerProgrammeModal.vue'
+import { typeGroupe, labelTypeGroupe } from '../../data/typesGroupe'
 
 // Distance horizontale minimale pour valider un swipe. Volontairement haute :
 // un doigt qui ripe sur un simple appui ne doit jamais changer d'onglet.
@@ -607,7 +608,7 @@ export default {
           }
         }
         if (!sessions[key].exercices[log.exercice.id]) {
-          sessions[key].exercices[log.exercice.id] = { id: log.exercice.id, nom: log.exercice.nom, ordre: log.exercice.ordre, groupe: log.exercice.groupe, logs: [] }
+          sessions[key].exercices[log.exercice.id] = { id: log.exercice.id, nom: log.exercice.nom, ordre: log.exercice.ordre, groupe: log.exercice.groupe, type_groupe: log.exercice.type_groupe, logs: [] }
         }
         sessions[key].exercices[log.exercice.id].logs.push(log)
       })
@@ -881,7 +882,7 @@ export default {
       programmesAssignes, programmeLogsId, loadingLogs, logsGroupes, ouvrirHistorique,
       vueHistorique, seanceFiltre, nomsSeances, sessionsFiltrees, resumeHistorique, courbesHistorique,
       sessionsOuvertes, basculerSession, classeTaux, labelType,
-      grouperExosSession, letterFor,
+      grouperExosSession, letterFor, typeGroupe, labelTypeGroupe,
       formatDate, formatDateCourte, getStatutClasse, getStatutIcon,
       loadingPoids, entriesPoids, courbePoids, ouvrirPoids,
       vuePoids, labelMois, joursGrille, poidsPourDate, moisPrecedent, moisSuivant, resumePoids,
