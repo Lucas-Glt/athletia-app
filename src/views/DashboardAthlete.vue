@@ -784,6 +784,19 @@
           </button>
         </div>
 
+        <div class="poids-moyenne">
+          <span class="poids-moyenne-label">Poids moyen :</span>
+          <template v-if="moyennePoidsMois">
+            <span class="poids-moyenne-val">
+              {{ moyennePoidsMois.valeur }}<span class="poids-moyenne-unite">kg</span>
+            </span>
+            <span class="poids-moyenne-sub">
+              {{ moyennePoidsMois.nb }} pesée{{ moyennePoidsMois.nb > 1 ? 's' : '' }} en {{ labelMois.toLowerCase() }}
+            </span>
+          </template>
+          <span class="poids-moyenne-sub" v-else>aucune pesée ce mois-ci</span>
+        </div>
+
         <!-- Courbe sous le calendrier : la tendance se lit d'un coup d'œil
              sans changer de vue. axe-x="dates" — une pesée par jour dépasse
              vite la dizaine de points, un label « S1…Sn » déborderait. -->
@@ -1976,6 +1989,22 @@ export default {
         .map(e => ({ date: e.date, valeur: e.poids }))
     )
 
+    // Moyenne des pesées du mois affiché : une pesée isolée varie de jour en
+    // jour (repas, hydratation), la moyenne mensuelle est ce qui se compare
+    // d'un mois à l'autre. Suit donc les flèches du calendrier.
+    const moyennePoidsMois = computed(() => {
+      const prefixe = `${moisAffiche.value.getFullYear()}-${pad2(moisAffiche.value.getMonth() + 1)}-`
+      const valeurs = entriesPoids.value
+        .filter(e => String(e.date).startsWith(prefixe))
+        .map(e => e.poids)
+      if (valeurs.length === 0) return null
+      const moyenne = valeurs.reduce((somme, v) => somme + v, 0) / valeurs.length
+      return {
+        valeur: moyenne.toLocaleString('fr-FR', { maximumFractionDigits: 1 }),
+        nb: valeurs.length
+      }
+    })
+
     const moisPrecedent = () => {
       moisAffiche.value = new Date(moisAffiche.value.getFullYear(), moisAffiche.value.getMonth() - 1, 1)
     }
@@ -2116,7 +2145,7 @@ export default {
       histoIndex, histoPlusAncienne, histoPlusRecente, sensHisto, valeursHistorique, courbesSeance,
       performances, toggleSuivi, toggleSuiviPerformance, dateTentativeGroupe,
       dateSaisiePoids, poidsSaisi, erreurPoids, poidsPourDate, entreeExistante, poidsValide,
-      labelMois, joursGrille, courbePoids, moisPrecedent, moisSuivant, formatDateLongue,
+      labelMois, joursGrille, courbePoids, moyennePoidsMois, moisPrecedent, moisSuivant, formatDateLongue,
       ouvrirSaisiePoids, fermerSaisiePoids, enregistrerPoids, supprimerPoids,
       popupRessenti, popupWellness, focusRessenti, focusWellness,
       repondreRessenti, repondreWellness, onFocusConsomme,
@@ -2915,6 +2944,26 @@ export default {
 }
 .poids-calendrier-head { display: flex; align-items: center; justify-content: space-between; }
 .poids-mois-label { font-size: var(--font-size-base); font-weight: 700; text-transform: capitalize; }
+
+.poids-moyenne {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md) var(--spacing-lg);
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+.poids-moyenne-label { font-size: var(--font-size-sm); font-weight: 600; color: var(--color-text-body); }
+.poids-moyenne-val {
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+  color: var(--color-primary-dark);
+  font-variant-numeric: tabular-nums;
+}
+.poids-moyenne-unite { font-size: var(--font-size-xs); font-weight: 600; margin-left: 2px; }
+.poids-moyenne-sub { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
 
 .poids-calendrier-grille { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
 .poids-jour-label {

@@ -30,7 +30,9 @@
         <i class="ti ti-check"></i> Enregistrer
       </button>
       <p v-if="erreurRessenti" class="stat-card-erreur">{{ erreurRessenti }}</p>
-      <p class="stat-card-note">{{ noteRessenti }}</p>
+      <p class="stat-card-note">
+        À compléter dans les 24 h qui suivent la séance. Une fois enregistré, le ressenti n'est plus modifiable.
+      </p>
     </div>
 
     <!-- Wellness du jour -->
@@ -168,10 +170,12 @@ export default {
 
     const fetchStats = async () => { stats.value = await api.get('/mes-stats/') }
 
+    // L'API ne remonte que les ressentis jamais renseignés : le formulaire
+    // repart donc toujours vierge.
     const fetchRessenti = async () => {
       ressenti.value = await api.get('/mes-stats/ressenti-a-completer')
-      rpeForm.value = ressenti.value?.rpe ?? null
-      dureeForm.value = ressenti.value?.duree_minutes ?? ''
+      rpeForm.value = null
+      dureeForm.value = ''
     }
 
     const fetchWellness = async () => {
@@ -257,14 +261,6 @@ export default {
       ressenti.value = null
       await fetchStats().catch(e => console.error('Erreur rechargement stats:', e))
     }
-
-    // Deux délais distincts côté API : 24 h pour donner un ressenti jamais
-    // renseigné, 1 h pour corriger celui qu'on vient de donner.
-    const noteRessenti = computed(() =>
-      ressenti.value?.rpe == null
-        ? 'À compléter dans les 24 h qui suivent la séance.'
-        : 'Modifiable pendant une heure après la séance.'
-    )
 
     const wellnessComplet = computed(() => Object.values(wellnessForm.value).every(v => v !== null))
 
@@ -352,7 +348,7 @@ export default {
     })
 
     return {
-      stats, ressenti, rpeForm, dureeForm, labelRpe, envoyerRessenti, noteRessenti,
+      stats, ressenti, rpeForm, dureeForm, labelRpe, envoyerRessenti,
       wellnessFait, wellnessForm, itemsWellness, wellnessComplet, envoyerWellness,
       erreurRessenti, erreurWellness,
       performances, exerciceChoisiId, exerciceChoisi, courbeExerciceChoisi,
