@@ -1638,6 +1638,17 @@ export default {
         historiqueEnEdition.value.delete(log.id)
       }
 
+      // La ligne de charge de la tentative ne suit pas les logs : sans ça la
+      // séance restait comptée dans « Mes stats » et l'ACWR, et son
+      // questionnaire de ressenti continuait d'être proposé — un fantôme
+      // sans séance derrière. Sans effet si la tentative est antérieure au
+      // monitoring (pas de ligne de charge).
+      try {
+        await api.del(`/seances/${seanceActive.value.id}/charge?session_id=${encodeURIComponent(cle)}`)
+      } catch (e) {
+        console.error('Erreur suppression charge séance:', e)
+      }
+
       // La saisie du jour en mémoire peut correspondre à la tentative
       // supprimée (même session_id) : on la vide pour rester cohérent.
       if (cle === sessionSaisieId.value) {
