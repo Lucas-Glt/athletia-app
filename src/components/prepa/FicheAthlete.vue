@@ -69,15 +69,15 @@
         </div>
         <div class="detail-grid">
           <div class="stat-card">
-            <CourbeProgression :points="pointsMonotonie" label="Monotonie" unite="" axe-x="dates" />
+            <CourbeProgression :points="pointsMonotonie" label="Monotonie" unite="" axe-x="dates" :hausse-favorable="false" />
           </div>
           <div class="stat-card">
-            <CourbeProgression :points="pointsContrainte" label="Contrainte (strain)" unite=" UA" axe-x="dates" />
+            <CourbeProgression :points="pointsContrainte" label="Contrainte (strain)" unite=" UA" axe-x="dates" :hausse-favorable="false" />
           </div>
         </div>
         <div class="stat-card">
           <div class="stat-card-titre">Wellness — Hooper Index</div>
-          <CourbeProgression :points="pointsHooper" label="Hooper Index (4 à 28, plus bas = mieux)" unite="" axe-x="dates" />
+          <CourbeProgression :points="pointsHooper" label="Hooper Index (4 à 28, plus bas = mieux)" unite="" axe-x="dates" :hausse-favorable="false" />
           <template v-if="dernierWellness">
             <div class="stat-card-titre stat-card-titre-sm">Dernier relevé — {{ formatDateCourt(dernierWellness.date) }}</div>
             <GraphiqueBarres :barres="barresDernierWellness" unite="/7" />

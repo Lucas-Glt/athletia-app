@@ -40,9 +40,9 @@
       </div>
 
       <div class="courbe-legende">
-        <span class="courbe-legende-item"><i class="courbe-dot diff-positif"></i> En hausse</span>
+        <span class="courbe-legende-item"><i class="courbe-dot" :class="classeVariation(1)"></i> En hausse</span>
         <span class="courbe-legende-item"><i class="courbe-dot diff-neutre"></i> Stable</span>
-        <span class="courbe-legende-item"><i class="courbe-dot diff-negatif"></i> En baisse</span>
+        <span class="courbe-legende-item"><i class="courbe-dot" :class="classeVariation(-1)"></i> En baisse</span>
       </div>
     </template>
   </div>
@@ -65,7 +65,12 @@ export default {
     // 'tentatives' (défaut, "S1"/"S2"/...) ou 'dates' (bornes début/fin
     // formatées) — utile pour les séries longues (charge quotidienne sur
     // plusieurs mois) où un label par point déborderait.
-    axeX: { type: String, default: 'tentatives' }
+    axeX: { type: String, default: 'tentatives' },
+    // Sens de lecture d'une variation. Par défaut, monter est une progression
+    // (poids soulevé, distance). À passer à false pour les indicateurs où une
+    // valeur haute est mauvaise — Hooper Index, monotonie, contrainte : monter
+    // y est un signal négatif, et le vert de la hausse disait l'inverse.
+    hausseFavorable: { type: Boolean, default: true }
   },
   setup(props) {
     const minY = computed(() => Math.min(...props.points.map(p => p.valeur)))
@@ -90,6 +95,15 @@ export default {
 
     const lignePoints = computed(() => coords.value.map(p => `${p.x},${p.y}`).join(' '))
 
+    // diff-positif = vert, diff-negatif = rouge : les classes disent « bon /
+    // mauvais », pas « monte / descend ». C'est hausseFavorable qui fait le
+    // lien entre les deux.
+    const classeVariation = (ecart) => {
+      if (ecart === 0) return 'diff-neutre'
+      const favorable = ecart > 0 ? props.hausseFavorable : !props.hausseFavorable
+      return favorable ? 'diff-positif' : 'diff-negatif'
+    }
+
     const delta = computed(() => {
       if (props.points.length < 2) return null
       const premier = props.points[0].valeur
@@ -98,23 +112,20 @@ export default {
       if (ecart === 0) return { texte: '=', classe: 'diff-neutre' }
       return {
         texte: (ecart > 0 ? '+' : '') + ecart + props.unite,
-        classe: ecart > 0 ? 'diff-positif' : 'diff-negatif'
+        classe: classeVariation(ecart)
       }
     })
 
     // Couleur d'un point selon son évolution par rapport au précédent
     const couleurPoint = (i) => {
       if (i === 0) return 'diff-neutre'
-      const ecart = props.points[i].valeur - props.points[i - 1].valeur
-      if (ecart > 0) return 'diff-positif'
-      if (ecart < 0) return 'diff-negatif'
-      return 'diff-neutre'
+      return classeVariation(props.points[i].valeur - props.points[i - 1].valeur)
     }
 
     const formatValeur = (v) => `${v}${props.unite}`
     const formatDateAxe = (d) => new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
 
-    return { coords, lignePoints, delta, minY, maxY, couleurPoint, formatValeur, formatDateAxe }
+    return { coords, lignePoints, delta, minY, maxY, couleurPoint, classeVariation, formatValeur, formatDateAxe }
   }
 }
 </script>
