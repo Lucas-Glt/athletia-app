@@ -140,7 +140,10 @@ const LABELS_RPE = {
 
 export default {
   components: { CourbeProgression, GraphiqueBarres },
-  emits: ['focus-consomme'],
+  // ressenti-envoye / wellness-envoye : la bannière du dashboard propose le
+  // même questionnaire. Sans ces signaux, y répondre ici la laissait affichée,
+  // à proposer quelque chose qui venait d'être fait.
+  emits: ['focus-consomme', 'ressenti-envoye', 'wellness-envoye'],
   props: {
     focusRessenti: { type: Boolean, default: false },
     focusWellness: { type: Boolean, default: false }
@@ -259,6 +262,11 @@ export default {
         return
       }
       ressenti.value = null
+      emit('ressenti-envoye')
+      // Une autre tentative peut rester à compléter (deux séances validées
+      // dans les 24 h) : on redemande au lieu de la masquer jusqu'au prochain
+      // affichage de l'onglet.
+      await fetchRessenti().catch(e => console.error('Erreur rechargement ressenti:', e))
       await fetchStats().catch(e => console.error('Erreur rechargement stats:', e))
     }
 
@@ -274,6 +282,7 @@ export default {
         return
       }
       wellnessFait.value = true
+      emit('wellness-envoye')
     }
 
     const repartitionBarres = computed(() =>

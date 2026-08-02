@@ -38,7 +38,7 @@
       texte-oui="Oui"
       texte-non="Non merci"
       @oui="repondreRessenti"
-      @non="popupRessenti = false"
+      @non="popupRessenti = null"
     />
     <PopupBanniere
       v-else-if="popupWellness"
@@ -840,6 +840,8 @@
         :focus-ressenti="focusRessenti"
         :focus-wellness="focusWellness"
         @focus-consomme="onFocusConsomme"
+        @ressenti-envoye="popupRessenti = null"
+        @wellness-envoye="popupWellness = false"
       />
     </div>
   </AppLayout>
@@ -987,13 +989,16 @@ export default {
     const historique = ref([])
     const loadingSeances = ref(false)
     const onglet = ref('mes-stats')
-    const popupRessenti = ref(false)
+    // Tentative (session_id) dont la bannière propose le ressenti, null si
+    // aucune : la bannière doit tomber si cette tentative disparaît de
+    // l'historique, sinon elle propose un questionnaire sans séance derrière.
+    const popupRessenti = ref(null)
     const popupWellness = ref(false)
     const focusRessenti = ref(false)
     const focusWellness = ref(false)
 
     const repondreRessenti = () => {
-      popupRessenti.value = false
+      popupRessenti.value = null
       onglet.value = 'mes-stats'
       focusRessenti.value = true
     }
@@ -1649,6 +1654,9 @@ export default {
         console.error('Erreur suppression charge séance:', e)
       }
 
+      // La bannière proposait peut-être le ressenti de cette tentative-là.
+      if (popupRessenti.value === cle) popupRessenti.value = null
+
       // La saisie du jour en mémoire peut correspondre à la tentative
       // supprimée (même session_id) : on la vide pour rester cohérent.
       if (cle === sessionSaisieId.value) {
@@ -1873,9 +1881,11 @@ export default {
       // Trace la complétion tout de suite (méthode de Foster, monitoring) —
       // sans rpe/durée : la séance se valide quand même, le ressenti reste
       // saisissable après coup (cf. MesStats.vue), jamais bloquant ici.
+      let chargeEnregistree = true
       try {
         await api.post(`/seances/${seanceActive.value.id}/charge`, { session_id: sessionSaisieId.value })
       } catch (e) {
+        chargeEnregistree = false
         console.error('Erreur enregistrement complétion séance:', e)
       }
 
@@ -1886,7 +1896,9 @@ export default {
       effacerBrouillon()
       debutSaisie.value = null
       seanceActive.value = null
-      popupRessenti.value = true
+      // Sans ligne de charge il n'y a rien à compléter côté serveur :
+      // proposer le questionnaire mènerait à un accueil vide.
+      if (chargeEnregistree) popupRessenti.value = sessionSaisieId.value
       // seancesAffichees recalcule alors automatiquement : ce créneau montrera
       // la semaine suivante programmée par le prépa (ou reboucle sur la
       // dernière si la programmation s'arrête là).
