@@ -436,8 +436,15 @@ export default {
     justify-content: center;
     gap: 2px;
     min-height: var(--bottom-nav-h);
-    padding: var(--spacing-xs) var(--spacing-sm);
+    /* Padding minimal et débordement coupé : avec cinq onglets (athlète), la
+       largeur par item tombe sous la longueur d'un libellé, et un mot trop
+       long débordait sur ses voisins au lieu de rester dans sa case. */
+    padding: var(--spacing-xs) 2px;
     font-size: var(--font-size-xs);
+    text-align: center;
+    line-height: 1.15;
+    min-width: 0;
+    overflow: hidden;
     border-radius: 0;
   }
   .bottom-nav :deep(.nav-item i) { font-size: 22px; }

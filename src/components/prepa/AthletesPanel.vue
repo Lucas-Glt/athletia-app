@@ -105,6 +105,10 @@
               </span>
             </div>
             <div class="amc-signaux" v-if="a.resume">
+              <span class="signal-badge signal-blessure" v-if="a.resume.blessures_en_cours > 0">
+                <i class="ti ti-bandage"></i>
+                {{ a.resume.blessures_en_cours }} blessure{{ a.resume.blessures_en_cours > 1 ? 's' : '' }} en cours
+              </span>
               <span class="signal-badge" v-for="(s, i) in a.resume.signaux" :key="i">
                 <i class="ti ti-alert-triangle"></i> {{ s }}
               </span>
@@ -224,8 +228,10 @@ const FRAICHEUR_WELLNESS_JOURS = 3
 const joursDepuis = (date) => Math.floor((Date.now() - new Date(date).getTime()) / 86400000)
 
 // « Rien à signaler » : aucun signal ET assez d'historique pour que l'ACWR soit
-// calculable — sans ça, l'absence de signal ne prouve rien.
-const estRAS = (r) => r.signaux.length === 0 && !!r.acwr.zone
+// calculable — sans ça, l'absence de signal ne prouve rien. Une blessure
+// déclarée disqualifie aussi le RAS : elle n'est pas un signal automatique,
+// mais afficher « rien à signaler » sur un athlète blessé serait faux.
+const estRAS = (r) => r.signaux.length === 0 && !!r.acwr.zone && !r.blessures_en_cours
 
 // Source unique des tuiles du bandeau, de leur définition (aide affichée sous
 // le libellé + modale) et du filtre appliqué au clic.
@@ -244,6 +250,11 @@ const INDICATEURS = {
     label: 'Signaux actifs', ton: 'vigilance', aide: 'à regarder en priorité',
     definition: 'au moins une alerte automatique (ACWR en vigilance ou surcharge, wellness dégradé 3 jours de suite).',
     test: (r) => r.signaux.length > 0
+  },
+  blessures: {
+    label: 'Blessés', ton: 'surcharge', aide: 'blessure en cours',
+    definition: "ont déclaré une blessure qu'ils n'ont pas encore marquée guérie. Déclaratif : c'est l'athlète qui saisit, jamais un calcul.",
+    test: (r) => r.blessures_en_cours > 0
   },
   optimale: {
     label: 'Zone optimale', ton: 'optimale', aide: 'ACWR 0,8 à 1,3',
@@ -278,7 +289,7 @@ const INDICATEURS = {
 }
 
 const GROUPES_INDICATEURS = [
-  { titre: "Vue d'ensemble", cles: ['tous', 'ras', 'signaux'] },
+  { titre: "Vue d'ensemble", cles: ['tous', 'ras', 'signaux', 'blessures'] },
   { titre: 'Charge — ACWR', cles: ['optimale', 'vigilance', 'surcharge', 'sous_charge'] },
   { titre: 'Wellness', cles: ['wellness_jour', 'wellness_bon'] }
 ]
@@ -306,12 +317,6 @@ export default {
     const indicateurFiltre = ref('tous')
     const aideOuverte = ref(false)
 
-    // On ne garde que l'id sélectionné : l'objet athlète est relu depuis
-    // monCercle à chaque rendu, donc toujours à jour après un fetchMonCercle
-    // déclenché par onModifie (cf. DashboardPrepa.vue).
-    const athleteSelectionneId = ref(null)
-    const athleteSelectionne = computed(() => props.monCercle.find(a => a.id === athleteSelectionneId.value) || null)
-
     const modalGroupes = ref(false)
     const athleteFocusGroupes = ref(null)
     const ouvrirGestionGroupes = (athlete = null) => {
@@ -337,6 +342,13 @@ export default {
     const athletesEnrichis = computed(() =>
       props.monCercle.map(a => ({ ...a, resume: resumes.value.find(r => r.athlete_id === a.id) || null }))
     )
+
+    // On ne garde que l'id sélectionné : l'objet athlète est relu depuis la
+    // liste enrichie à chaque rendu, donc toujours à jour après un
+    // fetchMonCercle déclenché par onModifie (cf. DashboardPrepa.vue). Enrichi
+    // et pas brut, pour que la fiche dispose aussi du résumé monitoring.
+    const athleteSelectionneId = ref(null)
+    const athleteSelectionne = computed(() => athletesEnrichis.value.find(a => a.id === athleteSelectionneId.value) || null)
 
     const athletesFiltres = computed(() => {
       const indicateur = INDICATEURS[indicateurFiltre.value]
@@ -580,6 +592,7 @@ export default {
 }
 .signal-badge.signal-ras { background: var(--color-valid-bg); color: var(--color-valid-text-strong); }
 .signal-badge.signal-attente { background: var(--color-bg-tertiary); color: var(--color-text-muted); }
+.signal-badge.signal-blessure { background: var(--color-danger-bg); color: var(--color-danger-text); }
 .hooper-badge {
   margin-left: 4px; padding: 1px 6px; border-radius: var(--radius-full);
   font-size: 10px; font-weight: 700;

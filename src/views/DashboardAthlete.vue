@@ -8,10 +8,13 @@
         <i class="ti ti-barbell"></i> Séances
       </div>
       <div class="nav-item" :class="{ active: onglet === 'performances' }" @click="onglet = 'performances'">
-        <i class="ti ti-trophy"></i> Performances
+        <i class="ti ti-trophy"></i> Perfs
       </div>
       <div class="nav-item" :class="{ active: onglet === 'poids' }" @click="onglet = 'poids'">
         <i class="ti ti-scale"></i> Poids
+      </div>
+      <div class="nav-item" :class="{ active: onglet === 'blessures' }" @click="onglet = 'blessures'">
+        <i class="ti ti-bandage"></i> Blessures
       </div>
     </template>
 
@@ -834,6 +837,9 @@
         </div>
       </div>
 
+      <!-- ONGLET BLESSURES -->
+      <BlessuresPanel v-if="onglet === 'blessures'" />
+
       <!-- ONGLET MES STATS -->
       <MesStats
         v-if="onglet === 'mes-stats'"
@@ -856,6 +862,7 @@ import { useAuthStore } from '../stores/auth'
 import AppLayout from '../components/AppLayout.vue'
 import CourbeProgression from '../components/athlete/CourbeProgression.vue'
 import MesStats from '../components/athlete/MesStats.vue'
+import BlessuresPanel from '../components/athlete/BlessuresPanel.vue'
 import PopupBanniere from '../components/athlete/PopupBanniere.vue'
 import ExerciceImage from '../components/ExerciceImage.vue'
 import { typeGroupe, labelTypeGroupe, estComplexe } from '../data/typesGroupe'
@@ -974,7 +981,7 @@ const CLE_BROUILLON = 'athletia:seance-en-cours'
 const DUREE_BROUILLON_MS = 48 * 60 * 60 * 1000
 
 export default {
-  components: { AppLayout, CourbeProgression, MesStats, PopupBanniere, ExerciceImage },
+  components: { AppLayout, CourbeProgression, MesStats, BlessuresPanel, PopupBanniere, ExerciceImage },
   setup() {
     const programmes = ref([])
     const programmeActif = ref(null)
@@ -2099,10 +2106,11 @@ export default {
     watch(seanceActive, (s) => { if (!s) fermerSaisie() })
 
     // Swipe horizontal entre onglets (Accueil <-> Séances <-> Performances <->
-    // Poids), sur tout le contenu du dashboard. Le panneau de saisie, la
-    // roulette de dates et les onglets d'une séance ont leur propre swipe et
-    // stoppent la propagation, donc aucun ne marche sur les pieds de l'autre.
-    const ONGLETS = ['mes-stats', 'programme', 'performances', 'poids']
+    // Poids <-> Blessures), sur tout le contenu du dashboard. Le panneau de
+    // saisie, la roulette de dates et les onglets d'une séance ont leur propre
+    // swipe et stoppent la propagation, donc aucun ne marche sur les pieds de
+    // l'autre.
+    const ONGLETS = ['mes-stats', 'programme', 'performances', 'poids', 'blessures']
     const swipeOnglets = creerSwipeHorizontal((sens) => {
       const cible = ONGLETS[ONGLETS.indexOf(onglet.value) + sens]
       if (cible) onglet.value = cible

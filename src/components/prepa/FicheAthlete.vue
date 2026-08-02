@@ -43,6 +43,10 @@
       <div :ref="(el) => setTabRef('programme', el)" class="tab" :class="{ active: sousOnglet === 'programme' }" @click="allerA('programme')">Programme</div>
       <div :ref="(el) => setTabRef('historique', el)" class="tab" :class="{ active: sousOnglet === 'historique' }" @click="allerA('historique')">Historique</div>
       <div :ref="(el) => setTabRef('poids', el)" class="tab" :class="{ active: sousOnglet === 'poids' }" @click="allerA('poids')">Poids</div>
+      <div :ref="(el) => setTabRef('blessures', el)" class="tab" :class="{ active: sousOnglet === 'blessures' }" @click="allerA('blessures')">
+        Blessures
+        <span class="tab-pastille" v-if="nbBlessuresEnCours > 0">{{ nbBlessuresEnCours }}</span>
+      </div>
     </div>
 
     <!-- APERÇU : monitoring (charge, ACWR, wellness) -->
@@ -386,6 +390,58 @@
         </div>
       </template>
     </div>
+
+    <!-- BLESSURES : déclarations de l'athlète, lecture seule. Ni déclarer ni
+         clôturer n'appartient au prépa (cf. routes /blessures). -->
+    <div v-if="sousOnglet === 'blessures'" class="tab-content">
+      <div v-if="loadingBlessures" class="empty">Chargement...</div>
+      <div v-else-if="blessures.length === 0" class="empty">Aucune blessure déclarée par cet athlète.</div>
+      <template v-else>
+        <div class="histo-resume">
+          <div class="histo-stat">
+            <span class="histo-stat-valeur" :class="{ 'variation-hausse': blessuresEnCours.length > 0 }">{{ blessuresEnCours.length }}</span>
+            <span class="histo-stat-label">en cours</span>
+          </div>
+          <div class="histo-stat">
+            <span class="histo-stat-valeur">{{ blessuresGueries.length }}</span>
+            <span class="histo-stat-label">guérie(s)</span>
+          </div>
+        </div>
+
+        <div class="stat-card blessure-carte" v-for="b in blessures" :key="b.id" :class="{ 'est-en-cours': b.en_cours }">
+          <div class="blessure-head">
+            <div>
+              <div class="stat-card-titre">{{ b.zone }}</div>
+              <div class="blessure-meta">
+                <template v-if="b.en_cours">
+                  {{ formatDateBlessure(b.date_blessure) }} · {{ labelAnciennete(b.date_blessure) }}
+                </template>
+                <template v-else>
+                  {{ formatDateBlessure(b.date_blessure) }} → {{ formatDateBlessure(b.date_guerison) }}
+                </template>
+              </div>
+            </div>
+            <span class="badge" :class="b.en_cours ? 'badge-danger' : 'badge-green'">
+              {{ b.en_cours ? 'En cours' : 'Guérie' }}
+            </span>
+          </div>
+
+          <p v-if="b.circonstances" class="blessure-circonstances">{{ b.circonstances }}</p>
+
+          <div class="blessure-tags">
+            <span class="tag" :class="b.docteur ? 'tag-oui' : 'tag-non'">
+              <i class="ti" :class="b.docteur ? 'ti-check' : 'ti-x'"></i> Médecin
+            </span>
+            <span class="tag" :class="b.kine ? 'tag-oui' : 'tag-non'">
+              <i class="ti" :class="b.kine ? 'ti-check' : 'ti-x'"></i> Kiné
+            </span>
+            <span class="tag" v-if="labelDureeBlessure(b.duree_estimee)">
+              <i class="ti ti-hourglass"></i> Arrêt estimé : {{ labelDureeBlessure(b.duree_estimee) }}
+            </span>
+          </div>
+        </div>
+      </template>
+    </div>
   </div>
 </template>
 
@@ -400,6 +456,7 @@ import GraphiqueBarres from '../monitoring/GraphiqueBarres.vue'
 import GroupesManagerModal from './GroupesManagerModal.vue'
 import AssignerProgrammeModal from './AssignerProgrammeModal.vue'
 import { typeGroupe, labelTypeGroupe } from '../../data/typesGroupe'
+import { labelDureeBlessure, formatDateBlessure, labelAnciennete } from '../../data/blessures'
 
 // Distance horizontale minimale pour valider un swipe. Volontairement haute :
 // un doigt qui ripe sur un simple appui ne doit jamais changer d'onglet.
@@ -814,8 +871,39 @@ export default {
       }
     })
 
+    // --- Blessures (lecture seule) ---
+    const blessures = ref([])
+    const loadingBlessures = ref(false)
+    const blessuresChargees = ref(false)
+
+    const blessuresEnCours = computed(() => blessures.value.filter(b => b.en_cours))
+    const blessuresGueries = computed(() => blessures.value.filter(b => !b.en_cours))
+
+    // Avant l'ouverture de l'onglet, le compteur de la pastille vient du résumé
+    // monitoring déjà chargé pour la liste ; ensuite, des blessures elles-mêmes
+    // (l'athlète a pu en clôturer une depuis le dernier /monitoring/cercle).
+    const nbBlessuresEnCours = computed(() =>
+      blessuresChargees.value
+        ? blessuresEnCours.value.length
+        : (props.athlete.resume?.blessures_en_cours || 0)
+    )
+
+    const fetchBlessures = async () => {
+      loadingBlessures.value = true
+      try {
+        blessures.value = await api.get(`/blessures/athlete/${props.athlete.id}`)
+      } finally {
+        loadingBlessures.value = false
+        blessuresChargees.value = true
+      }
+    }
+    const ouvrirBlessures = () => {
+      sousOnglet.value = 'blessures'
+      if (!blessuresChargees.value) fetchBlessures()
+    }
+
     // --- Navigation par onglet (clic ou swipe) ---
-    const ONGLETS_FICHE = ['apercu', 'programme', 'historique', 'poids']
+    const ONGLETS_FICHE = ['apercu', 'programme', 'historique', 'poids', 'blessures']
 
     // Recentre l'onglet actif dans la barre (qui peut déborder sur mobile) :
     // au swipe comme au clic, l'onglet qui devient actif se replace bien en
@@ -830,6 +918,7 @@ export default {
     const allerA = (tab) => {
       if (tab === 'historique') ouvrirHistorique()
       else if (tab === 'poids') ouvrirPoids()
+      else if (tab === 'blessures') ouvrirBlessures()
       else sousOnglet.value = tab
       centrerOnglet(tab)
     }
@@ -886,6 +975,8 @@ export default {
       formatDate, formatDateCourte, getStatutClasse, getStatutIcon,
       loadingPoids, entriesPoids, courbePoids, ouvrirPoids,
       vuePoids, labelMois, joursGrille, poidsPourDate, moisPrecedent, moisSuivant, resumePoids,
+      blessures, loadingBlessures, blessuresEnCours, blessuresGueries, nbBlessuresEnCours,
+      labelDureeBlessure, formatDateBlessure, labelAnciennete,
       allerA, onSwipeStart, onSwipeEnd, onSwipeCancel, setTabRef
     }
   }
@@ -939,7 +1030,27 @@ export default {
   text-align: center;
 }
 .tab.active { color: var(--color-primary-dark); border-bottom-color: var(--color-primary); font-weight: 600; }
+.tab-pastille {
+  margin-left: 6px; padding: 1px 6px; border-radius: var(--radius-full);
+  font-size: 10px; font-weight: 700;
+  background: var(--color-danger-bg); color: var(--color-danger-text);
+}
 .tab-content { display: flex; flex-direction: column; gap: var(--spacing-md); }
+
+.blessure-carte.est-en-cours { border-left: 3px solid var(--color-danger-text); }
+.blessure-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--spacing-md); }
+.blessure-meta { font-size: var(--font-size-xs); color: var(--color-text-muted); margin-top: 2px; }
+.blessure-circonstances { margin: 0; font-size: var(--font-size-sm); color: var(--color-text-body); white-space: pre-wrap; }
+.badge-danger { background: var(--color-danger-bg); color: var(--color-danger-text); }
+.blessure-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.blessure-tags .tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: var(--font-size-xs); font-weight: 600;
+  padding: 3px 8px; border-radius: var(--radius-full);
+  background: var(--color-bg-secondary); color: var(--color-text-secondary);
+}
+.blessure-tags .tag-oui { background: var(--color-valid-bg); color: var(--color-valid-text-strong); }
+.blessure-tags .tag-non { color: var(--color-text-muted); }
 
 .stat-card {
   background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-lg);
