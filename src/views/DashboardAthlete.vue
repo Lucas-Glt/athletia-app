@@ -103,24 +103,59 @@
 
             <div v-if="loadingSeances" class="empty">Chargement...</div>
 
-            <button
-              v-for="seance in seancesAffichees"
-              :key="seance.id"
-              class="seance-card"
-              @click="demarrerSeance(seance)"
-            >
-              <div class="seance-card-main">
-                <div class="seance-card-titre">{{ seance.nom }}</div>
-                <div class="seance-card-meta">
-                  <span class="type-badge" :class="`type-badge-${seance.type_seance || 'musculation'}`">
-                    {{ labelType(seance.type_seance) }}
-                  </span>
-                  <span class="badge badge-purple" v-if="seance.jour">{{ seance.jour }}</span>
-                  <span class="seance-card-count">{{ seance.exercices?.length || 0 }} exercices</span>
+            <!-- Semaine type créée : le calendrier remplace la liste. Sans
+                 semaine type, l'écran ne change pas — la liste reste la vue
+                 par défaut, avec la proposition d'en créer une. -->
+            <PlanningHebdo
+              v-else-if="planningActif"
+              :creneaux="creneaux"
+              :planning="planning"
+              :statuts="statutParCreneau"
+              @ouvrir="ouvrirDepuisPlanning"
+              @modifier="modalPlanning = true"
+            />
+
+            <template v-else>
+              <button
+                v-for="seance in seancesAffichees"
+                :key="seance.id"
+                class="seance-card"
+                @click="demarrerSeance(seance)"
+              >
+                <div class="seance-card-main">
+                  <div class="seance-card-titre">{{ seance.nom }}</div>
+                  <div class="seance-card-meta">
+                    <span class="type-badge" :class="`type-badge-${seance.type_seance || 'musculation'}`">
+                      {{ labelType(seance.type_seance) }}
+                    </span>
+                    <span class="badge badge-purple" v-if="seance.jour">{{ seance.jour }}</span>
+                    <span class="seance-card-count">{{ seance.exercices?.length || 0 }} exercices</span>
+                  </div>
                 </div>
-              </div>
-              <i class="ti ti-chevron-right seance-card-chevron"></i>
-            </button>
+                <i class="ti ti-chevron-right seance-card-chevron"></i>
+              </button>
+
+              <button
+                v-if="creneaux.length"
+                class="btn btn-dashed btn-creer-semaine"
+                @click="modalPlanning = true"
+              >
+                <i class="ti ti-calendar-plus"></i> Créer ma semaine d'entraînement
+              </button>
+            </template>
+
+            <PlanningHebdoModal
+              v-if="modalPlanning"
+              :creneaux="creneaux"
+              :planning="planning"
+              :erreur="erreurPlanning"
+              @enregistrer="enregistrerPlanning"
+              @supprimer="supprimerPlanning"
+              @fermer="fermerModalPlanning"
+              @pointerdown.stop
+              @pointermove.stop
+              @pointerup.stop
+            />
           </div>
         </template>
 
@@ -864,8 +899,11 @@ import CourbeProgression from '../components/athlete/CourbeProgression.vue'
 import MesStats from '../components/athlete/MesStats.vue'
 import BlessuresPanel from '../components/athlete/BlessuresPanel.vue'
 import PopupBanniere from '../components/athlete/PopupBanniere.vue'
+import PlanningHebdo from '../components/athlete/PlanningHebdo.vue'
+import PlanningHebdoModal from '../components/athlete/PlanningHebdoModal.vue'
 import ExerciceImage from '../components/ExerciceImage.vue'
 import { typeGroupe, labelTypeGroupe, estComplexe } from '../data/typesGroupe'
+import { lundiDeLaSemaine } from '../data/joursSemaine'
 
 // Distance horizontale minimale pour valider un swipe. Volontairement haute :
 // un doigt qui ripe sur un simple appui ne doit jamais changer d'écran.
@@ -981,7 +1019,10 @@ const CLE_BROUILLON = 'athletia:seance-en-cours'
 const DUREE_BROUILLON_MS = 48 * 60 * 60 * 1000
 
 export default {
-  components: { AppLayout, CourbeProgression, MesStats, BlessuresPanel, PopupBanniere, ExerciceImage },
+  components: {
+    AppLayout, CourbeProgression, MesStats, BlessuresPanel, PopupBanniere,
+    PlanningHebdo, PlanningHebdoModal, ExerciceImage
+  },
   setup() {
     const programmes = ref([])
     const programmeActif = ref(null)
@@ -1755,6 +1796,94 @@ export default {
         })
     })
 
+    // --- Semaine type de l'athlète ---
+    // Il place lui-même chaque séance de son programme sur un jour. Tant
+    // qu'aucune n'est placée, l'écran garde la liste de séances classique.
+    const planning = ref([])
+    const modalPlanning = ref(false)
+    const erreurPlanning = ref('')
+
+    // Une carte par créneau : deux séances de même nom sont un seul créneau
+    // pour l'historique (cf. tentativesProgramme) comme pour la semaine type.
+    const creneaux = computed(() => {
+      const vus = new Set()
+      return seancesAffichees.value.filter(s => {
+        if (vus.has(s.nom)) return false
+        vus.add(s.nom)
+        return true
+      })
+    })
+
+    // Une semaine type dont plus aucune séance n'existe (programme remanié par
+    // le prépa) ne doit pas afficher un calendrier vide : on retombe alors sur
+    // la liste, qui propose d'en recréer une.
+    const planningActif = computed(() =>
+      planning.value.some(e => creneaux.value.some(s => s.nom === e.creneau))
+    )
+
+    // État de chaque créneau pour le calendrier : « fait » ne vaut que pour la
+    // semaine en cours (le lundi remet la semaine à faire), la dernière date
+    // reste affichée à titre de repère.
+    const statutParCreneau = computed(() => {
+      const debutSemaine = lundiDeLaSemaine()
+      const map = {}
+      tentativesProgramme.value.forEach(t => {
+        const statut = map[t.creneau] || { fait: false, derniereDate: null }
+        if (!statut.derniereDate || new Date(t.date) > new Date(statut.derniereDate)) {
+          statut.derniereDate = t.date
+        }
+        if (new Date(t.date) >= debutSemaine) statut.fait = true
+        map[t.creneau] = statut
+      })
+      return map
+    })
+
+    const chargerPlanning = async () => {
+      planning.value = []
+      if (!programmeActif.value) return
+      try {
+        planning.value = await api.get(`/planning/programme/${programmeActif.value.id}/moi`)
+      } catch (e) {
+        console.error('Erreur chargement semaine type:', e)
+      }
+    }
+
+    const fermerModalPlanning = () => {
+      modalPlanning.value = false
+      erreurPlanning.value = ''
+    }
+
+    const enregistrerPlanning = async (entrees) => {
+      erreurPlanning.value = ''
+      try {
+        planning.value = await api.put(`/planning/programme/${programmeActif.value.id}/moi`, { entrees })
+        fermerModalPlanning()
+      } catch (e) {
+        erreurPlanning.value = e.message || "Erreur lors de l'enregistrement"
+      }
+    }
+
+    const supprimerPlanning = async () => {
+      if (!confirm('Supprimer ma semaine d\'entraînement ? Les séances reviendront en simple liste.')) return
+      erreurPlanning.value = ''
+      try {
+        await api.del(`/planning/programme/${programmeActif.value.id}/moi`)
+        planning.value = []
+        fermerModalPlanning()
+      } catch (e) {
+        erreurPlanning.value = e.message || 'Erreur lors de la suppression'
+      }
+    }
+
+    // Depuis le calendrier : une séance déjà faite cette semaine s'ouvre sur
+    // ses données enregistrées (on vient les consulter), les autres sur la
+    // feuille de saisie.
+    const ouvrirDepuisPlanning = (seance) => {
+      const fait = statutParCreneau.value[seance.nom]?.fait
+      demarrerSeance(seance)
+      if (fait) vueSeance.value = 'historique'
+    }
+
     const fetchProgrammes = async () => {
       try {
         programmes.value = await api.get('/programmes/')
@@ -1785,6 +1914,8 @@ export default {
 
       // Charge les logs existants après les séances
       await chargerLogsExistants(p.id)
+      // Semaine type : propre à chaque programme, rechargée à chaque bascule
+      await chargerPlanning()
       // Précharge l'historique complet : nécessaire dès l'écran de saisie
       // pour la comparaison au swipe, pas seulement l'onglet Historique
       fetchHistorique()
@@ -1903,6 +2034,10 @@ export default {
       effacerBrouillon()
       debutSaisie.value = null
       seanceActive.value = null
+      // Le calendrier de la semaine type colore les séances faites à partir de
+      // l'historique : sans ce rafraîchissement, celle qu'on vient de valider
+      // y resterait « à faire » jusqu'au prochain chargement de l'écran.
+      await fetchHistorique()
       // Sans ligne de charge il n'y a rien à compléter côté serveur :
       // proposer le questionnaire mènerait à un accueil vide.
       if (chargeEnregistree) popupRessenti.value = sessionSaisieId.value
@@ -2180,7 +2315,9 @@ export default {
       ouvrirSaisiePoids, fermerSaisiePoids, enregistrerPoids, supprimerPoids,
       popupRessenti, popupWellness, focusRessenti, focusWellness,
       repondreRessenti, repondreWellness, onFocusConsomme,
-      brouillonPropose, sousTitreBrouillon, reprendreBrouillon, abandonnerBrouillon
+      brouillonPropose, sousTitreBrouillon, reprendreBrouillon, abandonnerBrouillon,
+      planning, planningActif, creneaux, statutParCreneau, modalPlanning, erreurPlanning,
+      enregistrerPlanning, supprimerPlanning, fermerModalPlanning, ouvrirDepuisPlanning
     }
   }
 }
@@ -2265,6 +2402,16 @@ export default {
 .seance-card-meta { display: flex; align-items: center; gap: var(--spacing-sm); flex-wrap: wrap; }
 .seance-card-count { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
 .seance-card-chevron { color: var(--color-text-muted); font-size: var(--font-size-lg); flex-shrink: 0; }
+
+/* Proposition de semaine type, sous la liste : discrète tant que l'athlète
+   n'en a pas créé, elle disparaît ensuite au profit du calendrier. */
+.btn-creer-semaine {
+  width: 100%;
+  margin-top: var(--spacing-sm);
+  color: var(--color-primary-dark);
+  border-color: var(--color-primary-lighter);
+  flex-shrink: 0;
+}
 
 /* Encart d'information (conseil de pesée, mode de calcul d'une courbe...) */
 .info-note {

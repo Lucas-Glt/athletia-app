@@ -59,6 +59,13 @@ export function useApi() {
       body: JSON.stringify(body)
     }).then(handleResponse)
 
+  const put = (path, body) =>
+    fetch(`${BASE_URL}${path}`, {
+      method: 'PUT',
+      headers: headers(),
+      body: JSON.stringify(body)
+    }).then(handleResponse)
+
   const patch = (path, body) =>
     fetch(`${BASE_URL}${path}`, {
       method: 'PATCH',
@@ -72,5 +79,5 @@ export function useApi() {
       headers: headers()
     }).then(handleResponse)
 
-  return { get, post, patch, del }
+  return { get, post, put, patch, del }
 }
