@@ -103,14 +103,14 @@
 
             <div v-if="loadingSeances" class="empty">Chargement...</div>
 
-            <!-- Semaine type créée : le calendrier remplace la liste. Sans
-                 semaine type, l'écran ne change pas — la liste reste la vue
-                 par défaut, avec la proposition d'en créer une. -->
-            <PlanningHebdo
+            <!-- Semaine type créée : le calendrier du mois remplace la liste.
+                 Sans semaine type, l'écran ne change pas — la liste reste la
+                 vue par défaut, avec la proposition d'en créer une. -->
+            <PlanningCalendrier
               v-else-if="planningActif"
               :creneaux="creneaux"
               :planning="planning"
-              :statuts="statutParCreneau"
+              :faites="seancesFaites"
               @ouvrir="ouvrirDepuisPlanning"
               @modifier="modalPlanning = true"
             />
@@ -899,11 +899,11 @@ import CourbeProgression from '../components/athlete/CourbeProgression.vue'
 import MesStats from '../components/athlete/MesStats.vue'
 import BlessuresPanel from '../components/athlete/BlessuresPanel.vue'
 import PopupBanniere from '../components/athlete/PopupBanniere.vue'
-import PlanningHebdo from '../components/athlete/PlanningHebdo.vue'
+import PlanningCalendrier from '../components/athlete/PlanningCalendrier.vue'
 import PlanningHebdoModal from '../components/athlete/PlanningHebdoModal.vue'
 import ExerciceImage from '../components/ExerciceImage.vue'
 import { typeGroupe, labelTypeGroupe, estComplexe } from '../data/typesGroupe'
-import { lundiDeLaSemaine } from '../data/joursSemaine'
+import { cleOccurrence } from '../data/joursSemaine'
 
 // Distance horizontale minimale pour valider un swipe. Volontairement haute :
 // un doigt qui ripe sur un simple appui ne doit jamais changer d'écran.
@@ -1021,7 +1021,7 @@ const DUREE_BROUILLON_MS = 48 * 60 * 60 * 1000
 export default {
   components: {
     AppLayout, CourbeProgression, MesStats, BlessuresPanel, PopupBanniere,
-    PlanningHebdo, PlanningHebdoModal, ExerciceImage
+    PlanningCalendrier, PlanningHebdoModal, ExerciceImage
   },
   setup() {
     const programmes = ref([])
@@ -1821,19 +1821,16 @@ export default {
       planning.value.some(e => creneaux.value.some(s => s.nom === e.creneau))
     )
 
-    // État de chaque créneau pour le calendrier : « fait » ne vaut que pour la
-    // semaine en cours (le lundi remet la semaine à faire), la dernière date
-    // reste affichée à titre de repère.
-    const statutParCreneau = computed(() => {
-      const debutSemaine = lundiDeLaSemaine()
+    // Séances validées, indexées par créneau ET par semaine : le calendrier
+    // colore l'occurrence de la semaine où la séance a été faite, même si elle
+    // l'a été un autre jour que celui prévu (rattachement hebdomadaire).
+    const seancesFaites = computed(() => {
       const map = {}
       tentativesProgramme.value.forEach(t => {
-        const statut = map[t.creneau] || { fait: false, derniereDate: null }
-        if (!statut.derniereDate || new Date(t.date) > new Date(statut.derniereDate)) {
-          statut.derniereDate = t.date
-        }
-        if (new Date(t.date) >= debutSemaine) statut.fait = true
-        map[t.creneau] = statut
+        const cle = cleOccurrence(t.creneau, new Date(t.date))
+        // Plusieurs tentatives la même semaine : on garde la première, c'est
+        // celle qui a rempli le créneau.
+        if (!map[cle] || new Date(t.date) < new Date(map[cle])) map[cle] = t.date
       })
       return map
     })
@@ -1875,13 +1872,16 @@ export default {
       }
     }
 
-    // Depuis le calendrier : une séance déjà faite cette semaine s'ouvre sur
-    // ses données enregistrées (on vient les consulter), les autres sur la
-    // feuille de saisie.
-    const ouvrirDepuisPlanning = (seance) => {
-      const fait = statutParCreneau.value[seance.nom]?.fait
-      demarrerSeance(seance)
-      if (fait) vueSeance.value = 'historique'
+    // Depuis le calendrier : une séance déjà faite s'ouvre sur ses données
+    // enregistrées, positionnées sur la date de cette occurrence-là (on vient
+    // les consulter) ; les autres sur la feuille de saisie.
+    const ouvrirDepuisPlanning = async ({ seance, dateFait }) => {
+      await demarrerSeance(seance)
+      if (!dateFait) return
+      vueSeance.value = 'historique'
+      const jour = dateFait.split('T')[0]
+      const index = tentativesSeance.value.findIndex(t => t.date.split('T')[0] === jour)
+      if (index >= 0) histoIndex.value = index
     }
 
     const fetchProgrammes = async () => {
@@ -1977,7 +1977,7 @@ export default {
       if (brouillon) brouillonPropose.value = brouillon
     }
 
-    const demarrerSeance = (seance) => {
+    const demarrerSeance = async (seance) => {
       seanceActive.value = seance
       vueSeance.value = 'seance'
       histoIndex.value = 0
@@ -1998,7 +1998,9 @@ export default {
       // Recharge l'historique à chaque (re)démarrage : sinon il reste figé
       // sur l'état du chargement de la page et n'inclut pas les performances
       // validées lors d'une saisie précédente pendant la même session.
-      fetchHistorique()
+      // Attendu : l'ouverture depuis le calendrier a besoin des tentatives
+      // rechargées pour se positionner sur la bonne date.
+      await fetchHistorique()
     }
 
     const validerSeance = async () => {
@@ -2316,7 +2318,7 @@ export default {
       popupRessenti, popupWellness, focusRessenti, focusWellness,
       repondreRessenti, repondreWellness, onFocusConsomme,
       brouillonPropose, sousTitreBrouillon, reprendreBrouillon, abandonnerBrouillon,
-      planning, planningActif, creneaux, statutParCreneau, modalPlanning, erreurPlanning,
+      planning, planningActif, creneaux, seancesFaites, modalPlanning, erreurPlanning,
       enregistrerPlanning, supprimerPlanning, fermerModalPlanning, ouvrirDepuisPlanning
     }
   }
