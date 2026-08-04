@@ -40,13 +40,21 @@
             v-for="occ in jour.occurrences.slice(0, 2)"
             :key="occ.seance.id"
             class="cal-chip"
-            :class="occ.classe"
+            :class="[occ.classe, classeType(occ.seance)]"
           >{{ occ.seance.nom }}</span>
           <span v-if="jour.occurrences.length > 2" class="cal-plus">
             +{{ jour.occurrences.length - 2 }}
           </span>
         </template>
       </button>
+    </div>
+
+    <!-- Légende des types présents dans le programme : le fond d'une séance
+         dit son statut, sa barre de couleur dit son type. -->
+    <div class="cal-legende" v-if="typesPresents.length > 1">
+      <span v-for="type in typesPresents" :key="type.cle" class="legende-item" :class="`est-${type.cle}`">
+        <span class="legende-bar"></span>{{ type.label }}
+      </span>
     </div>
 
     <!-- Jour sélectionné : les noms complets, et le seul endroit d'où on ouvre
@@ -64,7 +72,7 @@
         v-for="occ in occurrencesSelection"
         :key="occ.seance.id"
         class="planning-seance"
-        :class="occ.classe"
+        :class="[occ.classe, classeType(occ.seance)]"
         @click="$emit('ouvrir', { seance: occ.seance, dateFait: occ.dateFait })"
       >
         <div class="ps-main">
@@ -97,7 +105,8 @@
       <button
         v-for="seance in nonPlanifiees"
         :key="seance.id"
-        class="planning-seance is-hors"
+        class="planning-seance"
+        :class="classeType(seance)"
         @click="$emit('ouvrir', { seance, dateFait: null })"
       >
         <div class="ps-main">
@@ -121,6 +130,7 @@ import { lundiDeLaSemaine, dateISO, cleOccurrence, jourDeLaDate } from '../../da
 
 const LABELS_TYPE = { musculation: 'Musculation', natation: 'Natation', athletisme: 'Athlétisme', pliometrie: 'Pliométrie' }
 const LABELS_COURTS = ['L', 'M', 'M', 'J', 'V', 'S', 'D']
+const TYPES = Object.keys(LABELS_TYPE)
 
 export default {
   emits: ['ouvrir', 'modifier'],
@@ -137,6 +147,8 @@ export default {
   },
   setup(props) {
     const labelType = (t) => LABELS_TYPE[t] || LABELS_TYPE.musculation
+    const typeSeance = (seance) => (LABELS_TYPE[seance.type_seance] ? seance.type_seance : 'musculation')
+    const classeType = (seance) => `est-${typeSeance(seance)}`
     const formatCourt = (d) => new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
 
     const aujourdhui = new Date()
@@ -206,6 +218,14 @@ export default {
       props.creneaux.filter(s => !jourParCreneau.value[s.nom])
     )
 
+    // Légende : seulement les types que le programme contient réellement, dans
+    // l'ordre de référence — une légende de 4 lignes pour un programme 100 %
+    // musculation n'apprendrait rien.
+    const typesPresents = computed(() => {
+      const presents = new Set(props.creneaux.map(typeSeance))
+      return TYPES.filter(t => presents.has(t)).map(t => ({ cle: t, label: LABELS_TYPE[t] }))
+    })
+
     const majuscule = (t) => t.charAt(0).toUpperCase() + t.slice(1)
     const labelMois = computed(() =>
       majuscule(moisAffiche.value.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }))
@@ -231,9 +251,9 @@ export default {
 
     return {
       LABELS_COURTS,
-      labelType, formatCourt,
+      labelType, classeType, formatCourt,
       jourSelectionne, grille, occurrencesSelection, nbFaitesMois,
-      nonPlanifiees, labelMois, labelJourSelectionne, moisPrecedent, moisSuivant
+      nonPlanifiees, typesPresents, labelMois, labelJourSelectionne, moisPrecedent, moisSuivant
     }
   }
 }
@@ -284,12 +304,22 @@ export default {
 }
 .est-aujourdhui .cal-num { color: var(--color-primary-dark); font-weight: 700; }
 
+/* Couleur du type d'entraînement, posée une seule fois ici et reprise par les
+   puces, les cartes et la légende. Elle ne sert que de repère de discipline :
+   le fond, lui, reste réservé au statut (vert = fait, gris = manqué), comme
+   pour tout le reste de l'app (cf. tokens.css). */
+.est-musculation { --type-couleur: var(--color-type-musculation-border); }
+.est-natation { --type-couleur: var(--color-type-natation-border); }
+.est-athletisme { --type-couleur: var(--color-type-athletisme-border); }
+.est-pliometrie { --type-couleur: var(--color-type-pliometrie-border); }
+
 /* Nom de séance dans la case : tronqué, le détail du jour donne le nom entier. */
 .cal-chip {
   font-size: 10px;
   font-weight: 600;
   line-height: 1.3;
   padding: 1px 3px;
+  border-left: 3px solid var(--type-couleur, var(--color-primary));
   border-radius: 3px;
   background: var(--color-primary-light);
   color: var(--color-primary-text);
@@ -301,6 +331,17 @@ export default {
 .cal-chip.est-faite { background: var(--color-valid-bg); color: var(--color-valid-text-strong); }
 .cal-chip.est-manquee { background: var(--color-bg-tertiary); color: var(--color-text-muted); }
 .cal-plus { font-size: 9px; color: var(--color-text-muted); text-align: left; padding-left: 3px; }
+
+/* --- Légende des types --- */
+.cal-legende { display: flex; flex-wrap: wrap; gap: var(--spacing-md); }
+.legende-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+.legende-bar { width: 10px; height: 10px; border-radius: 3px; background: var(--type-couleur); }
 
 /* --- Détail du jour choisi --- */
 .jour-detail { display: flex; flex-direction: column; gap: var(--spacing-sm); }
@@ -324,18 +365,22 @@ export default {
   padding: var(--spacing-md);
   background: var(--color-bg);
   border: 1px solid var(--color-border);
-  border-left: 4px solid var(--color-primary);
+  border-left: 4px solid var(--type-couleur, var(--color-primary));
   border-radius: var(--radius-lg);
   cursor: pointer;
 }
 .planning-seance:hover { background: var(--color-bg-hover); }
+/* border-left-color n'est pas repris ici : le statut se lit au fond, le type
+   à la barre de gauche. */
 .planning-seance.est-faite {
   background: var(--color-valid-bg-soft);
-  border-color: var(--color-valid-border);
-  border-left-color: var(--color-valid-border-strong);
+  border-top-color: var(--color-valid-border);
+  border-right-color: var(--color-valid-border);
+  border-bottom-color: var(--color-valid-border);
 }
-.planning-seance.est-manquee { border-left-color: var(--color-border-strong); }
-.planning-seance.is-hors { border-left-color: var(--color-border-strong); }
+/* Semaine révolue sans séance validée : grisée, sans dramatiser. */
+.planning-seance.est-manquee { background: var(--color-bg-secondary); }
+.planning-seance.est-manquee .ps-titre { color: var(--color-text-secondary); }
 
 .ps-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
 .ps-titre { font-size: var(--font-size-base); font-weight: 600; color: var(--color-text); }
