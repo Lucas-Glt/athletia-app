@@ -19,6 +19,13 @@ import './assets/base.css'
 // recharge automatiquement dès qu'un nouveau SW prend le contrôle.
 useRegisterSW({ immediate: true })
 
+// iOS ignore `user-scalable=no` / `maximum-scale` de la balise viewport depuis
+// iOS 10 : le pinch-to-zoom ne peut être bloqué qu'en annulant les événements
+// gesture* de WebKit (inexistants ailleurs, l'écoute est donc sans effet).
+for (const evt of ['gesturestart', 'gesturechange', 'gestureend']) {
+  document.addEventListener(evt, (e) => e.preventDefault(), { passive: false })
+}
+
 const app = createApp(App)
 
 app.use(createPinia())

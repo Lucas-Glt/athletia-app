@@ -133,6 +133,20 @@
   border-color: var(--color-primary);
 }
 
+/* iOS zoome automatiquement sur le champ au focus dès que sa police descend
+   sous 16px (et ne dézoome jamais ensuite). On impose donc ce plancher à tous
+   les contrôles de saisie sur écran tactile — 16px est la valeur imposée par
+   iOS, pas un token. !important est nécessaire : les <style scoped> des
+   composants ciblent leurs champs par classe, donc avec une spécificité
+   supérieure, et descendent parfois à 12/14px. */
+@media (pointer: coarse) {
+  input:not([type='checkbox']):not([type='radio']),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
 /* --- Messages --- */
 .error-box,
 .error {

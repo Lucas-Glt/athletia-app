@@ -14,6 +14,11 @@ html, body, #app {
   margin: 0;
   padding: 0;
   color: var(--color-text);
+  /* Pas de zoom dans l'app : `manipulation` supprime le zoom double-tap,
+     `text-size-adjust` empêche iOS de grossir le texte tout seul en paysage. */
+  touch-action: manipulation;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 input, select, textarea, button {
