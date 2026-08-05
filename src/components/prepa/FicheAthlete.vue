@@ -83,6 +83,27 @@
             <GraphiqueBarres :barres="barresDernierWellness" unite="/7" />
           </template>
         </div>
+        <div class="stat-card">
+          <div class="stat-card-titre">
+            Sommeil — durée
+            <span class="sommeil-badge" :class="'sommeil-' + detail.sommeil.niveau" v-if="detail.sommeil.niveau">
+              {{ labelNiveauSommeil(detail.sommeil.niveau) }}
+            </span>
+          </div>
+          <CourbeProgression :points="pointsSommeil" label="Heures par nuit" unite=" h" axe-x="dates" />
+          <div class="sommeil-resume" v-if="detail.sommeil.statut === 'ok'">
+            <span>Moyenne 7 j : <strong>{{ formatHeures(detail.sommeil.moyenne) }}</strong></span>
+            <span>Nuits &lt; 7 h : <strong>{{ detail.sommeil.nuits_courtes }} / {{ detail.sommeil.nuits_renseignees }}</strong></span>
+            <span>Dette vs 8 h : <strong>{{ formatHeures(detail.sommeil.dette) }}</strong></span>
+          </div>
+          <p class="stat-card-note" v-else>
+            {{ detail.sommeil.nuits_renseignees }} nuit{{ detail.sommeil.nuits_renseignees > 1 ? 's' : '' }} renseignée{{ detail.sommeil.nuits_renseignees > 1 ? 's' : '' }} sur les 7 dernières :
+            pas assez pour une lecture chronique (4 minimum).
+          </p>
+          <p class="stat-card-note">
+            C'est le déficit installé sur plusieurs nuits qui est associé au risque de blessure, pas une mauvaise nuit isolée.
+          </p>
+        </div>
       </template>
     </div>
 
@@ -457,6 +478,7 @@ import GroupesManagerModal from './GroupesManagerModal.vue'
 import AssignerProgrammeModal from './AssignerProgrammeModal.vue'
 import { typeGroupe, labelTypeGroupe } from '../../data/typesGroupe'
 import { labelDureeBlessure, formatDateBlessure, labelAnciennete } from '../../data/blessures'
+import { formatHeures, labelNiveauSommeil } from '../../data/sommeil'
 
 // Distance horizontale minimale pour valider un swipe. Volontairement haute :
 // un doigt qui ripe sur un simple appui ne doit jamais changer d'onglet.
@@ -528,6 +550,11 @@ export default {
         { cle: 'stress', nom: 'Stress', valeur: w.stress }
       ]
     })
+    const pointsSommeil = computed(() =>
+      detail.value
+        ? detail.value.wellness.filter(p => p.heures_sommeil !== null).map(p => ({ date: p.date, valeur: p.heures_sommeil }))
+        : []
+    )
     const formatDateCourt = (d) => new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
 
     // --- Programme : contenu des programmes assignés, assigner/retirer ---
@@ -964,6 +991,7 @@ export default {
       estSuperPrepa, sousOnglet, modalGroupes, groupesDe, initiales, retirerDuCercle,
       detail, loadingApercu, pointsAcwr, pointsAigueChronique, pointsMonotonie, pointsContrainte,
       pointsHooper, dernierWellness, barresDernierWellness, formatDateCourt,
+      pointsSommeil, formatHeures, labelNiveauSommeil,
       enCours, estAssigne, assignerProgramme, retirerProgramme,
       modalAjoutProgramme, programmesDisponibles, programmesOuverts, seancesOuvertes,
       seancesParProgramme, loadingSeances, basculerProgramme, basculerSeanceProg,
@@ -1056,9 +1084,20 @@ export default {
   background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-lg);
   padding: var(--spacing-lg); display: flex; flex-direction: column; gap: var(--spacing-sm);
 }
-.stat-card-titre { font-size: var(--font-size-sm); font-weight: 700; }
+.stat-card-titre { font-size: var(--font-size-sm); font-weight: 700; display: flex; align-items: center; gap: var(--spacing-sm); flex-wrap: wrap; }
 .stat-card-titre-sm { font-size: var(--font-size-xs); color: var(--color-text-secondary); font-weight: 600; margin-top: var(--spacing-xs); }
+.stat-card-note { font-size: var(--font-size-xs); color: var(--color-text-muted); margin: 0; }
 .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-lg); }
+
+.sommeil-resume { display: flex; flex-wrap: wrap; gap: var(--spacing-sm) var(--spacing-lg); font-size: var(--font-size-sm); color: var(--color-text-secondary); }
+.sommeil-badge {
+  padding: 2px 8px; border-radius: var(--radius-full);
+  font-size: var(--font-size-xs); font-weight: 700;
+  background: var(--color-bg-tertiary); color: var(--color-text-secondary);
+}
+.sommeil-badge.sommeil-faible { background: var(--color-valid-bg); color: var(--color-valid-text-strong); }
+.sommeil-badge.sommeil-modere { background: var(--color-warning-bg); color: var(--color-warning-text); }
+.sommeil-badge.sommeil-eleve { background: var(--color-danger-bg); color: var(--color-danger-text); }
 
 .prog-topbar { display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-md); flex-wrap: wrap; }
 .prog-topbar-titre { font-size: var(--font-size-sm); font-weight: 600; color: var(--color-text-secondary); }

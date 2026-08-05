@@ -45,7 +45,31 @@
       </template>
       <template v-else>
         <div class="stat-card-titre"><i class="ti ti-heart-rate-monitor"></i> Wellness du jour</div>
-        <p class="stat-card-sub">4 questions, moins de 20 secondes.</p>
+        <p class="stat-card-sub">5 questions, moins de 30 secondes.</p>
+
+        <div class="wellness-item">
+          <div class="wellness-item-head">
+            <span>Temps de sommeil</span>
+            <span class="wellness-echelle">la nuit dernière</span>
+          </div>
+          <div class="sommeil-stepper">
+            <button
+              class="sommeil-btn"
+              :disabled="wellnessForm.heures_sommeil !== null && wellnessForm.heures_sommeil <= SOMMEIL_MIN"
+              @click="ajusterSommeil(-1)"
+              aria-label="Moins 15 minutes"
+            ><i class="ti ti-minus"></i></button>
+            <span class="sommeil-valeur" :class="{ vide: wellnessForm.heures_sommeil === null }">
+              {{ wellnessForm.heures_sommeil === null ? '— h' : formatHeures(wellnessForm.heures_sommeil) }}
+            </span>
+            <button
+              class="sommeil-btn"
+              :disabled="wellnessForm.heures_sommeil !== null && wellnessForm.heures_sommeil >= SOMMEIL_MAX"
+              @click="ajusterSommeil(1)"
+              aria-label="Plus 15 minutes"
+            ><i class="ti ti-plus"></i></button>
+          </div>
+        </div>
 
         <div class="wellness-item" v-for="item in itemsWellness" :key="item.champ">
           <div class="wellness-item-head">
@@ -123,6 +147,7 @@ import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useApi } from '../../services/api'
 import CourbeProgression from './CourbeProgression.vue'
 import GraphiqueBarres from '../monitoring/GraphiqueBarres.vue'
+import { SOMMEIL_MIN, SOMMEIL_MAX, SOMMEIL_PAS, SOMMEIL_DEFAUT, formatHeures } from '../../data/sommeil'
 
 const LABELS_TYPE = { musculation: 'Musculation', natation: 'Natation', athletisme: 'Athlétisme', pliometrie: 'Pliométrie' }
 
@@ -155,7 +180,10 @@ export default {
     const rpeForm = ref(null)
     const dureeForm = ref('')
     const wellnessFait = ref(false)
-    const wellnessForm = ref({ sommeil: null, fatigue: null, courbatures: null, stress: null })
+    // heures_sommeil est la durée de la nuit ; l'item « sommeil » reste la
+    // note de qualité 1-7 du questionnaire de Hooper. Les deux comptent, et
+    // pour des raisons différentes (cf. monitoring_calc.py côté API).
+    const wellnessForm = ref({ sommeil: null, fatigue: null, courbatures: null, stress: null, heures_sommeil: null })
     const performances = ref([])
     const exerciceChoisiId = ref(null)
     const historiqueExercice = ref([])
@@ -170,6 +198,15 @@ export default {
     ]
 
     const labelRpe = (v) => LABELS_RPE[v] || ''
+
+    // Premier appui : on part de SOMMEIL_DEFAUT sans appliquer le pas, pour
+    // que « + » comme « − » amènent au même point de départ.
+    const ajusterSommeil = (sens) => {
+      const actuel = wellnessForm.value.heures_sommeil
+      if (actuel === null) { wellnessForm.value.heures_sommeil = SOMMEIL_DEFAUT; return }
+      const valeur = actuel + sens * SOMMEIL_PAS
+      wellnessForm.value.heures_sommeil = Math.min(SOMMEIL_MAX, Math.max(SOMMEIL_MIN, Math.round(valeur * 4) / 4))
+    }
 
     const fetchStats = async () => { stats.value = await api.get('/mes-stats/') }
 
@@ -359,6 +396,7 @@ export default {
     return {
       stats, ressenti, rpeForm, dureeForm, labelRpe, envoyerRessenti,
       wellnessFait, wellnessForm, itemsWellness, wellnessComplet, envoyerWellness,
+      ajusterSommeil, formatHeures, SOMMEIL_MIN, SOMMEIL_MAX,
       erreurRessenti, erreurWellness,
       performances, exerciceChoisiId, exerciceChoisi, courbeExerciceChoisi,
       repartitionBarres, derniersJours, styleJour, courbePoids,
@@ -440,6 +478,24 @@ export default {
   cursor: pointer;
 }
 .wellness-btn.active { background: var(--color-primary); border-color: var(--color-primary); color: var(--color-on-primary); }
+
+.sommeil-stepper { display: flex; align-items: center; gap: var(--spacing-sm); }
+.sommeil-btn {
+  width: var(--tap-min);
+  height: var(--tap-min);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  font-size: var(--font-size-base);
+  cursor: pointer;
+}
+.sommeil-btn:disabled { opacity: 0.4; cursor: default; }
+.sommeil-valeur { flex: 1; text-align: center; font-size: var(--font-size-lg); font-weight: 700; }
+.sommeil-valeur.vide { color: var(--color-text-muted); font-weight: 500; }
 
 .regularite-grille { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
 .regularite-case { aspect-ratio: 1; border-radius: 4px; background: var(--color-bg-tertiary); }

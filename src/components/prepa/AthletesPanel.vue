@@ -89,6 +89,13 @@
                     <i class="ti ti-mood-check"></i> Wellness : <strong>{{ formatDateRecente(a.resume.dernier_wellness) }}</strong>
                     <span v-if="a.resume.hooper_dernier" class="hooper-badge" :class="'wellness-' + a.resume.wellness_zone">{{ a.resume.hooper_dernier }}/28</span>
                   </span>
+                  <span>
+                    <i class="ti ti-zzz"></i> Sommeil 7 j :
+                    <strong>{{ a.resume.sommeil.moyenne !== null ? formatHeures(a.resume.sommeil.moyenne) : '—' }}</strong>
+                    <span v-if="a.resume.sommeil.nuits_courtes > 0" class="sommeil-badge" :class="'sommeil-' + a.resume.sommeil.niveau">
+                      {{ a.resume.sommeil.nuits_courtes }} nuit{{ a.resume.sommeil.nuits_courtes > 1 ? 's' : '' }} &lt; 7 h
+                    </span>
+                  </span>
                   <span><i class="ti ti-weight"></i> Poids : <strong>{{ a.resume.dernier_poids ? `${a.resume.dernier_poids.poids}kg (${formatDateRecente(a.resume.dernier_poids.date)})` : '—' }}</strong></span>
                 </div>
                 <div class="groupes-badges" v-if="groupesDe(a.id).length > 0">
@@ -205,8 +212,20 @@
             <p>L'athlète note chaque jour 4 critères de 1 à 7 : sommeil, fatigue, courbatures, stress. Le total va de <strong>4 (forme parfaite) à 28 (très dégradé)</strong> — plus bas = mieux. Un signal se déclenche si l'indice se dégrade 3 jours de suite.</p>
           </div>
           <div class="aide-section">
+            <h4>Sommeil — durée</h4>
+            <p>L'athlète déclare aussi <strong>combien de temps il a dormi</strong>. C'est une donnée à part du Hooper Index (une durée, pas une note sur 7) : la qualité ressentie et la quantité effective sont deux choses différentes.</p>
+            <p>La lecture se fait sur une <strong>fenêtre glissante de 7 nuits</strong>, jamais sur la nuit de la veille : dans la littérature, c'est le manque de sommeil <em>installé</em> qui est associé à la blessure. Sous 4 nuits renseignées sur 7, rien n'est affiché.</p>
+            <ul class="aide-zones">
+              <li><span class="aide-dot aide-dot-optimale"></span><strong>≥ 8 h</strong> — cible. Chez l'adolescent sportif, dormir 8 h ou plus est associé à environ <strong>deux fois moins</strong> de blessures (Milewski 2014 : &lt; 8 h → OR 1,7).</li>
+              <li><span class="aide-dot aide-dot-vigilance"></span><strong>7 à 8 h</strong> — plancher adulte. En dessous de 7 h sur au moins deux semaines, le risque de blessure musculo-squelettique est multiplié par ~1,7.</li>
+              <li><span class="aide-dot aide-dot-surcharge"></span><strong>&lt; 6 h</strong> — déficit marqué, signal automatique.</li>
+            </ul>
+            <p>Une moyenne correcte obtenue avec plusieurs nuits courtes rattrapées par des grasses matinées compte aussi comme insuffisante : l'irrégularité pèse, comme la monotonie sur la charge.</p>
+          </div>
+          <div class="aide-section">
             <h4>Signaux &amp; RAS</h4>
-            <p>Les signaux sont générés automatiquement, sans action du prépa : zone de vigilance ou surcharge sur l'ACWR, ou wellness dégradé 3 jours de suite.</p>
+            <p>Les signaux sont générés automatiquement, sans action du prépa : zone de vigilance ou surcharge sur l'ACWR, wellness dégradé 3 jours de suite, sommeil chronique insuffisant, ou <strong>charge en hausse sur sommeil insuffisant</strong>.</p>
+            <p>Ce dernier est le plus important : sommeil réduit <em>pendant</em> une montée de charge est le facteur le plus fortement associé à la blessure (OR ≈ 2,25, contre ~1,5 pour chacun pris isolément). Les deux signaux séparés peuvent être verts alors que leur croisement ne l'est pas.</p>
             <p>Un athlète est marqué <strong>RAS</strong> quand il n'a aucun signal <em>et</em> que son ACWR est calculable. Sans signal mais avec moins de 28 jours de données, il porte le badge <strong>« ACWR pas encore calculable »</strong> : rien ne le signale, mais rien ne prouve non plus que tout va bien.</p>
           </div>
         </div>
@@ -221,6 +240,7 @@ import { useApi } from '../../services/api'
 import { useAuthStore } from '../../stores/auth'
 import FicheAthlete from './FicheAthlete.vue'
 import GroupesManagerModal from './GroupesManagerModal.vue'
+import { formatHeures, estSommeilInsuffisant } from '../../data/sommeil'
 
 // Au-delà, un relevé wellness ne dit plus rien de l'état actuel de l'athlète :
 // on ne le compte plus comme « wellness bon ».
@@ -285,13 +305,18 @@ const INDICATEURS = {
     label: 'Wellness bon', ton: 'optimale', aide: 'Hooper ≤ 10 / 28',
     definition: `dernier relevé au vert (Hooper 10 ou moins) et datant de moins de ${FRAICHEUR_WELLNESS_JOURS} jours.`,
     test: (r) => r.wellness_zone === 'bon' && r.dernier_wellness && joursDepuis(r.dernier_wellness) <= FRAICHEUR_WELLNESS_JOURS
+  },
+  sommeil_insuffisant: {
+    label: 'Sommeil insuffisant', ton: 'vigilance', aide: '< 7 h/nuit sur 7 jours',
+    definition: "moyenne sous 7 h par nuit sur les 7 dernières, ou au moins 3 nuits courtes sur la période. C'est le déficit installé qui est associé au risque de blessure, pas la mauvaise nuit isolée.",
+    test: (r) => estSommeilInsuffisant(r.sommeil)
   }
 }
 
 const GROUPES_INDICATEURS = [
   { titre: "Vue d'ensemble", cles: ['tous', 'ras', 'signaux', 'blessures'] },
   { titre: 'Charge — ACWR', cles: ['optimale', 'vigilance', 'surcharge', 'sous_charge'] },
-  { titre: 'Wellness', cles: ['wellness_jour', 'wellness_bon'] }
+  { titre: 'Wellness', cles: ['wellness_jour', 'wellness_bon', 'sommeil_insuffisant'] }
 ]
 const CLES_INDICATEURS = GROUPES_INDICATEURS.flatMap(g => g.cles)
 
@@ -424,7 +449,7 @@ export default {
       estSuperPrepa, athleteSelectionneId, athleteSelectionne, ouvrirFiche, aideOuverte,
       modalGroupes, athleteFocusGroupes, ouvrirGestionGroupes, groupesDe,
       searchEmail, athleteTrouve, searchError, rechercherAthlète, ajouterAuCercle, retirerDuCercle,
-      onModifie, iconeTendance, initiales, formatDateRecente
+      onModifie, iconeTendance, initiales, formatDateRecente, formatHeures
     }
   }
 }
@@ -600,6 +625,14 @@ export default {
 }
 .hooper-badge.wellness-bon { background: var(--color-valid-bg); color: var(--color-valid-text-strong); }
 .hooper-badge.wellness-degrade { background: var(--color-danger-bg); color: var(--color-danger-text); }
+
+.sommeil-badge {
+  margin-left: 4px; padding: 1px 6px; border-radius: var(--radius-full);
+  font-size: var(--font-size-xs); font-weight: 700;
+  background: var(--color-bg-tertiary); color: var(--color-text-secondary);
+}
+.sommeil-badge.sommeil-modere { background: var(--color-warning-bg); color: var(--color-warning-text); }
+.sommeil-badge.sommeil-eleve { background: var(--color-danger-bg); color: var(--color-danger-text); }
 .amc-actions { display: flex; justify-content: flex-end; align-items: center; gap: var(--spacing-sm); }
 .btn-icon-tiny {
   width: 28px; height: 28px; padding: 0;
