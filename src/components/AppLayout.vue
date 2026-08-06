@@ -436,7 +436,7 @@ export default {
     justify-content: center;
     gap: 2px;
     min-height: var(--bottom-nav-h);
-    /* Padding minimal et débordement coupé : avec cinq onglets (athlète), la
+    /* Padding minimal et débordement coupé : avec six onglets (athlète), la
        largeur par item tombe sous la longueur d'un libellé, et un mot trop
        long débordait sur ses voisins au lieu de rester dans sa case. */
     padding: var(--spacing-xs) 2px;
@@ -448,6 +448,12 @@ export default {
     border-radius: 0;
   }
   .bottom-nav :deep(.nav-item i) { font-size: 22px; }
+  /* Six onglets sur un écran de 360 px laissent 60 px par case : « Blessures »
+     à 12 px n'y tient plus. Seul le libellé rétrécit, l'icône et la hauteur de
+     cible tactile ne bougent pas. */
+  @media (max-width: 400px) {
+    .bottom-nav :deep(.nav-item) { font-size: 11px; letter-spacing: -0.2px; }
+  }
   .bottom-nav :deep(.nav-item.active) {
     background: var(--color-primary-light);
     color: var(--color-primary-dark);
