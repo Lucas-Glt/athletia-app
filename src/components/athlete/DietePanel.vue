@@ -1,5 +1,15 @@
 <template>
   <div class="diete">
+    <div class="sous-onglets">
+      <button type="button" :class="{ actif: vue === 'journee' }" @click="vue = 'journee'">
+        <i class="ti ti-tools-kitchen-2"></i> Journée
+      </button>
+      <button type="button" :class="{ actif: vue === 'objectif' }" @click="vue = 'objectif'">
+        <i class="ti ti-target"></i> Objectif
+      </button>
+    </div>
+
+    <template v-if="vue === 'journee'">
     <!-- Journée courante : la diète se saisit au fil de la journée, mais on
          doit pouvoir rattraper la veille le lendemain matin. -->
     <div class="diete-jour">
@@ -19,12 +29,25 @@
 
     <div class="diete-total">
       <div class="diete-total-kcal">
-        {{ totalJour.kcal }}<span class="diete-total-unite">kcal</span>
+        {{ fr(totalJour.kcal) }}<span v-if="bilan" class="diete-total-cible">/ {{ fr(bilan.kcal_cible) }}</span
+        ><span class="diete-total-unite">kcal</span>
       </div>
+
+      <!-- Sans objectif défini, le total reste une information brute : c'est
+           la cible qui lui donne un sens, pas l'inverse. -->
+      <template v-if="bilan">
+        <div class="jauge">
+          <div class="jauge-barre" :class="{ depasse: reste.depasse }" :style="{ width: reste.pct + '%' }"></div>
+        </div>
+        <div class="diete-reste" :class="{ depasse: reste.depasse }">{{ reste.texte }}</div>
+      </template>
+
       <div class="diete-macros">
-        <span class="diete-macro"><b>{{ totalJour.proteines }}</b> g prot.</span>
-        <span class="diete-macro"><b>{{ totalJour.glucides }}</b> g gluc.</span>
-        <span class="diete-macro"><b>{{ totalJour.lipides }}</b> g lip.</span>
+        <span class="diete-macro">
+          <b>{{ fr(totalJour.proteines) }}</b><template v-if="bilan">/{{ fr(bilan.proteines_cible_g) }}</template> g prot.
+        </span>
+        <span class="diete-macro"><b>{{ fr(totalJour.glucides) }}</b> g gluc.</span>
+        <span class="diete-macro"><b>{{ fr(totalJour.lipides) }}</b> g lip.</span>
       </div>
     </div>
 
@@ -36,7 +59,7 @@
       <article v-for="r in repas" :key="r.id" class="repas-carte">
         <header class="repas-head">
           <h3 class="repas-nom">{{ r.nom }}</h3>
-          <span class="repas-kcal">{{ r.total_kcal }} kcal</span>
+          <span class="repas-kcal">{{ fr(r.total_kcal) }} kcal</span>
           <button class="repas-action" @click="ouvrirRenommage(r)" aria-label="Renommer le repas">
             <i class="ti ti-pencil"></i>
           </button>
@@ -49,9 +72,9 @@
           <li v-for="l in r.lignes" :key="l.id" class="ligne">
             <button type="button" class="ligne-corps" @click="ouvrirEditionQuantite(r, l)">
               <span class="ligne-nom">{{ l.nom }}</span>
-              <span class="ligne-meta">{{ formatNombre(l.grammes) }} g · {{ l.kcal_100g }} kcal/100 g</span>
+              <span class="ligne-meta">{{ fr(l.grammes) }} g · {{ fr(l.kcal_100g) }} kcal/100 g</span>
             </button>
-            <span class="ligne-kcal">{{ l.kcal }}</span>
+            <span class="ligne-kcal">{{ fr(l.kcal) }}</span>
             <button class="ligne-suppr" @click="supprimerLigne(l)" aria-label="Retirer cet aliment">
               <i class="ti ti-x"></i>
             </button>
@@ -72,6 +95,98 @@
         <p>Aucun repas enregistré ce jour.</p>
         <span>Ajoutez un repas, puis les aliments que vous avez mangés.</span>
       </div>
+    </template>
+    </template>
+
+    <!-- VUE OBJECTIF -->
+    <template v-else>
+      <div v-if="chargementBilan" class="empty">Chargement...</div>
+
+      <div v-else-if="!bilan" class="empty-state">
+        <i class="ti ti-target empty-icon"></i>
+        <p>Aucun objectif défini.</p>
+        <span>Renseignez vos mesures pour obtenir votre cible calorique quotidienne.</span>
+        <button class="btn btn-primary objectif-cta" @click="ouvrirObjectif">
+          <i class="ti ti-plus"></i> Définir mon objectif
+        </button>
+      </div>
+
+      <template v-else>
+        <div class="cible-carte">
+          <span class="cible-badge">{{ LABELS_OBJECTIF[bilan.objectif] }}</span>
+          <div class="cible-kcal">{{ fr(bilan.kcal_cible) }}<span class="cible-unite">kcal / jour</span></div>
+          <div class="cible-sub">
+            {{ fr(bilan.proteines_cible_g) }} g de protéines visées
+            <template v-if="bilan.objectif !== 'maintien'">
+              · {{ fr(bilan.rythme_effectif_kg_semaine) }} kg/semaine
+            </template>
+          </div>
+        </div>
+
+        <!-- Un garde-fou qui mord change la cible demandée : le dire, sinon
+             l'athlète croit à une erreur de calcul. -->
+        <div v-if="bilan.plafonnee" class="alerte">
+          <i class="ti ti-alert-triangle"></i>
+          <span>{{ bilan.motif_plafond }}</span>
+        </div>
+
+        <div class="detail-calcul">
+          <h4 class="detail-titre">D'où vient ce chiffre</h4>
+          <div class="detail-ligne">
+            <span>Métabolisme de base</span>
+            <b>{{ fr(bilan.metabolisme_base) }} kcal</b>
+          </div>
+          <div class="detail-ligne">
+            <span>× activité ({{ LABELS_ACTIVITE_COURT[bilan.niveau_activite] }})</span>
+            <b>{{ fr(bilan.depense_totale) }} kcal</b>
+          </div>
+          <div class="detail-ligne" v-if="bilan.ajustement_kcal !== 0">
+            <span>{{ bilan.ajustement_kcal < 0 ? 'Déficit' : 'Surplus' }}</span>
+            <b>{{ bilan.ajustement_kcal > 0 ? '+' : '' }}{{ fr(bilan.ajustement_kcal) }} kcal</b>
+          </div>
+          <p class="detail-note">
+            {{ bilan.methode_mb === 'katch'
+              ? 'Formule de Katch-McArdle (masse grasse renseignée).'
+              : 'Formule de Mifflin-St Jeor.' }}
+            {{ bilan.age }} ans, {{ fr(bilan.taille_cm) }} cm, {{ fr(bilan.poids_actuel_kg) }} kg.
+          </p>
+        </div>
+
+        <div class="progression" v-if="bilan.poids_cible_kg">
+          <div class="progression-bornes">
+            <span><b>{{ fr(bilan.poids_depart_kg) }}</b> kg<br /><span class="progression-lbl">départ</span></span>
+            <span class="progression-actuel"><b>{{ fr(bilan.poids_actuel_kg) }}</b> kg<br /><span class="progression-lbl">aujourd'hui</span></span>
+            <span><b>{{ fr(bilan.poids_cible_kg) }}</b> kg<br /><span class="progression-lbl">visé</span></span>
+          </div>
+          <div class="jauge">
+            <div class="jauge-barre" :style="{ width: (bilan.progression.pct || 0) + '%' }"></div>
+          </div>
+          <div class="progression-sub">
+            {{ bilan.progression.pct }} % du chemin ·
+            <template v-if="bilan.date_cible_estimee">
+              objectif atteint vers le {{ formatDateLongue(bilan.date_cible_estimee) }}
+            </template>
+            <template v-else>objectif atteint</template>
+          </div>
+        </div>
+
+        <CourbeObjectif
+          :reel="bilan.courbe.reel"
+          :cible="bilan.courbe.cible"
+          :objectif="bilan.objectif"
+        />
+
+        <div class="objectif-actions">
+          <button class="btn btn-sm" @click="ouvrirObjectif">
+            <i class="ti ti-pencil"></i> Modifier
+          </button>
+          <button class="btn btn-sm btn-danger" @click="supprimerObjectif">
+            <i class="ti ti-trash"></i> Supprimer
+          </button>
+        </div>
+      </template>
+
+      <p v-if="erreurListe" class="error">{{ erreurListe }}</p>
     </template>
 
     <!-- Création / renommage d'un repas : même modale, form.id décide. -->
@@ -104,6 +219,105 @@
           <button class="btn" @click="fermerModaleRepas">Annuler</button>
           <button class="btn btn-primary" :disabled="!formRepas.nom.trim() || envoiEnCours" @click="enregistrerRepas">
             <i class="ti ti-check"></i> {{ formRepas.id ? 'Enregistrer' : 'Créer' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Objectif : toutes les mesures qui entrent dans le calcul de la cible. -->
+    <div v-if="modaleObjectif" class="modal-overlay" @click.self="fermerObjectif">
+      <div class="modal modal-objectif">
+        <div class="modal-header">
+          <h3>Mon objectif</h3>
+          <button class="modal-close" @click="fermerObjectif" aria-label="Fermer">
+            <i class="ti ti-x"></i>
+          </button>
+        </div>
+
+        <div class="modal-body">
+          <div class="field">
+            <label>Je veux…</label>
+            <div class="choix-cartes">
+              <button
+                v-for="o in OBJECTIFS"
+                :key="o.valeur"
+                type="button"
+                class="choix-carte"
+                :class="{ actif: formObjectif.objectif === o.valeur }"
+                @click="choisirObjectif(o.valeur)"
+              >
+                <i class="ti" :class="o.icone"></i>
+                <span>{{ o.label }}</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>Sexe</label>
+            <div class="ouinon">
+              <button type="button" class="ouinon-btn" :class="{ actif: formObjectif.sexe === 'homme' }" @click="formObjectif.sexe = 'homme'">Homme</button>
+              <button type="button" class="ouinon-btn" :class="{ actif: formObjectif.sexe === 'femme' }" @click="formObjectif.sexe = 'femme'">Femme</button>
+            </div>
+            <span class="aide">Les formules de métabolisme diffèrent selon le sexe.</span>
+          </div>
+
+          <div class="deux-colonnes">
+            <div class="field">
+              <label for="obj-naissance">Date de naissance</label>
+              <input id="obj-naissance" v-model="formObjectif.date_naissance" type="date" :max="aujourdhuiISO" />
+            </div>
+            <div class="field">
+              <label for="obj-taille">Taille (cm)</label>
+              <input id="obj-taille" v-model="formObjectif.taille_cm" inputmode="numeric" placeholder="Ex : 180" />
+            </div>
+          </div>
+
+          <div class="deux-colonnes">
+            <div class="field">
+              <label for="obj-poids">Poids actuel (kg)</label>
+              <input id="obj-poids" v-model="formObjectif.poids_actuel_kg" inputmode="decimal" placeholder="Ex : 82" />
+            </div>
+            <div class="field" v-if="formObjectif.objectif !== 'maintien'">
+              <label for="obj-cible">Poids visé (kg)</label>
+              <input id="obj-cible" v-model="formObjectif.poids_cible_kg" inputmode="decimal" placeholder="Ex : 76" />
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="obj-activite">Niveau d'activité</label>
+            <select id="obj-activite" v-model="formObjectif.niveau_activite">
+              <option v-for="n in NIVEAUX_ACTIVITE" :key="n.valeur" :value="n.valeur">{{ n.label }}</option>
+            </select>
+          </div>
+
+          <div class="field" v-if="formObjectif.objectif !== 'maintien'">
+            <label>Rythme visé</label>
+            <div class="suggestions">
+              <button
+                v-for="r in rythmesProposes"
+                :key="r.valeur"
+                type="button"
+                class="suggestion"
+                :class="{ actif: Number(formObjectif.rythme_kg_semaine) === r.valeur }"
+                @click="formObjectif.rythme_kg_semaine = r.valeur"
+              >{{ r.label }}</button>
+            </div>
+            <span class="aide">Au-delà, le corps puise dans le muscle plutôt que dans la graisse.</span>
+          </div>
+
+          <div class="field">
+            <label for="obj-mg">Masse grasse (%) — facultatif</label>
+            <input id="obj-mg" v-model="formObjectif.masse_grasse_pct" inputmode="decimal" placeholder="Laissez vide si inconnu" />
+            <span class="aide">Si vous la connaissez, le calcul bascule sur une formule plus précise pour un sportif.</span>
+          </div>
+
+          <p v-if="erreurModale" class="error">{{ erreurModale }}</p>
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn" @click="fermerObjectif">Annuler</button>
+          <button class="btn btn-primary" :disabled="!objectifValide || envoiEnCours" @click="enregistrerObjectif">
+            <i class="ti ti-check"></i> Calculer ma cible
           </button>
         </div>
       </div>
@@ -257,9 +471,44 @@
 <script>
 import { ref, computed, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { useApi } from '../../services/api'
+import CourbeObjectif from './CourbeObjectif.vue'
 
 const REPAS_COURANTS = ['Petit-déjeuner', 'Déjeuner', 'Dîner', 'Collation']
 const RACCOURCIS_G = [50, 100, 150, 200]
+
+const OBJECTIFS = [
+  { valeur: 'perte', label: 'Perdre du poids', icone: 'ti-trending-down' },
+  { valeur: 'maintien', label: 'Maintenir', icone: 'ti-equal' },
+  { valeur: 'prise', label: 'Prendre du poids', icone: 'ti-trending-up' }
+]
+const LABELS_OBJECTIF = { perte: 'Perte de poids', maintien: 'Maintien', prise: 'Prise de masse' }
+
+// Libellés décrivant une semaine type : « modéré » ne veut rien dire seul,
+// « 3 à 5 séances » se répond sans hésiter.
+const NIVEAUX_ACTIVITE = [
+  { valeur: 'sedentaire', label: 'Sédentaire — travail assis, pas de sport' },
+  { valeur: 'leger', label: 'Léger — 1 à 3 séances par semaine' },
+  { valeur: 'modere', label: 'Modéré — 3 à 5 séances par semaine' },
+  { valeur: 'intense', label: 'Intense — 6 à 7 séances par semaine' },
+  { valeur: 'tres_intense', label: 'Très intense — 2 séances/jour ou métier physique' }
+]
+const LABELS_ACTIVITE_COURT = {
+  sedentaire: 'sédentaire', leger: 'léger', modere: 'modéré',
+  intense: 'intense', tres_intense: 'très intense'
+}
+
+// Un surplus se tient plus bas qu'un déficit : au-delà de 0,5 kg/semaine la
+// prise part largement en gras, alors qu'un déficit de 1 kg reste jouable.
+const RYTHMES_PERTE = [
+  { valeur: 0.25, label: '0,25 kg/sem — doux' },
+  { valeur: 0.5, label: '0,5 kg/sem — recommandé' },
+  { valeur: 0.75, label: '0,75 kg/sem' },
+  { valeur: 1, label: '1 kg/sem — agressif' }
+]
+const RYTHMES_PRISE = [
+  { valeur: 0.25, label: '0,25 kg/sem — recommandé' },
+  { valeur: 0.5, label: '0,5 kg/sem' }
+]
 
 const pad2 = (n) => String(n).padStart(2, '0')
 const dateISOLocale = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
@@ -279,9 +528,28 @@ const formManuelVide = () => ({
   lipides_100g: ''
 })
 
+const formObjectifVide = () => ({
+  objectif: 'perte',
+  sexe: 'homme',
+  date_naissance: '',
+  taille_cm: '',
+  poids_actuel_kg: '',
+  poids_cible_kg: '',
+  niveau_activite: 'modere',
+  rythme_kg_semaine: 0.5,
+  masse_grasse_pct: ''
+})
+
 export default {
+  components: { CourbeObjectif },
   setup() {
     const api = useApi()
+
+    const vue = ref('journee')
+    const bilan = ref(null)
+    const chargementBilan = ref(true)
+    const modaleObjectif = ref(false)
+    const formObjectif = ref(formObjectifVide())
 
     const jour = ref(dateISOLocale(new Date()))
     const repas = ref([])
@@ -324,8 +592,126 @@ export default {
       lipides: Math.round(acc.lipides + r.total_lipides)
     }), { kcal: 0, proteines: 0, glucides: 0, lipides: 0 }))
 
-    // Affiche 150 et non 150.0, mais garde 12.5 si l'athlète l'a saisi.
+    // Pré-remplissage du champ de quantité : 150 et non 150.0, mais 12,5
+    // reste 12,5 si l'athlète l'a saisi ainsi. Usage interne — l'affichage
+    // passe par fr().
     const formatNombre = (n) => (Number.isInteger(n) ? n : Math.round(n * 10) / 10)
+
+    // Conventions françaises pour tout nombre affiché : virgule décimale et
+    // espace des milliers (« 2 531 kcal », « 79,6 kg »).
+    const fr = (n) => Number(n).toLocaleString('fr-FR', { maximumFractionDigits: 1 })
+
+    const aujourdhuiISO = dateISOLocale(new Date())
+    const formatDateLongue = (iso) =>
+      new Date(`${iso}T00:00:00`).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
+
+    /* --- Objectif --- */
+
+    const reste = computed(() => {
+      if (!bilan.value) return null
+      const ecart = bilan.value.kcal_cible - totalJour.value.kcal
+      return {
+        pct: Math.min(100, Math.round((totalJour.value.kcal / bilan.value.kcal_cible) * 100)),
+        depasse: ecart < 0,
+        texte: ecart >= 0
+          ? `Il reste ${fr(ecart)} kcal`
+          : `Dépassement de ${fr(Math.abs(ecart))} kcal`
+      }
+    })
+
+    const rythmesProposes = computed(() =>
+      formObjectif.value.objectif === 'prise' ? RYTHMES_PRISE : RYTHMES_PERTE
+    )
+
+    const objectifValide = computed(() => {
+      const f = formObjectif.value
+      const taille = nombreOuNull(f.taille_cm)
+      const poids = nombreOuNull(f.poids_actuel_kg)
+      if (!f.date_naissance || taille === null || poids === null) return false
+      if (f.objectif === 'maintien') return true
+      return nombreOuNull(f.poids_cible_kg) !== null && Number(f.rythme_kg_semaine) > 0
+    })
+
+    const chargerBilan = async () => {
+      chargementBilan.value = true
+      try {
+        bilan.value = await api.get('/diete/objectif')
+      } catch (e) {
+        erreurListe.value = e.message || "Erreur de chargement de l'objectif"
+      } finally {
+        chargementBilan.value = false
+      }
+    }
+
+    const ouvrirObjectif = () => {
+      // Repartir des valeurs enregistrées plutôt que d'un formulaire vide :
+      // corriger son niveau d'activité ne doit pas obliger à tout ressaisir.
+      formObjectif.value = bilan.value
+        ? {
+            objectif: bilan.value.objectif,
+            sexe: bilan.value.sexe,
+            date_naissance: bilan.value.date_naissance,
+            taille_cm: String(bilan.value.taille_cm),
+            poids_actuel_kg: String(bilan.value.poids_actuel_kg),
+            poids_cible_kg: bilan.value.poids_cible_kg === null ? '' : String(bilan.value.poids_cible_kg),
+            niveau_activite: bilan.value.niveau_activite,
+            rythme_kg_semaine: bilan.value.rythme_kg_semaine || 0.5,
+            masse_grasse_pct: bilan.value.masse_grasse_pct === null ? '' : String(bilan.value.masse_grasse_pct)
+          }
+        : formObjectifVide()
+      erreurModale.value = ''
+      modaleObjectif.value = true
+    }
+
+    const fermerObjectif = () => {
+      modaleObjectif.value = false
+      erreurModale.value = ''
+    }
+
+    // Changer d'objectif remet un rythme cohérent : 1 kg/semaine reste
+    // sélectionné en passant à la prise de masse, où il n'est plus proposé.
+    const choisirObjectif = (valeur) => {
+      formObjectif.value.objectif = valeur
+      if (valeur === 'prise') formObjectif.value.rythme_kg_semaine = 0.25
+      else if (valeur === 'perte') formObjectif.value.rythme_kg_semaine = 0.5
+    }
+
+    const enregistrerObjectif = async () => {
+      if (!objectifValide.value || envoiEnCours.value) return
+      envoiEnCours.value = true
+      erreurModale.value = ''
+      const f = formObjectif.value
+      const corps = {
+        sexe: f.sexe,
+        date_naissance: f.date_naissance,
+        taille_cm: nombreOuNull(f.taille_cm),
+        poids_actuel_kg: nombreOuNull(f.poids_actuel_kg),
+        niveau_activite: f.niveau_activite,
+        objectif: f.objectif,
+        poids_cible_kg: f.objectif === 'maintien' ? null : nombreOuNull(f.poids_cible_kg),
+        rythme_kg_semaine: f.objectif === 'maintien' ? 0 : Number(f.rythme_kg_semaine),
+        masse_grasse_pct: nombreOuNull(f.masse_grasse_pct)
+      }
+      try {
+        bilan.value = await api.put('/diete/objectif', corps)
+        modaleObjectif.value = false
+      } catch (e) {
+        erreurModale.value = e.message || "Erreur lors de l'enregistrement"
+      } finally {
+        envoiEnCours.value = false
+      }
+    }
+
+    const supprimerObjectif = async () => {
+      if (!confirm('Supprimer votre objectif et sa cible calorique ?')) return
+      erreurListe.value = ''
+      try {
+        await api.del('/diete/objectif')
+        bilan.value = null
+      } catch (e) {
+        erreurListe.value = e.message || 'Erreur lors de la suppression'
+      }
+    }
 
     const charger = async () => {
       chargement.value = true
@@ -587,13 +973,19 @@ export default {
       return 'Ajouter un aliment'
     })
 
-    onMounted(charger)
+    // La cible est chargée dès le montage, pas à l'ouverture de l'onglet
+    // Objectif : c'est la vue Journée qui s'en sert pour situer le total.
+    onMounted(() => Promise.all([charger(), chargerBilan()]))
     onBeforeUnmount(() => clearTimeout(timerRecherche))
 
     return {
-      REPAS_COURANTS, RACCOURCIS_G,
+      REPAS_COURANTS, RACCOURCIS_G, OBJECTIFS, LABELS_OBJECTIF,
+      NIVEAUX_ACTIVITE, LABELS_ACTIVITE_COURT,
+      vue, bilan, chargementBilan, reste, aujourdhuiISO, formatDateLongue,
+      modaleObjectif, formObjectif, objectifValide, rythmesProposes,
+      ouvrirObjectif, fermerObjectif, choisirObjectif, enregistrerObjectif, supprimerObjectif,
       jour, repas, chargement, envoiEnCours, erreurListe, erreurModale,
-      estAujourdhui, labelJour, totalJour, formatNombre,
+      estAujourdhui, labelJour, totalJour, fr,
       changerJour, allerAujourdhui,
       modaleRepas, formRepas, ouvrirNouveauRepas, ouvrirRenommage, fermerModaleRepas,
       enregistrerRepas, supprimerRepas,
@@ -619,6 +1011,35 @@ export default {
   overflow-y: auto;
   min-height: 0;
   touch-action: pan-y;
+}
+
+/* --- Sous-onglets Journée / Objectif --- */
+.sous-onglets {
+  display: flex;
+  gap: 2px;
+  background: var(--color-bg-secondary);
+  border-radius: var(--radius-md);
+  padding: 3px;
+}
+.sous-onglets button {
+  flex: 1;
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+.sous-onglets button.actif {
+  background: var(--color-bg);
+  color: var(--color-primary-dark);
+  box-shadow: var(--shadow-sm);
 }
 
 /* --- Bandeau du jour --- */
@@ -656,6 +1077,9 @@ export default {
   font-variant-numeric: tabular-nums;
 }
 .diete-total-unite { font-size: var(--font-size-base); font-weight: 600; margin-left: 6px; }
+.diete-total-cible { font-size: var(--font-size-lg); font-weight: 600; opacity: 0.65; margin-left: 6px; }
+.diete-reste { margin-top: 6px; font-size: var(--font-size-xs); font-weight: 600; color: var(--color-primary-text); }
+.diete-reste.depasse { color: var(--color-warning-text-strong); }
 .diete-macros {
   display: flex;
   justify-content: center;
@@ -875,6 +1299,149 @@ export default {
   font-size: var(--font-size-xs);
   color: var(--color-primary-text);
 }
+
+/* --- Jauge partagée : total du jour vs cible, et avancement vers le poids visé --- */
+.jauge {
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--color-bg-tertiary);
+  overflow: hidden;
+  margin-top: var(--spacing-sm);
+}
+.jauge-barre {
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+  transition: width 0.25s;
+}
+.jauge-barre.depasse { background: var(--color-warning-icon); }
+
+/* --- Vue Objectif --- */
+.objectif-cta { margin-top: var(--spacing-md); }
+
+.cible-carte {
+  background: var(--color-primary-light);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+  text-align: center;
+  color: var(--color-primary-text);
+}
+.cible-badge {
+  display: inline-block;
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  opacity: 0.75;
+}
+.cible-kcal {
+  font-size: 34px;
+  font-weight: 800;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.cible-unite { font-size: var(--font-size-base); font-weight: 600; margin-left: 6px; }
+.cible-sub { font-size: var(--font-size-xs); margin-top: 2px; }
+
+.alerte {
+  display: flex;
+  gap: var(--spacing-sm);
+  background: var(--color-warning-bg-soft);
+  border: 1px solid var(--color-warning-border);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-md);
+  font-size: var(--font-size-xs);
+  color: var(--color-warning-text-strong);
+}
+.alerte i { color: var(--color-warning-icon); flex-shrink: 0; font-size: var(--font-size-base); }
+
+.detail-calcul {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.detail-titre {
+  margin: 0 0 2px;
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--color-text-secondary);
+}
+.detail-ligne {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-body);
+}
+.detail-ligne b { font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.detail-note { margin: 4px 0 0; font-size: var(--font-size-xs); color: var(--color-text-muted); }
+
+.progression { display: flex; flex-direction: column; gap: 2px; }
+.progression-bornes {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  text-align: center;
+}
+.progression-bornes > span:first-child { text-align: left; }
+.progression-bornes > span:last-child { text-align: right; }
+.progression-bornes b { font-size: var(--font-size-base); color: var(--color-text); }
+.progression-actuel b { color: var(--color-primary); }
+.progression-lbl { font-size: 10px; color: var(--color-text-muted); }
+.progression-sub { font-size: var(--font-size-xs); color: var(--color-text-muted); margin-top: 4px; }
+
+.objectif-actions { display: flex; gap: var(--spacing-sm); }
+
+/* --- Formulaire d'objectif --- */
+.modal-objectif .modal-body { gap: var(--spacing-lg); }
+.deux-colonnes { display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-md); }
+.choix-cartes { display: flex; gap: var(--spacing-sm); }
+.choix-carte {
+  flex: 1;
+  min-height: 64px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: var(--spacing-sm) 4px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.15;
+  text-align: center;
+  color: var(--color-text-body);
+  cursor: pointer;
+}
+.choix-carte i { font-size: 20px; color: var(--color-text-muted); }
+.choix-carte.actif {
+  border-color: var(--color-primary);
+  background: var(--color-primary-light);
+  color: var(--color-primary-text);
+}
+.choix-carte.actif i { color: var(--color-primary); }
+
+.ouinon { display: flex; gap: var(--spacing-sm); }
+.ouinon-btn {
+  flex: 1;
+  min-height: var(--tap-min);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  color: var(--color-text-body);
+  cursor: pointer;
+}
+.ouinon-btn.actif { background: var(--color-primary); border-color: var(--color-primary); color: var(--color-on-primary); }
 
 /* --- Suggestions de nom de repas --- */
 .suggestions { display: flex; flex-wrap: wrap; gap: var(--spacing-sm); }
