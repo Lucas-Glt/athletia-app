@@ -889,6 +889,7 @@
         @focus-consomme="onFocusConsomme"
         @ressenti-envoye="popupRessenti = null"
         @wellness-envoye="popupWellness = false"
+        @voir-seance="ouvrirDepuisRegularite"
       />
     </div>
   </AppLayout>
@@ -1909,6 +1910,22 @@ export default {
       if (index >= 0) histoIndex.value = index
     }
 
+    // Depuis la grille de régularité de l'accueil : basculer sur l'onglet
+    // Séances et ouvrir les résultats de la séance faite ce jour-là. La séance
+    // peut appartenir à un autre programme que celui affiché (l'accueil couvre
+    // tous les programmes de l'athlète) : on l'active d'abord.
+    const ouvrirDepuisRegularite = async ({ seanceId, programmeId, date }) => {
+      const programme = programmes.value.find(p => p.id === programmeId)
+      if (!programme) return
+      if (programmeActif.value?.id !== programme.id) await selectProgramme(programme)
+      const seance = seances.value.find(s => s.id === seanceId)
+      // programme désassigné ou séance retirée depuis : on reste sur l'accueil
+      // plutôt que d'ouvrir un onglet Séances qui ne montrerait pas la séance
+      if (!seance) return
+      onglet.value = 'programme'
+      await ouvrirDepuisPlanning({ seance, dateFait: date })
+    }
+
     const fetchProgrammes = async () => {
       try {
         programmes.value = await api.get('/programmes/')
@@ -2344,7 +2361,8 @@ export default {
       repondreRessenti, repondreWellness, onFocusConsomme,
       brouillonPropose, sousTitreBrouillon, reprendreBrouillon, abandonnerBrouillon,
       planning, planningActif, creneaux, seancesFaites, modalPlanning, erreurPlanning,
-      enregistrerPlanning, supprimerPlanning, fermerModalPlanning, ouvrirDepuisPlanning
+      enregistrerPlanning, supprimerPlanning, fermerModalPlanning, ouvrirDepuisPlanning,
+      ouvrirDepuisRegularite
     }
   }
 }

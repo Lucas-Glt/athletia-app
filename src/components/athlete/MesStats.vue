@@ -104,16 +104,39 @@
       <div class="stat-card-titre"><i class="ti ti-calendar-stats"></i> Régularité</div>
       <p class="stat-card-sub">{{ stats.nb_seances_completees }} séance{{ stats.nb_seances_completees > 1 ? 's' : '' }} complétée{{ stats.nb_seances_completees > 1 ? 's' : '' }} au total</p>
       <div class="regularite-grille">
-        <div
+        <button
           v-for="j in derniersJours"
           :key="j.date"
+          type="button"
           class="regularite-case"
-          :class="{ 'est-aujourdhui': j.estAujourdhui }"
+          :class="{ 'est-aujourdhui': j.estAujourdhui, 'est-ouvert': jourOuvert === j.date }"
           :style="styleJour(j)"
           :title="j.date"
-        ></div>
+          :disabled="j.seances.length === 0"
+          @click="basculerJour(j)"
+        ></button>
       </div>
-      <p class="stat-card-note">Les 35 derniers jours — couleur = type de séance complétée (rouge musculation, bleu natation, vert athlétisme, orange pliométrie).</p>
+
+      <!-- Jour cliqué : quelles séances ont été complétées ce jour-là, avec le
+           renvoi vers leurs résultats (onglet Séances, historique de la séance
+           positionné sur cette date). -->
+      <div class="jour-detail" v-if="jourDetail">
+        <div class="jour-detail-date">{{ formatJourLong(jourDetail.date) }}</div>
+        <div class="jour-detail-ligne" v-for="s in jourDetail.seances" :key="s.seance_id">
+          <span class="jour-detail-nom">
+            <span class="jour-detail-puce" :style="{ background: couleurType(s.type_seance) }"></span>
+            {{ s.nom }}
+          </span>
+          <button
+            class="btn-resultats"
+            @click="$emit('voir-seance', { seanceId: s.seance_id, programmeId: s.programme_id, date: jourDetail.date })"
+          >
+            Aller voir les résultats <i class="ti ti-arrow-right"></i>
+          </button>
+        </div>
+      </div>
+
+      <p class="stat-card-note">Les 35 derniers jours — couleur = type de séance complétée (rouge musculation, bleu natation, vert athlétisme, orange pliométrie). Touche un carré coloré pour voir la séance faite ce jour-là.</p>
     </div>
 
     <div class="stat-card" v-if="stats && stats.repartition_types.length > 0">
@@ -168,7 +191,9 @@ export default {
   // ressenti-envoye / wellness-envoye : la bannière du dashboard propose le
   // même questionnaire. Sans ces signaux, y répondre ici la laissait affichée,
   // à proposer quelque chose qui venait d'être fait.
-  emits: ['focus-consomme', 'ressenti-envoye', 'wellness-envoye'],
+  // voir-seance : la grille de régularité ne sait pas ouvrir une séance, c'est
+  // le dashboard qui détient le programme et sa liste de séances.
+  emits: ['focus-consomme', 'ressenti-envoye', 'wellness-envoye', 'voir-seance'],
   props: {
     focusRessenti: { type: Boolean, default: false },
     focusWellness: { type: Boolean, default: false }
@@ -344,16 +369,43 @@ export default {
         d.setDate(d.getDate() - i)
         const iso = dateISOLocale(d)
         const info = parJour[iso]
-        jours.push({ date: iso, nb: info?.nb_seances || 0, types: info?.types || [], estAujourdhui: i === 0 })
+        jours.push({
+          date: iso,
+          nb: info?.nb_seances || 0,
+          types: info?.types || [],
+          // absent d'une version antérieure de l'API : la grille reste
+          // affichable, seulement pas cliquable
+          seances: info?.seances || [],
+          estAujourdhui: i === 0
+        })
       }
       return jours
     })
+
+    // Jour dont le détail est déplié (date ISO), null sinon.
+    const jourOuvert = ref(null)
+    // Relu depuis derniersJours plutôt que figé à l'ouverture : le détail suit
+    // un rechargement des stats (validation d'une séance, ressenti envoyé).
+    const jourDetail = computed(() =>
+      derniersJours.value.find(j => j.date === jourOuvert.value && j.seances.length > 0) || null
+    )
+    const basculerJour = (j) => {
+      if (j.seances.length === 0) return
+      jourOuvert.value = jourOuvert.value === j.date ? null : j.date
+    }
+
+    // « lundi 8 septembre » : la date ISO est interprétée en UTC par Date, ce
+    // qui reste le bon jour en France (UTC+1/+2).
+    const formatJourLong = (iso) =>
+      new Date(iso).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
+
+    const couleurType = (t) => COULEUR_TYPE[t] || 'var(--color-valid-text-strong)'
 
     // Une couleur par type ; plusieurs types le même jour => dégradé partagé
     // à parts égales entre chaque couleur.
     const styleJour = (j) => {
       if (j.types.length === 0) return {}
-      const couleurs = j.types.map(t => COULEUR_TYPE[t] || 'var(--color-valid-text-strong)')
+      const couleurs = j.types.map(couleurType)
       if (couleurs.length === 1) return { background: couleurs[0] }
       const pas = 100 / couleurs.length
       const stops = couleurs.map((c, i) => `${c} ${i * pas}%, ${c} ${(i + 1) * pas}%`).join(', ')
@@ -400,6 +452,7 @@ export default {
       erreurRessenti, erreurWellness,
       performances, exerciceChoisiId, exerciceChoisi, courbeExerciceChoisi,
       repartitionBarres, derniersJours, styleJour, courbePoids,
+      jourOuvert, jourDetail, basculerJour, formatJourLong, couleurType,
       ressentiEl, wellnessEl
     }
   }
@@ -498,8 +551,53 @@ export default {
 .sommeil-valeur.vide { color: var(--color-text-muted); font-weight: 500; }
 
 .regularite-grille { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
-.regularite-case { aspect-ratio: 1; border-radius: 4px; background: var(--color-bg-tertiary); }
+.regularite-case {
+  aspect-ratio: 1;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: var(--color-bg-tertiary);
+  cursor: pointer;
+}
+.regularite-case:disabled { cursor: default; }
 .regularite-case.est-aujourdhui { outline: 2px solid var(--color-primary); outline-offset: 1px; }
+/* Anneau (et non outline) pour rester lisible sur la case du jour, qui a déjà
+   le sien. */
+.regularite-case.est-ouvert { box-shadow: 0 0 0 2px var(--color-bg), 0 0 0 4px var(--color-text); }
+
+.jour-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-secondary);
+}
+.jour-detail-date { font-size: var(--font-size-sm); font-weight: 700; text-transform: capitalize; }
+.jour-detail-ligne {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+.jour-detail-nom { display: flex; align-items: center; gap: 6px; font-size: var(--font-size-sm); font-weight: 600; }
+.jour-detail-puce { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+.btn-resultats {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: var(--tap-min);
+  padding: 0 var(--spacing-md);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-primary-text);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
 
 .select-exercice {
   min-height: var(--tap-min);
