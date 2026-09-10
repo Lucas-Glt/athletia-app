@@ -1223,12 +1223,29 @@ export default {
     // antérieurs à cette fonctionnalité), on retombe sur le jour calendaire.
     const cleTentative = (l) => l.session_id || l.date.split('T')[0]
 
+    // Créneau d'un log : le nom de sa séance. Un programme multi-semaines
+    // duplique le même créneau à chaque semaine (séances d'ids différents),
+    // c'est bien la même séance du point de vue de l'athlète.
+    const creneauLog = (l) => l.seance?.nom || ''
+
+    // Logs d'un exercice pour le créneau ouvert uniquement : un même exercice
+    // peut figurer dans plusieurs séances du programme (« Squat » en Push et en
+    // Full body). Sans ce filtre, ouvrir la seconde séance affichait
+    // l'historique et les courbes réalisés dans la première — un passé qui
+    // n'appartient pas à cette séance, et dont les séries ne s'apparient même
+    // pas (ids différents, cf. logTentativePourSerie). Les semaines dupliquées
+    // du même créneau, elles, restent regroupées : c'est la progression.
+    const logsCreneauPourExo = (nom) => {
+      const creneau = seanceActive.value?.nom
+      if (!creneau) return []
+      return historique.value.filter(l => l.exo_nom === nom && creneauLog(l) === creneau)
+    }
+
     // Toutes les tentatives passées d'un exercice, la plus récente en premier :
     // [[logs de la tentative n-1], [logs de la tentative n-2], ...]
     const tentativesExo = (exo) => {
       const parTentative = {}
-      historique.value
-        .filter(l => l.exo_nom === exo.nom)
+      logsCreneauPourExo(exo.nom)
         .forEach(l => {
           const cle = cleTentative(l)
           if (!parTentative[cle]) parTentative[cle] = []
@@ -1362,9 +1379,9 @@ export default {
         .sort((a, b) => new Date(a.date) - new Date(b.date))
     }
 
-    // Courbe de progression d'un exercice, tout l'historique confondu.
+    // Courbe de progression d'un exercice au fil des semaines de ce créneau.
     const courbeExo = (exo, champ) =>
-      moyennesParTentative(historique.value.filter(l => l.exo_nom === exo.nom), champ)
+      moyennesParTentative(logsCreneauPourExo(exo.nom), champ)
 
     // --- Onglets d'une séance : sa feuille de saisie, son historique, ses courbes ---
     const vueSeance = ref('seance')
@@ -1412,7 +1429,7 @@ export default {
     const tentativesProgramme = computed(() => {
       const parTentative = {}
       historique.value.forEach(l => {
-        const creneau = l.seance?.nom || ''
+        const creneau = creneauLog(l)
         const cle = `${creneau}||${cleTentative(l)}`
         if (!parTentative[cle]) {
           parTentative[cle] = {
@@ -1506,8 +1523,9 @@ export default {
 
     // Une courbe par exercice de la séance ouverte, dans l'ordre du programme :
     // moyenne de la charge sur toutes ses séries, un point par séance réalisée.
-    // Les points viennent de tout l'historique de l'exercice (même exercice
-    // dupliqué d'une semaine à l'autre = une seule courbe continue).
+    // Les points viennent de l'historique de ce créneau (même exercice dupliqué
+    // d'une semaine à l'autre = une seule courbe continue), pas des autres
+    // séances où l'exercice figure aussi.
     const courbesSeance = computed(() => {
       if (!seanceActive.value) return []
       const conf = champCharge(seanceActive.value.type_seance)
@@ -1520,7 +1538,7 @@ export default {
         .map(nom => ({
           nom,
           unite: conf.unite,
-          points: moyennesParTentative(historique.value.filter(l => l.exo_nom === nom), conf.champ)
+          points: moyennesParTentative(logsCreneauPourExo(nom), conf.champ)
         }))
         .filter(c => c.points.length >= 2)
     })
