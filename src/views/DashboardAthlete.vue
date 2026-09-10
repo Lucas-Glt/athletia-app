@@ -86,16 +86,31 @@
         <!-- ÉCRAN 1 : liste des séances (une par créneau, semaine courante) -->
         <template v-if="!seanceActive">
           <div class="screen">
-            <!-- Sélecteur de programme : seulement s'il y a un choix à faire -->
-            <div class="prog-switcher" v-if="programmes.length > 1" @pointerdown.stop>
+            <!-- Sélecteur de programme, seulement s'il y a un choix à faire :
+                 tous les programmes visibles d'un coup, en colonnes de même
+                 largeur (les noms sont longs et débordaient d'une seule ligne),
+                 plus l'épingle qui décide lequel s'ouvre au lancement. -->
+            <div class="prog-bar" v-if="programmes.length > 1" @pointerdown.stop>
+              <div class="prog-switcher">
+                <button
+                  v-for="p in programmesAffiches"
+                  :key="p.id"
+                  class="prog-chip"
+                  :class="{ active: programmeActif?.id === p.id }"
+                  @click="selectProgramme(p)"
+                >
+                  <i class="ti ti-pinned prog-chip-pin" v-if="programmeEpingleId === p.id"></i>
+                  {{ p.nom }}
+                </button>
+              </div>
               <button
-                v-for="p in programmes"
-                :key="p.id"
-                class="prog-chip"
-                :class="{ active: programmeActif?.id === p.id }"
-                @click="selectProgramme(p)"
+                class="btn-epingle-prog"
+                :class="{ active: estEpingle }"
+                :title="estEpingle ? 'Ne plus ouvrir ce programme en premier' : 'Ouvrir ce programme en premier'"
+                :aria-label="estEpingle ? 'Ne plus ouvrir ce programme en premier' : 'Ouvrir ce programme en premier'"
+                @click="basculerEpingleProgramme"
               >
-                {{ p.nom }}
+                <i class="ti" :class="estEpingle ? 'ti-pinned' : 'ti-pin'"></i>
               </button>
             </div>
 
@@ -1022,6 +1037,8 @@ const champsRealises = (type) => CHAMPS_REALISES[type] || CHAMPS_REALISES.muscul
 // jour du service worker — faisait tout perdre. On garde donc la saisie en
 // cours en local et on propose de la reprendre au lancement suivant.
 const CLE_BROUILLON = 'athletia:seance-en-cours'
+// Programme épinglé par l'athlète : celui qui s'ouvre au lancement.
+const CLE_EPINGLE = 'athletia:programme-epingle'
 // Au-delà, une séance interrompue n'a plus de sens à reprendre : le brouillon
 // est ignoré puis effacé plutôt que de proposer une reprise vieille d'une semaine.
 const DUREE_BROUILLON_MS = 48 * 60 * 60 * 1000
@@ -1926,6 +1943,47 @@ export default {
       await ouvrirDepuisPlanning({ seance, dateFait: date })
     }
 
+    // --- Programme épinglé (local, jamais envoyé au serveur) ---
+    // Simple préférence d'affichage propre à cet appareil : quel programme
+    // s'ouvre au lancement, et lequel ouvre la liste. Rien à synchroniser.
+    const lireEpingleProgramme = () => {
+      try {
+        const brut = JSON.parse(localStorage.getItem(CLE_EPINGLE) || 'null')
+        // téléphone partagé : l'épingle d'un autre compte n'est pas la sienne
+        if (!brut || brut.userId !== (authStore.user?.id ?? null)) return null
+        return brut.programmeId ?? null
+      } catch {
+        return null
+      }
+    }
+
+    const programmeEpingleId = ref(lireEpingleProgramme())
+    const estEpingle = computed(() =>
+      !!programmeActif.value && programmeEpingleId.value === programmeActif.value.id
+    )
+
+    // L'épinglé passe en tête de la bande, le reste garde l'ordre de l'API.
+    const programmesAffiches = computed(() => {
+      const id = programmeEpingleId.value
+      if (!id) return programmes.value
+      const rang = (p) => (p.id === id ? 0 : 1)
+      return [...programmes.value].sort((a, b) => rang(a) - rang(b))
+    })
+
+    const basculerEpingleProgramme = () => {
+      if (!programmeActif.value) return
+      programmeEpingleId.value = estEpingle.value ? null : programmeActif.value.id
+      try {
+        localStorage.setItem(CLE_EPINGLE, JSON.stringify({
+          userId: authStore.user?.id ?? null,
+          programmeId: programmeEpingleId.value
+        }))
+      } catch (e) {
+        // stockage refusé (navigation privée) : l'épingle ne tiendra que la session
+        console.error('Erreur sauvegarde épingle:', e)
+      }
+    }
+
     const fetchProgrammes = async () => {
       try {
         programmes.value = await api.get('/programmes/')
@@ -1933,7 +1991,13 @@ export default {
         console.error('Erreur chargement programmes:', e)
         return
       }
-      if (programmes.value.length > 0) await selectProgramme(programmes.value[0])
+      // Le programme épinglé s'ouvre en premier ; à défaut, le premier de la
+      // liste (l'épingle peut viser un programme désassigné entre-temps).
+      if (programmes.value.length > 0) {
+        await selectProgramme(
+          programmes.value.find(p => p.id === programmeEpingleId.value) || programmes.value[0]
+        )
+      }
       // une fois les séances chargées : la reprise a besoin de les retrouver
       proposerReprise()
     }
@@ -2342,6 +2406,7 @@ export default {
       estEnEdition,
       etatBoutonSerie, toggleSerie, historiqueGroupeExiste, supprimerSeanceHistorique,
       selectProgramme, demarrerSeance, validerSeance,
+      programmesAffiches, programmeEpingleId, estEpingle, basculerEpingleProgramme,
       isGroupeComplete,
       progressionSeance,
       groupeSaisie, ouvrirSaisie, fermerSaisie, valeursSerie, resumeExo,
@@ -2405,25 +2470,64 @@ export default {
 .screen-header p { font-size: var(--font-size-sm); color: var(--color-text-secondary); margin: 0; }
 
 /* --- Sélecteur de programme (seulement si > 1) --- */
-.prog-switcher { display: flex; gap: var(--spacing-sm); overflow-x: auto; flex-shrink: 0; padding-bottom: 2px; }
+/* L'épingle est posée à côté de la grille, jamais dedans : elle ne doit pas se
+   confondre avec un programme. */
+.prog-bar { display: flex; align-items: flex-start; gap: var(--spacing-sm); flex-shrink: 0; }
+/* auto-fill + 1fr : autant de colonnes que la largeur en permet, toutes de même
+   largeur, et les puces d'une même ligne prennent la même hauteur — un nom long
+   passe sur deux lignes sans désaligner ses voisines. */
+.prog-switcher {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: var(--spacing-sm);
+  flex: 1;
+  min-width: 0;
+}
 .prog-chip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
   min-height: var(--tap-min);
-  padding: 0 var(--spacing-lg);
+  padding: var(--spacing-sm) var(--spacing-md);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-full);
   background: var(--color-bg);
   color: var(--color-text-secondary);
   font-size: var(--font-size-sm);
   font-weight: 500;
+  line-height: 1.3;
+  text-align: center;
+  /* un nom d'un seul mot très long ne doit pas dépasser de sa colonne */
+  overflow-wrap: break-word;
   cursor: pointer;
-  white-space: nowrap;
-  flex-shrink: 0;
 }
 .prog-chip.active {
   background: var(--color-primary-light);
   border-color: var(--color-primary);
   color: var(--color-primary-text);
   font-weight: 600;
+}
+.prog-chip-pin { font-size: var(--font-size-sm); color: var(--color-primary); }
+
+.btn-epingle-prog {
+  width: var(--tap-min);
+  height: var(--tap-min);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-bg);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-lg);
+  cursor: pointer;
+}
+.btn-epingle-prog.active {
+  background: var(--color-primary-light);
+  border-color: var(--color-primary);
+  color: var(--color-primary-text);
 }
 
 /* --- Cartes séance --- */
