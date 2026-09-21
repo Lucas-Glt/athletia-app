@@ -360,7 +360,8 @@
                 <button type="button" class="resultat" @click="choisirAliment(a)">
                   <span class="resultat-texte">
                     <span class="resultat-nom">{{ a.nom }}</span>
-                    <span class="resultat-groupe" v-if="a.groupe">{{ a.groupe }}</span>
+                    <span class="resultat-perso" v-if="a.perso"><i class="ti ti-user"></i> Mon aliment</span>
+                    <span class="resultat-groupe" v-else-if="a.groupe">{{ a.groupe }}</span>
                   </span>
                   <span class="resultat-kcal">
                     <b>{{ a.kcal_100g }}</b>
@@ -376,7 +377,9 @@
 
             <!-- Ciqual ne référence ni les compléments ni les produits de
                  marque : sans cette porte de sortie, une whey ou une barre
-                 protéinée serait impossible à saisir. -->
+                 protéinée serait impossible à saisir. Ce qui est saisi ici
+                 rejoint le catalogue de l'athlète et se retrouve ensuite par
+                 la recherche. -->
             <button type="button" class="btn btn-sm btn-dashed manuel-lien" @click="ouvrirSaisieManuelle">
               <i class="ti ti-edit"></i> Saisir un aliment manuellement
             </button>
@@ -406,7 +409,10 @@
                 <input id="manuel-lip" v-model="formManuel.lipides_100g" inputmode="decimal" placeholder="—" />
               </div>
             </div>
-            <p class="aide">Recopiez les valeurs de l'étiquette. Les macros sont facultatives.</p>
+            <p class="aide">
+              Recopiez les valeurs de l'étiquette. Les macros sont facultatives.
+              L'aliment sera enregistré : vous le retrouverez par la recherche la prochaine fois.
+            </p>
           </template>
 
           <!-- ÉTAPE 2 : quantité -->
@@ -1235,6 +1241,11 @@ export default {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.resultat-perso {
+  align-self: flex-start;
+  font-size: var(--font-size-xs);
+  color: var(--color-primary);
 }
 .resultat-kcal {
   flex-shrink: 0;
