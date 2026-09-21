@@ -241,7 +241,7 @@
                   <i class="ti ti-link"></i> {{ labelTypeGroupe(typeGroupe(groupe)) }}
                 </span>
 
-                <div v-if="groupe.exercices[0].series.length === 0" class="empty-series">
+                <div v-if="nbSeriesGroupe(groupe) === 0" class="empty-series">
                   Aucune série définie.
                 </div>
 
@@ -252,7 +252,7 @@
                        à la série suivante, l'affichage doit le montrer. -->
                   <div v-if="estComplexe(groupe)" class="resume-series-list">
                     <div
-                      v-for="serieIdx in groupe.exercices[0].series.length"
+                      v-for="serieIdx in nbSeriesGroupe(groupe)"
                       :key="'c' + serieIdx"
                       class="resume-ligne resume-ligne-complexe"
                     >
@@ -280,12 +280,12 @@
                   </template>
 
                   <div class="exo-group-foot">
-                    <span class="serie-repos" v-if="groupe.exercices[0].series[0]?.temps_repos">
-                      <i class="ti ti-clock"></i> {{ groupe.exercices[0].series[0].temps_repos }}
+                    <span class="serie-repos" v-if="reposSerie(groupe, 0)">
+                      <i class="ti ti-clock"></i> {{ reposSerie(groupe, 0) }}
                     </span>
                     <div class="series-dots">
                       <span
-                        v-for="i in groupe.exercices[0].series.length"
+                        v-for="i in nbSeriesGroupe(groupe)"
                         :key="i"
                         class="serie-dot"
                         :class="{ done: isGroupeDone(groupe, i - 1) }"
@@ -523,26 +523,27 @@
 
               <template v-else>
               <div
-                v-for="serieIdx in groupe.exercices[0].series.length"
+                v-for="serieIdx in nbSeriesGroupe(groupe)"
                 :key="serieIdx"
                 class="serie-card"
                 :class="{ done: isGroupeDone(groupe, serieIdx - 1) }"
               >
                 <div class="serie-head">
                   <span class="serie-label">Série {{ serieIdx }}</span>
-                  <span
-                    class="serie-repos"
-                    v-if="groupe.exercices[0].series[serieIdx - 1]?.temps_repos"
-                  >
-                    <i class="ti ti-clock"></i> {{ groupe.exercices[0].series[serieIdx - 1].temps_repos }}
+                  <span class="serie-repos" v-if="reposSerie(groupe, serieIdx - 1)">
+                    <i class="ti ti-clock"></i> {{ reposSerie(groupe, serieIdx - 1) }}
                   </span>
                 </div>
 
-                <div
-                  v-for="(exo, eidx) in groupe.exercices"
-                  :key="exo.id"
-                  class="serie-exo"
-                >
+                <!-- template v-for + v-if interne (et non v-if sur le v-for,
+                     que Vue 3 évalue en premier) : un exercice rattaché à un
+                     superset déjà chiffré n'a pas toutes les séries du groupe.
+                     Sans ce garde-fou, l'athlète remplit deux champs pour une
+                     série inexistante, jetée à la validation faute d'id de
+                     série à qui l'attacher. eidx reste l'index dans le groupe,
+                     pour que les lettres A/B ne se décalent pas. -->
+                <template v-for="(exo, eidx) in groupe.exercices" :key="exo.id">
+                <div class="serie-exo" v-if="exo.series[serieIdx - 1]">
                   <div class="serie-exo-head" v-if="groupe.exercices.length > 1">
                     <span class="exo-letter-mini">{{ letterFor(eidx) }}</span>
                     <span class="serie-exo-nom">{{ exo.nom }}</span>
@@ -719,6 +720,7 @@
                     </template>
                   </div>
                 </div>
+                </template>
 
                 <div class="serie-actions" v-if="saisieVue === 'saisie' || historiqueGroupeExiste(groupe, serieIdx)">
                   <button
@@ -761,6 +763,9 @@
             <button class="btn btn-primary btn-valider" @click="validerSeance">
               <i class="ti ti-check"></i> Valider la séance
             </button>
+            <p class="valider-erreur" v-if="erreurValidation">
+              <i class="ti ti-alert-triangle"></i> {{ erreurValidation }}
+            </p>
           </div>
         </template>
       </div>
@@ -1059,6 +1064,9 @@ export default {
     // liste et en rouvrant la même séance, sans perdre ce qui a été rempli.
     const seanceEnCoursId = ref(null)
     const logs = ref({})
+    // Séries restées au bord de la route à la dernière validation : tant que
+    // ce message est là, la séance n'est ni marquée faite ni son brouillon effacé.
+    const erreurValidation = ref('')
     const historique = ref([])
     const loadingSeances = ref(false)
     const onglet = ref('mes-stats')
@@ -1177,6 +1185,20 @@ export default {
       return groupes
     }
 
+    // Les exercices d'un même groupe n'ont pas forcément le même nombre de
+    // séries : ajouterAuSuperset (ProgrammeForm) rattache un exercice neuf,
+    // sans séries, à un groupe déjà chiffré. Le groupe se cadre donc sur
+    // l'exercice qui en a le plus, jamais sur le premier — sinon les séries
+    // au-delà disparaissent, ou pire : l'athlète saisit des lignes qui
+    // n'existent pas en base et qui partent à la poubelle à la validation.
+    const nbSeriesGroupe = (groupe) => Math.max(0, ...groupe.exercices.map(e => e.series.length))
+
+    // Les seuls exercices à afficher, cocher et enregistrer pour cet index.
+    const exosDeLaSerie = (groupe, serieIdx) => groupe.exercices.filter(e => e.series[serieIdx])
+
+    // Le repos affiché : celui du premier exercice qui a réellement cette série.
+    const reposSerie = (groupe, serieIdx) => exosDeLaSerie(groupe, serieIdx)[0]?.series[serieIdx]?.temps_repos
+
     const getLogs = (exoId, serieIdx) => {
       if (!logs.value[exoId]) logs.value[exoId] = {}
       if (!logs.value[exoId][serieIdx]) {
@@ -1186,13 +1208,14 @@ export default {
     }
 
     const isGroupeDone = (groupe, serieIdx) => {
-      return groupe.exercices.every(exo => getLogs(exo.id, serieIdx).fait)
+      const exos = exosDeLaSerie(groupe, serieIdx)
+      return exos.length > 0 && exos.every(exo => getLogs(exo.id, serieIdx).fait)
     }
 
     const toggleGroupeDone = (groupe, serieIdx) => {
       const isDone = isGroupeDone(groupe, serieIdx)
       const devientFait = !isDone
-      groupe.exercices.forEach(exo => {
+      exosDeLaSerie(groupe, serieIdx).forEach(exo => {
         const log = getLogs(exo.id, serieIdx)
         // Rien saisi à la validation : on retient la valeur demandée par le
         // prépa (le placeholder grisé) plutôt qu'un champ vide.
@@ -1210,7 +1233,7 @@ export default {
 
       // Après validation, vérifie si toutes les séries du groupe sont complètes
       if (!isDone) {
-        const nbSeries = groupe.exercices[0].series.length
+        const nbSeries = nbSeriesGroupe(groupe)
         const toutesValidees = Array.from({ length: nbSeries }, (_, i) => i)
           .every(i => isGroupeDone(groupe, i))
 
@@ -1591,23 +1614,27 @@ export default {
       return uniforme ? { uniforme: true, texte: `${n} × ${premiere || '—'}` } : { uniforme: false }
     }
 
+    // Renvoie le nombre de séries qui ne sont pas parties : le try enveloppait
+    // toute la boucle, un échec sur l'exercice A sautait aussi le B. Et rien
+    // ne « re-synchronise tout » plus tard — validerSeance est le seul appelant,
+    // c'est donc ici que la saisie se perd si personne ne compte les échecs.
     const sauvegarderSerie = async (groupe, serieIdx) => {
-      try {
-        for (const exo of groupe.exercices) {
-          const serie = exo.series[serieIdx]
-          if (!serie) continue
-          const log = getLogs(exo.id, serieIdx)
-          await api.post(`/series/${serie.id}/logs/`, {
+      let echecs = 0
+      for (const exo of exosDeLaSerie(groupe, serieIdx)) {
+        const log = getLogs(exo.id, serieIdx)
+        try {
+          await api.post(`/series/${exo.series[serieIdx].id}/logs/`, {
             reps_realisees: log.reps_realisees || null,
             poids_realise: log.poids_realise || null,
             fait: log.fait,
             session_id: sessionSaisieId.value
           })
+        } catch (e) {
+          echecs++
+          console.error('Erreur sauvegarde série:', e)
         }
-      } catch (e) {
-        // Pas bloquant : la validation finale re-synchronise tout
-        console.error('Erreur sauvegarde série:', e)
       }
+      return echecs
     }
 
     // Valeur par défaut d'un champ réalisé quand l'athlète valide sans
@@ -2087,6 +2114,7 @@ export default {
       seanceActive.value = seance
       vueSeance.value = 'seance'
       histoIndex.value = 0
+      erreurValidation.value = ''
 
       // Ressaisie de la séance déjà en cours (retour à la liste puis
       // réouverture sans avoir validé) : on reprend logs.value tel quel,
@@ -2117,12 +2145,23 @@ export default {
       // (aucun remplissage automatique) : le bouton fige ce qui a été fait,
       // il ne complète pas ce qui ne l'a pas été.
       const groupes = grouperExercices(seanceActive.value.exercices)
+      let echecs = 0
       for (const groupe of groupes) {
-        const nbSeries = groupe.exercices[0].series.length
+        const nbSeries = nbSeriesGroupe(groupe)
         for (let i = 0; i < nbSeries; i++) {
-          await sauvegarderSerie(groupe, i)
+          echecs += await sauvegarderSerie(groupe, i)
         }
       }
+
+      // Tant que tout n'est pas parti, on ne détruit rien : le brouillon est
+      // la seule copie restante de la saisie (salle en sous-sol, 4G qui
+      // saute). Sans ça la séance était marquée faite et le brouillon effacé
+      // juste après, sans un mot à l'athlète.
+      if (echecs) {
+        erreurValidation.value = `${echecs} série(s) n'ont pas pu être enregistrées. Vérifiez votre connexion et revalidez : votre saisie est conservée.`
+        return
+      }
+      erreurValidation.value = ''
 
       // Trace la complétion tout de suite (méthode de Foster, monitoring) —
       // sans rpe/durée : la séance se valide quand même, le ressenti reste
@@ -2373,7 +2412,7 @@ export default {
     onMounted(fetchProgrammes)
 
     const isGroupeComplete = (groupe) => {
-      const nbSeries = groupe.exercices[0].series.length
+      const nbSeries = nbSeriesGroupe(groupe)
       if (nbSeries === 0) return false
       for (let i = 0; i < nbSeries; i++) {
         if (!isGroupeDone(groupe, i)) return false
@@ -2388,7 +2427,7 @@ export default {
       let done = 0
       let total = 0
       grouperExercices(seanceActive.value.exercices).forEach(groupe => {
-        const nb = groupe.exercices[0].series.length
+        const nb = nbSeriesGroupe(groupe)
         total += nb
         for (let i = 0; i < nb; i++) {
           if (isGroupeDone(groupe, i)) done++
@@ -2402,7 +2441,8 @@ export default {
       loadingSeances, onglet,
       seancesAffichees,
       labelType, letterFor, grouperExercices,
-      getLogs, isGroupeDone,
+      nbSeriesGroupe, exosDeLaSerie, reposSerie,
+      getLogs, isGroupeDone, erreurValidation,
       estEnEdition,
       etatBoutonSerie, toggleSerie, historiqueGroupeExiste, supprimerSeanceHistorique,
       selectProgramme, demarrerSeance, validerSeance,
@@ -3177,10 +3217,22 @@ export default {
   flex-shrink: 0;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--spacing-lg);
   padding: var(--spacing-md) var(--spacing-lg);
   background: var(--color-bg);
   border-top: 1px solid var(--color-border);
+}
+/* Pleine largeur sous la barre : le message doit être lu avant de réessayer,
+   pas comprimé entre la progression et le bouton. */
+.valider-erreur {
+  flex-basis: 100%;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: var(--font-size-xs);
+  color: var(--color-danger-text);
 }
 .valider-progress { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .valider-progress-track {
