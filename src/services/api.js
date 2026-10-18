@@ -1,7 +1,19 @@
 import { useAuthStore } from '../stores/auth'
 import router from '../router'
 
-export const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+
+// fetch ne rejette que sur une erreur réseau (hors ligne, serveur arrêté
+// pendant un déploiement, CORS) avec un message brut et propre à chaque
+// navigateur : « Failed to fetch » (Chrome), « Load failed » (Safari),
+// « NetworkError when attempting to fetch resource » (Firefox).
+export async function requeteReseau(path, options) {
+  try {
+    return await fetch(`${BASE_URL}${path}`, options)
+  } catch {
+    throw new Error('Serveur injoignable. Vérifiez votre connexion internet.')
+  }
+}
 
 async function handleResponse(response) {
   if (response.status === 401) {
@@ -51,31 +63,31 @@ export function useApi() {
   })
 
   const get = (path) =>
-    fetch(`${BASE_URL}${path}`, { headers: headers() }).then(handleResponse)
+    requeteReseau(path, { headers: headers() }).then(handleResponse)
 
   const post = (path, body) =>
-    fetch(`${BASE_URL}${path}`, {
+    requeteReseau(path, {
       method: 'POST',
       headers: headers(),
       body: JSON.stringify(body)
     }).then(handleResponse)
 
   const put = (path, body) =>
-    fetch(`${BASE_URL}${path}`, {
+    requeteReseau(path, {
       method: 'PUT',
       headers: headers(),
       body: JSON.stringify(body)
     }).then(handleResponse)
 
   const patch = (path, body) =>
-    fetch(`${BASE_URL}${path}`, {
+    requeteReseau(path, {
       method: 'PATCH',
       headers: headers(),
       body: JSON.stringify(body)
     }).then(handleResponse)
 
   const del = (path) =>
-    fetch(`${BASE_URL}${path}`, {
+    requeteReseau(path, {
       method: 'DELETE',
       headers: headers()
     }).then(handleResponse)

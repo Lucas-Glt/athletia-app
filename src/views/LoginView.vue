@@ -49,7 +49,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
-import { BASE_URL, lireCorps, messageErreur } from '../services/api'
+import { lireCorps, messageErreur, requeteReseau } from '../services/api'
 
 const ROUTES_PAR_ROLE = {
   athlete: '/athlete',
@@ -77,14 +77,7 @@ export default {
     }
 
     const requete = async (path, options) => {
-      let response
-      try {
-        response = await fetch(`${BASE_URL}${path}`, options)
-      } catch {
-        // « Failed to fetch » (Chrome) / « Load failed » (Safari) : réseau
-        // coupé ou serveur injoignable, message brut incompréhensible.
-        throw new Error('Serveur injoignable. Vérifiez votre connexion internet.')
-      }
+      const response = await requeteReseau(path, options)
       const data = await lireCorps(response)
       if (!response.ok) throw new Error(messageErreur(data, response.status))
       return data
