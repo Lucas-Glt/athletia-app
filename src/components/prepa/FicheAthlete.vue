@@ -479,6 +479,7 @@ import AssignerProgrammeModal from './AssignerProgrammeModal.vue'
 import { typeGroupe, labelTypeGroupe } from '../../data/typesGroupe'
 import { labelDureeBlessure, formatDateBlessure, labelAnciennete } from '../../data/blessures'
 import { formatHeures, labelNiveauSommeil } from '../../data/sommeil'
+import { parseValeurSerie } from '../../utils/valeurSerie'
 
 // Distance horizontale minimale pour valider un swipe. Volontairement haute :
 // un doigt qui ripe sur un simple appui ne doit jamais changer d'onglet.
@@ -496,7 +497,6 @@ const champCharge = (type) => CHAMP_CHARGE[type] || CHAMP_CHARGE.musculation
 
 const LABELS_TYPE = { musculation: 'Musculation', natation: 'Natation', athletisme: 'Athlétisme', pliometrie: 'Pliométrie' }
 
-const parseNombre = (v) => parseFloat(String(v).replace(',', '.'))
 const pad2 = (n) => String(n).padStart(2, '0')
 
 export default {
@@ -742,7 +742,7 @@ export default {
       sessionsFiltrees.value.forEach(session => {
         const conf = champCharge(session.typeSeance)
         session.exercices.forEach(exo => {
-          const valeurs = exo.logs.map(l => parseNombre(l[conf.champ])).filter(v => !isNaN(v))
+          const valeurs = exo.logs.map(l => parseValeurSerie(l[conf.champ])).filter(v => !isNaN(v))
           if (valeurs.length === 0) return
           if (!parExo[exo.nom]) parExo[exo.nom] = { nom: exo.nom, label: conf.label, unite: conf.unite, points: [] }
           const moyenne = valeurs.reduce((a, b) => a + b, 0) / valeurs.length
@@ -802,8 +802,8 @@ export default {
         : typeSeance === 'pliometrie'
           ? log.serie.bonds
           : log.serie.nb_reps
-      const prescR = parseFloat(prescrit)
-      const realR = parseFloat(log.reps_realisees)
+      const prescR = parseValeurSerie(prescrit)
+      const realR = parseValeurSerie(log.reps_realisees)
       if (!isNaN(prescR) && !isNaN(realR) && realR < prescR) return 'statut-warn'
       return 'statut-done'
     }

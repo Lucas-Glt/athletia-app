@@ -623,7 +623,7 @@
                         <input
                           v-model="getLogs(exo.id, serieIdx-1).reps_realisees"
                           :placeholder="exo.series[serieIdx-1]?.nb_reps || 'reps'"
-                          inputmode="decimal"
+                          :inputmode="inputmodeSaisie(exo.series[serieIdx-1]?.nb_reps)"
                           class="log-input"
                           :class="{ 'log-input-locked': isGroupeDone(groupe, serieIdx - 1) }"
                           :readonly="isGroupeDone(groupe, serieIdx - 1)"
@@ -638,7 +638,7 @@
                         <input
                           v-model="getLogs(exo.id, serieIdx-1).poids_realise"
                           :placeholder="exo.series[serieIdx-1]?.poids_cible || 'charge'"
-                          inputmode="decimal"
+                          :inputmode="inputmodeSaisie(exo.series[serieIdx-1]?.poids_cible)"
                           class="log-input"
                           :class="{ 'log-input-locked': isGroupeDone(groupe, serieIdx - 1) }"
                           :readonly="isGroupeDone(groupe, serieIdx - 1)"
@@ -654,7 +654,7 @@
                       <input
                         v-model="getLogs(exo.id, serieIdx-1).reps_realisees"
                         :placeholder="exo.series[serieIdx-1]?.metres ? `${exo.series[serieIdx-1].metres}m` : 'mètres'"
-                        inputmode="decimal"
+                        :inputmode="inputmodeSaisie(exo.series[serieIdx-1]?.metres)"
                         class="log-input"
                         :class="{ 'log-input-locked': isGroupeDone(groupe, serieIdx - 1) }"
                         :readonly="isGroupeDone(groupe, serieIdx - 1)"
@@ -671,7 +671,7 @@
                       <input
                         v-model="getLogs(exo.id, serieIdx-1).reps_realisees"
                         :placeholder="exo.series[serieIdx-1]?.bonds ? `${exo.series[serieIdx-1].bonds} bonds` : 'bonds'"
-                        inputmode="decimal"
+                        :inputmode="inputmodeSaisie(exo.series[serieIdx-1]?.bonds)"
                         class="log-input"
                         :class="{ 'log-input-locked': isGroupeDone(groupe, serieIdx - 1) }"
                         :readonly="isGroupeDone(groupe, serieIdx - 1)"
@@ -932,6 +932,7 @@ import PlanningHebdoModal from '../components/athlete/PlanningHebdoModal.vue'
 import ExerciceImage from '../components/ExerciceImage.vue'
 import { typeGroupe, labelTypeGroupe, estComplexe } from '../data/typesGroupe'
 import { cleOccurrence } from '../data/joursSemaine'
+import { parseValeurSerie, inputmodeSaisie } from '../utils/valeurSerie'
 
 // Distance horizontale minimale pour valider un swipe. Volontairement haute :
 // un doigt qui ripe sur un simple appui ne doit jamais changer d'écran.
@@ -1377,8 +1378,8 @@ export default {
     // hausse, rouge si en baisse. Non numérique (intensité en texte) = pas de
     // comparaison possible.
     const ecartValeurs = (actuel, precedent) => {
-      const a = parseNombre(actuel)
-      const b = parseNombre(precedent)
+      const a = parseValeurSerie(actuel)
+      const b = parseValeurSerie(precedent)
       if (isNaN(a) || isNaN(b)) return null
       const ecart = Math.round((a - b) * 100) / 100
       if (ecart === 0) return { texte: '=', classe: 'diff-neutre' }
@@ -1408,7 +1409,7 @@ export default {
     const moyennesParTentative = (logs, champ) => {
       const parTentative = {}
       logs.forEach(l => {
-        const valeur = parseNombre(l[champ])
+        const valeur = parseValeurSerie(l[champ])
         if (isNaN(valeur)) return
         const cle = cleTentative(l)
         if (!parTentative[cle]) parTentative[cle] = { date: l.date.split('T')[0], total: 0, n: 0 }
@@ -2453,7 +2454,7 @@ export default {
       typeGroupe, labelTypeGroupe, estComplexe,
       saisieVue, historiqueIndex, nbTentativesGroupe, retourSaisie,
       swipeOnglets, swipeVueSeance, swipeSaisie, swipeRoulette,
-      historiqueSeriePourExo, n1SeriePourExo, formatDateCourt, formatDateNumerique, diffVsHistorique,
+      historiqueSeriePourExo, n1SeriePourExo, formatDateCourt, formatDateNumerique, diffVsHistorique, inputmodeSaisie,
       champsGraphique, courbeExo,
       VUES_SEANCE, vueSeance, ouvrirVueSeance,
       tentativesSeance, tentativeAffichee, tentativeAncienne, tentativeRecente,

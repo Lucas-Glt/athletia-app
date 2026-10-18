@@ -171,6 +171,7 @@ import { useApi } from '../../services/api'
 import CourbeProgression from './CourbeProgression.vue'
 import GraphiqueBarres from '../monitoring/GraphiqueBarres.vue'
 import { SOMMEIL_MIN, SOMMEIL_MAX, SOMMEIL_PAS, SOMMEIL_DEFAUT, formatHeures } from '../../data/sommeil'
+import { parseValeurSerie } from '../../utils/valeurSerie'
 
 const LABELS_TYPE = { musculation: 'Musculation', natation: 'Natation', athletisme: 'Athlétisme', pliometrie: 'Pliométrie' }
 
@@ -292,7 +293,7 @@ export default {
       historiqueExercice.value
         .filter(l => l.exercice.nom === exerciceChoisi.value.exercice_nom)
         .forEach(l => {
-          const valeur = parseFloat(l[champ])
+          const valeur = parseValeurSerie(l[champ])
           if (isNaN(valeur)) return
           const cle = cleTentative(l)
           if (!parTentative[cle]) parTentative[cle] = { date: l.date.split('T')[0], total: 0, n: 0 }
