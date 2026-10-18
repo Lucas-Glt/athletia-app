@@ -8,11 +8,18 @@
       <form @submit.prevent="handleLogin" class="login-form">
         <div class="field">
           <label>Email</label>
+          <!-- type="text" et non "email" : la validation native de type="email"
+               bloque l'envoi sur certains identifiants valides côté serveur
+               (ex. domaine super_prepa.fr), sans message clair sur mobile. -->
           <input
             v-model="email"
-            type="email"
+            type="text"
+            inputmode="email"
             name="email"
-            autocomplete="email"
+            autocomplete="username"
+            autocapitalize="none"
+            autocorrect="off"
+            spellcheck="false"
             placeholder="votre@email.com"
             required
           />
@@ -42,6 +49,15 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import { BASE_URL, lireCorps, messageErreur } from '../services/api'
+
+const ROUTES_PAR_ROLE = {
+  athlete: '/athlete',
+  prepa: '/prepa',
+  super_prepa: '/prepa',
+  admin: '/admin',
+  super_admin: '/super-admin'
+}
 
 export default {
   setup() {
@@ -52,45 +68,50 @@ export default {
     const router = useRouter()
     const authStore = useAuthStore()
 
+    // La PWA installée démarre toujours sur start_url "/" : sans ça, un
+    // utilisateur déjà connecté retombait sur le formulaire à chaque
+    // ouverture de l'app. Un token expiré renverra un 401 depuis le
+    // dashboard, qui déconnecte et ramène ici.
+    if (authStore.isAuthenticated && ROUTES_PAR_ROLE[authStore.role]) {
+      router.replace(ROUTES_PAR_ROLE[authStore.role])
+    }
+
+    const requete = async (path, options) => {
+      let response
+      try {
+        response = await fetch(`${BASE_URL}${path}`, options)
+      } catch {
+        // « Failed to fetch » (Chrome) / « Load failed » (Safari) : réseau
+        // coupé ou serveur injoignable, message brut incompréhensible.
+        throw new Error('Serveur injoignable. Vérifiez votre connexion internet.')
+      }
+      const data = await lireCorps(response)
+      if (!response.ok) throw new Error(messageErreur(data, response.status))
+      return data
+    }
+
     const handleLogin = async () => {
       error.value = ''
       loading.value = true
       try {
         const formData = new URLSearchParams()
-        formData.append('username', email.value)
+        formData.append('username', email.value.trim())
         formData.append('password', password.value)
 
-        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/auth/login`, {
+        const { access_token } = await requete('/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
           body: formData
         })
-
-        if (response.status === 429) {
-          const data = await response.json()
-          throw new Error(data.detail || 'Trop de tentatives. Réessayez dans 15 minutes.')
-        }
-
-        if (!response.ok) {
-          const data = await response.json()
-          throw new Error(data.detail || 'Identifiants incorrects')
-        }
-
-        const data = await response.json()
-        const payload = JSON.parse(atob(data.access_token.split('.')[1]))
-
-        const userResponse = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/users/me`, {
-          headers: { Authorization: `Bearer ${data.access_token}` }
+        // Rôle lu sur /users/me plutôt qu'en décodant le JWT à la main.
+        const user = await requete('/users/me', {
+          headers: { Authorization: `Bearer ${access_token}` }
         })
-        const user = await userResponse.json()
+        const route = ROUTES_PAR_ROLE[user?.role]
+        if (!route) throw new Error('Rôle de compte non reconnu')
 
-        authStore.setAuth(data.access_token, payload.role, user)
-
-        if (payload.role === 'athlete') router.push('/athlete')
-        else if (payload.role === 'prepa' || payload.role === 'super_prepa') router.push('/prepa')
-        else if (payload.role === 'admin') router.push('/admin')
-        else if (payload.role === 'super_admin') router.push('/super-admin')
-
+        authStore.setAuth(access_token, user.role, user)
+        router.push(route)
       } catch (e) {
         error.value = e.message
       } finally {

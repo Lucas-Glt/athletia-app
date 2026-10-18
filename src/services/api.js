@@ -1,7 +1,7 @@
 import { useAuthStore } from '../stores/auth'
 import router from '../router'
 
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+export const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 async function handleResponse(response) {
   if (response.status === 401) {
@@ -10,28 +10,29 @@ async function handleResponse(response) {
     router.push('/')
     throw new Error('Session expirée')
   }
-  // Corps lu en texte puis parsé : une réponse vide (204) ou non-JSON (page
-  // d'erreur nginx sur un 502) faisait lever un SyntaxError à response.json(),
-  // affiché tel quel à l'utilisateur (« Unexpected token '<' »).
-  const texte = await response.text()
-  let data = null
-  if (texte) {
-    try {
-      data = JSON.parse(texte)
-    } catch {
-      data = null
-    }
-  }
-
+  const data = await lireCorps(response)
   if (!response.ok) {
     throw new Error(messageErreur(data, response.status))
   }
   return data
 }
 
+// Corps lu en texte puis parsé : une réponse vide (204) ou non-JSON (page
+// d'erreur nginx sur un 502) faisait lever un SyntaxError à response.json(),
+// affiché tel quel à l'utilisateur (« Unexpected token '<' »).
+export async function lireCorps(response) {
+  const texte = await response.text()
+  if (!texte) return null
+  try {
+    return JSON.parse(texte)
+  } catch {
+    return null
+  }
+}
+
 // FastAPI renvoie `detail` en texte, ou en liste d'objets pour les erreurs de
 // validation (422) — cette liste s'affichait « [object Object] ».
-function messageErreur(data, status) {
+export function messageErreur(data, status) {
   const detail = data?.detail
   if (typeof detail === 'string' && detail) return detail
   if (Array.isArray(detail)) {

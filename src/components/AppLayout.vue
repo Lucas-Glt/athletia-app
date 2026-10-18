@@ -83,7 +83,7 @@
     </div>
 
     <!-- Bannière PWA Android/Chrome -->
-    <div v-if="showInstallBanner && !isInStandaloneMode" class="install-banner">
+    <div v-if="installPrompt && showInstallBanner && !isInStandaloneMode" class="install-banner">
       <div class="install-banner-content">
         <i class="ti ti-device-mobile install-icon"></i>
         <div>
@@ -121,6 +121,7 @@ import { useAuthStore } from '../stores/auth'
 import { useThemeStore } from '../stores/theme'
 import { useRouter } from 'vue-router'
 import { useApi } from '../services/api'
+import { promptInstallation as installPrompt } from '../services/installationPwa'
 
 export default {
   props: {
@@ -178,21 +179,11 @@ export default {
       }
     }
 
-    const onInstallPrompt = (e) => {
-      e.preventDefault()
-      installPrompt.value = e
-      if (!isInStandaloneMode) showInstallBanner.value = true
-    }
-
     onMounted(() => {
       document.addEventListener('click', fermerMenu)
-      window.addEventListener('beforeinstallprompt', onInstallPrompt)
     })
     onUnmounted(() => {
       document.removeEventListener('click', fermerMenu)
-      // le listener restait attaché à window à chaque démontage du layout
-      // (connexion -> dashboard, changement de rôle) et s'accumulait
-      window.removeEventListener('beforeinstallprompt', onInstallPrompt)
     })
 
     const deconnexion = () => {
@@ -245,9 +236,13 @@ export default {
       }
     }
 
-    const installPrompt = ref(null)
-    const showInstallBanner = ref(false)
-    const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent)
+    const showInstallBanner = ref(true)
+    // iPadOS 13+ se présente comme un Mac (« Macintosh ») : seul l'écran
+    // tactile le distingue, sinon les utilisateurs d'iPad n'avaient jamais
+    // la bannière.
+    const isIos =
+      /iphone|ipad|ipod/i.test(navigator.userAgent) ||
+      (/macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1)
     // navigator.standalone en plus du media query : sur iOS, une app lancée
     // depuis l'écran d'accueil ne remonte pas display-mode: standalone, si
     // bien que la bannière « installez l'app » restait affichée en
@@ -256,12 +251,13 @@ export default {
       window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true
     const showIosBanner = ref(isIos && !isInStandaloneMode)
 
-    const installerApp = async () => {
-      if (!installPrompt.value) return
-      installPrompt.value.prompt()
-      const result = await installPrompt.value.userChoice
-      if (result.outcome === 'accepted') showInstallBanner.value = false
+    const installerApp = () => {
+      const prompt = installPrompt.value
+      if (!prompt) return
+      // prompt() n'est utilisable qu'une fois par événement : la bannière
+      // disparaît quel que soit le choix (elle restait affichée, inerte).
       installPrompt.value = null
+      prompt.prompt()
     }
 
     return {

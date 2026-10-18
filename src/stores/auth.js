@@ -24,6 +24,11 @@ export const useAuthStore = defineStore('auth', {
       localStorage.removeItem('token')
       localStorage.removeItem('role')
       localStorage.removeItem('user')
+      // Le cache Workbox des réponses API (vite.config.js) est indexé par URL,
+      // pas par utilisateur : sur un appareil partagé, le compte suivant
+      // pouvait voir les données du précédent dès que le réseau dépassait le
+      // timeout du NetworkFirst (/users/me, programmes…).
+      if ('caches' in window) caches.delete('api-cache')
     }
   },
 

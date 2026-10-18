@@ -5,6 +5,7 @@ import { useRegisterSW } from 'virtual:pwa-register/vue'
 import App from './App.vue'
 import router from './router'
 import { useThemeStore } from './stores/theme'
+import './services/installationPwa'
 
 import '@tabler/icons-webfont/dist/tabler-icons.min.css'
 import './assets/tokens.css'
