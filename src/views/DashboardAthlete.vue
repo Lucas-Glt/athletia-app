@@ -10,14 +10,8 @@
       <div class="nav-item" :class="{ active: onglet === 'performances' }" @click="onglet = 'performances'">
         <i class="ti ti-trophy"></i> Perfs
       </div>
-      <div class="nav-item" :class="{ active: onglet === 'poids' }" @click="onglet = 'poids'">
-        <i class="ti ti-scale"></i> Poids
-      </div>
-      <div class="nav-item" :class="{ active: onglet === 'diete' }" @click="onglet = 'diete'">
-        <i class="ti ti-salad"></i> Diète
-      </div>
-      <div class="nav-item" :class="{ active: onglet === 'blessures' }" @click="onglet = 'blessures'">
-        <i class="ti ti-bandage"></i> Blessures
+      <div class="nav-item" :class="{ active: ongletsSuivi.includes(onglet) }" @click="menuSuiviOuvert = true">
+        <i class="ti ti-activity"></i> Suivi
       </div>
     </template>
 
@@ -56,6 +50,39 @@
       @oui="repondreWellness"
       @non="popupWellness = false"
     />
+
+    <!-- Feuille "Suivi" : regroupe Poids / Diète / Blessures, trois usages
+         occasionnels qui ne méritent pas chacun leur propre onglet à l'égal
+         de Séances. Même habillage que le panneau de saisie de séance —
+         l'athlète a déjà appris ce geste-là. -->
+    <Transition name="sheet">
+      <div class="suivi-overlay" v-if="menuSuiviOuvert" @click.self="menuSuiviOuvert = false">
+        <div class="suivi-sheet">
+          <div class="suivi-head">
+            <span>Suivi</span>
+            <button class="btn btn-icon" @click="menuSuiviOuvert = false" aria-label="Fermer">
+              <i class="ti ti-x"></i>
+            </button>
+          </div>
+          <button
+            v-for="item in ITEMS_SUIVI"
+            :key="item.cle"
+            class="suivi-item"
+            :class="{ active: onglet === item.cle }"
+            @click="choisirSuivi(item.cle)"
+          >
+            <span class="suivi-item-icone" :style="{ background: item.bg, color: item.couleur }">
+              <i class="ti" :class="item.icone"></i>
+            </span>
+            <span class="suivi-item-texte">
+              <span class="suivi-item-label">{{ item.label }}</span>
+              <span class="suivi-item-desc">{{ item.desc }}</span>
+            </span>
+            <i class="ti ti-chevron-right suivi-item-chevron"></i>
+          </button>
+        </div>
+      </div>
+    </Transition>
 
     <div
       class="dashboard-root"
@@ -138,10 +165,17 @@
                 v-for="seance in seancesAffichees"
                 :key="seance.id"
                 class="seance-card"
+                :class="[`seance-card-${seance.type_seance || 'musculation'}`, { 'est-aujourdhui': estAujourdhuiSeance(seance) }]"
                 @click="demarrerSeance(seance)"
               >
+                <span class="seance-card-icone">
+                  <i class="ti" :class="iconeType(seance.type_seance)"></i>
+                </span>
                 <div class="seance-card-main">
-                  <div class="seance-card-titre">{{ seance.nom }}</div>
+                  <div class="seance-card-titre-ligne">
+                    <span class="seance-card-titre">{{ seance.nom }}</span>
+                    <span class="badge badge-today" v-if="estAujourdhuiSeance(seance)">Aujourd'hui</span>
+                  </div>
                   <div class="seance-card-meta">
                     <span class="type-badge" :class="`type-badge-${seance.type_seance || 'musculation'}`">
                       {{ labelType(seance.type_seance) }}
@@ -753,6 +787,7 @@
               <div class="valider-progress-track">
                 <div
                   class="valider-progress-fill"
+                  :class="{ 'est-complete': progressionSeance.total && progressionSeance.done === progressionSeance.total }"
                   :style="{ width: progressionSeance.total ? (progressionSeance.done / progressionSeance.total * 100) + '%' : '0%' }"
                 ></div>
               </div>
@@ -931,7 +966,7 @@ import PlanningCalendrier from '../components/athlete/PlanningCalendrier.vue'
 import PlanningHebdoModal from '../components/athlete/PlanningHebdoModal.vue'
 import ExerciceImage from '../components/ExerciceImage.vue'
 import { typeGroupe, labelTypeGroupe, estComplexe } from '../data/typesGroupe'
-import { cleOccurrence } from '../data/joursSemaine'
+import { cleOccurrence, jourDeLaDate } from '../data/joursSemaine'
 import { parseValeurSerie, inputmodeSaisie } from '../utils/valeurSerie'
 
 // Distance horizontale minimale pour valider un swipe. Volontairement haute :
@@ -1071,6 +1106,16 @@ export default {
     const historique = ref([])
     const loadingSeances = ref(false)
     const onglet = ref('mes-stats')
+
+    // --- Feuille "Suivi" (Poids / Diète / Blessures regroupés) ---
+    const menuSuiviOuvert = ref(false)
+    const ongletsSuivi = ['poids', 'diete', 'blessures']
+    const ITEMS_SUIVI = [
+      { cle: 'poids', label: 'Poids', desc: 'Pesées et courbe', icone: 'ti-scale', bg: 'var(--color-primary-light)', couleur: 'var(--color-primary-dark)' },
+      { cle: 'diete', label: 'Diète', desc: 'Repas et objectifs', icone: 'ti-salad', bg: 'var(--color-valid-bg)', couleur: 'var(--color-valid-text-strong)' },
+      { cle: 'blessures', label: 'Blessures', desc: 'Déclarer un bobo', icone: 'ti-bandage', bg: 'var(--color-danger-bg)', couleur: 'var(--color-danger-text)' }
+    ]
+    const choisirSuivi = (cle) => { onglet.value = cle; menuSuiviOuvert.value = false }
     // Tentative (session_id) dont la bannière propose le ressenti, null si
     // aucune : la bannière doit tomber si cette tentative disparaît de
     // l'historique, sinon elle propose un questionnaire sans séance derrière.
@@ -1165,6 +1210,15 @@ export default {
       return map[t] || 'Musculation'
     }
 
+    const iconeType = (t) => {
+      const map = { musculation: 'ti-barbell', natation: 'ti-swimming', athletisme: 'ti-run', pliometrie: 'ti-bolt' }
+      return map[t] || 'ti-barbell'
+    }
+
+    // Repère la séance du jour sur l'écran liste : l'athlète n'a pas à
+    // comparer "lundi" dans sa tête avec la date d'aujourd'hui.
+    const estAujourdhuiSeance = (seance) => seance.jour === jourDeLaDate(new Date())
+
     const letterFor = (idx) => String.fromCharCode(65 + idx)
 
     const grouperExercices = (exercices) => {
@@ -1213,39 +1267,61 @@ export default {
       return exos.length > 0 && exos.every(exo => getLogs(exo.id, serieIdx).fait)
     }
 
-    const toggleGroupeDone = (groupe, serieIdx) => {
-      const isDone = isGroupeDone(groupe, serieIdx)
-      const devientFait = !isDone
-      exosDeLaSerie(groupe, serieIdx).forEach(exo => {
-        const log = getLogs(exo.id, serieIdx)
-        // Rien saisi à la validation : on retient la valeur demandée par le
-        // prépa (le placeholder grisé) plutôt qu'un champ vide.
-        if (devientFait) {
-          if (!log.reps_realisees) log.reps_realisees = valeurParDefaut(exo, serieIdx, 'reps_realisees')
-          if (!log.poids_realise) log.poids_realise = valeurParDefaut(exo, serieIdx, 'poids_realise')
+    // Clés (groupe+série) dont la sauvegarde est en cours. Un double-tap
+    // pendant qu'une requête part encore enverrait fait:true puis fait:false
+    // en quasi-simultané : si le serveur les traite dans le désordre, l'état
+    // enregistré reste l'inverse de ce que montre l'écran jusqu'à la
+    // prochaine « Valider la séance ». On ignore donc le second tap tant que
+    // le premier n'est pas arrivé.
+    const seriesEnEnvoi = new Set()
+
+    const toggleGroupeDone = async (groupe, serieIdx) => {
+      const cle = `${groupe.key}-${serieIdx}`
+      if (seriesEnEnvoi.has(cle)) return
+      seriesEnEnvoi.add(cle)
+      try {
+        const isDone = isGroupeDone(groupe, serieIdx)
+        const devientFait = !isDone
+        exosDeLaSerie(groupe, serieIdx).forEach(exo => {
+          const log = getLogs(exo.id, serieIdx)
+          // Rien saisi à la validation : on retient la valeur demandée par le
+          // prépa (le placeholder grisé) plutôt qu'un champ vide.
+          if (devientFait) {
+            if (!log.reps_realisees) log.reps_realisees = valeurParDefaut(exo, serieIdx, 'reps_realisees')
+            if (!log.poids_realise) log.poids_realise = valeurParDefaut(exo, serieIdx, 'poids_realise')
+          }
+          log.fait = devientFait
+        })
+
+        // Sauvegarde immédiate : une série cochée part tout de suite au
+        // serveur, sans attendre « Valider la séance ». Avant, tout restait
+        // local jusqu'à ce bouton final — un athlète qui s'arrêtait en route
+        // (connexion coupée, séance écourtée) perdait alors tout ce qu'il
+        // avait déjà validé. L'upsert par session_id (cf. route /series/.../logs)
+        // rend cet appel idempotent : « Valider la séance » peut sans risque
+        // renvoyer la même série plus tard. Échec silencieux ici (pas de
+        // blocage de la saisie en cours) : le brouillon local et le renvoi
+        // global de validerSeance restent le filet de sécurité en cas de
+        // coupure réseau.
+        await sauvegarderSerie(groupe, serieIdx)
+
+        // Après validation, vérifie si toutes les séries du groupe sont complètes
+        if (!isDone) {
+          const nbSeries = nbSeriesGroupe(groupe)
+          const toutesValidees = Array.from({ length: nbSeries }, (_, i) => i)
+            .every(i => isGroupeDone(groupe, i))
+
+          // Groupe terminé : referme le panneau de saisie, retour à la vue
+          // d'ensemble. La clé est revérifiée à l'échéance : ouvrir un autre
+          // exercice pendant ces 400 ms refermait sinon ce nouveau panneau.
+          if (toutesValidees && groupeSaisie.value?.key === groupe.key) {
+            setTimeout(() => {
+              if (groupeSaisie.value?.key === groupe.key) fermerSaisie()
+            }, 400)
+          }
         }
-        log.fait = devientFait
-      })
-
-      // Pas de sauvegarde ici : la saisie reste locale (verte, en attente)
-      // tant que l'athlète n'a pas cliqué sur « Valider la séance » — sinon
-      // des séries isolées se retrouvaient poussées dans l'historique avant
-      // que la séance entière soit terminée.
-
-      // Après validation, vérifie si toutes les séries du groupe sont complètes
-      if (!isDone) {
-        const nbSeries = nbSeriesGroupe(groupe)
-        const toutesValidees = Array.from({ length: nbSeries }, (_, i) => i)
-          .every(i => isGroupeDone(groupe, i))
-
-        // Groupe terminé : referme le panneau de saisie, retour à la vue
-        // d'ensemble. La clé est revérifiée à l'échéance : ouvrir un autre
-        // exercice pendant ces 400 ms refermait sinon ce nouveau panneau.
-        if (toutesValidees && groupeSaisie.value?.key === groupe.key) {
-          setTimeout(() => {
-            if (groupeSaisie.value?.key === groupe.key) fermerSaisie()
-          }, 400)
-        }
+      } finally {
+        seriesEnEnvoi.delete(cle)
       }
     }
 
@@ -1277,10 +1353,21 @@ export default {
     // n'appartient pas à cette séance, et dont les séries ne s'apparient même
     // pas (ids différents, cf. logTentativePourSerie). Les semaines dupliquées
     // du même créneau, elles, restent regroupées : c'est la progression.
+    // Depuis la sauvegarde immédiate des séries cochées (cf. toggleGroupeDone),
+    // la tentative en cours existe déjà côté serveur avant d'être terminée.
+    // Tant que sa feuille reste ouverte, on la masque des comparaisons N-1 et
+    // de l'onglet historique : sinon l'athlète se verrait comparé à lui-même
+    // quelques secondes plus tôt, dans la même séance. Une fois la feuille
+    // fermée (validée ou abandonnée), elle redevient un historique normal.
+    const historiqueSansSessionEnCours = computed(() => {
+      if (!seanceActive.value) return historique.value
+      return historique.value.filter(l => l.session_id !== sessionSaisieId.value)
+    })
+
     const logsCreneauPourExo = (nom) => {
       const creneau = seanceActive.value?.nom
       if (!creneau) return []
-      return historique.value.filter(l => l.exo_nom === nom && creneauLog(l) === creneau)
+      return historiqueSansSessionEnCours.value.filter(l => l.exo_nom === nom && creneauLog(l) === creneau)
     }
 
     // Toutes les tentatives passées d'un exercice, la plus récente en premier :
@@ -1470,7 +1557,7 @@ export default {
     // séance du point de vue de l'athlète.
     const tentativesProgramme = computed(() => {
       const parTentative = {}
-      historique.value.forEach(l => {
+      historiqueSansSessionEnCours.value.forEach(l => {
         const creneau = creneauLog(l)
         const cle = `${creneau}||${cleTentative(l)}`
         if (!parTentative[cle]) {
@@ -2440,8 +2527,9 @@ export default {
     return {
       programmes, programmeActif, seances, seanceActive, logs, historique,
       loadingSeances, onglet,
+      menuSuiviOuvert, ongletsSuivi, ITEMS_SUIVI, choisirSuivi,
       seancesAffichees,
-      labelType, letterFor, grouperExercices,
+      labelType, iconeType, estAujourdhuiSeance, letterFor, grouperExercices,
       nbSeriesGroupe, exosDeLaSerie, reposSerie,
       getLogs, isGroupeDone, erreurValidation,
       estEnEdition,
@@ -2579,16 +2667,43 @@ export default {
   padding: var(--spacing-lg);
   background: var(--color-bg);
   border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-border);
   border-radius: var(--radius-lg);
   cursor: pointer;
   text-align: left;
   flex-shrink: 0;
   width: 100%;
-  transition: border-color 0.1s;
+  box-shadow: var(--shadow-card);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
 }
-.seance-card:hover { border-color: var(--color-primary); }
+.seance-card:hover { border-color: var(--color-primary); box-shadow: var(--shadow-card-hover); }
+.seance-card:active { transform: scale(0.99); }
+.seance-card.est-aujourdhui { border-left-color: var(--color-primary); box-shadow: var(--shadow-card-hover); }
+.seance-card-musculation { border-left-color: var(--color-type-musculation-border); }
+.seance-card-natation { border-left-color: var(--color-type-natation-border); }
+.seance-card-athletisme { border-left-color: var(--color-type-athletisme-border); }
+.seance-card-pliometrie { border-left-color: var(--color-type-pliometrie-border); }
+.seance-card.est-aujourdhui.seance-card-musculation,
+.seance-card.est-aujourdhui.seance-card-natation,
+.seance-card.est-aujourdhui.seance-card-athletisme,
+.seance-card.est-aujourdhui.seance-card-pliometrie { border-left-color: var(--color-primary); }
+.seance-card-icone {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  background: var(--color-bg-app);
+  color: var(--color-text-secondary);
+}
+.seance-card.est-aujourdhui .seance-card-icone { background: var(--color-primary-light); color: var(--color-primary-dark); }
 .seance-card-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.seance-card-titre-ligne { display: flex; align-items: center; gap: var(--spacing-sm); flex-wrap: wrap; }
 .seance-card-titre { font-size: var(--font-size-base); font-weight: 600; color: var(--color-text); }
+.badge-today { background: var(--color-primary); color: var(--color-on-primary); font-weight: 600; }
 .seance-card-meta { display: flex; align-items: center; gap: var(--spacing-sm); flex-wrap: wrap; }
 .seance-card-count { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
 .seance-card-chevron { color: var(--color-text-muted); font-size: var(--font-size-lg); flex-shrink: 0; }
@@ -2821,7 +2936,11 @@ export default {
   gap: var(--spacing-md);
   flex-shrink: 0;
   cursor: pointer;
+  box-shadow: var(--shadow-card);
+  transition: box-shadow var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
 }
+.exo-group:hover { box-shadow: var(--shadow-card-hover); }
+.exo-group:active { transform: scale(0.99); }
 .exo-group.is-superset { border-color: var(--color-superset-border); border-left: 4px solid var(--color-primary); }
 .exo-group.is-complete { border-color: var(--color-valid-border); background: var(--color-valid-bg-soft); }
 
@@ -2830,7 +2949,21 @@ export default {
 
 .exo-group-head { display: flex; align-items: flex-start; gap: var(--spacing-md); }
 .exo-group-head .exo-noms-list { flex: 1; }
-.groupe-check { color: var(--color-valid-text); font-size: 24px; flex-shrink: 0; }
+.groupe-check {
+  color: var(--color-valid-text);
+  font-size: 24px;
+  flex-shrink: 0;
+  animation: pop-in var(--transition-base);
+}
+
+@keyframes pop-in {
+  0% { transform: scale(0.4); opacity: 0; }
+  60% { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .groupe-check { animation: none; }
+}
 
 .exo-noms-list { display: flex; flex-direction: column; gap: var(--spacing-sm); }
 .exo-nom-inline {
@@ -2865,7 +2998,7 @@ export default {
   justify-content: center;
   flex-shrink: 0;
 }
-.exo-num { border-radius: var(--radius-full); }
+.exo-num { border-radius: var(--radius-full); box-shadow: 0 0 0 3px var(--color-bg-app); }
 .exo-letter { border-radius: var(--radius-sm); background: var(--color-primary); color: var(--color-on-primary); }
 
 /* --- Cartes série --- */
@@ -2873,15 +3006,16 @@ export default {
   background: var(--color-bg-secondary);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  padding: var(--spacing-md);
+  padding: var(--spacing-lg);
   display: flex;
   flex-direction: column;
   gap: var(--spacing-md);
+  transition: background var(--transition-base), border-color var(--transition-base);
 }
 .serie-card.done { background: var(--color-valid-bg-soft); border-color: var(--color-valid-border); }
 
 .serie-head { display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-sm); }
-.serie-label { font-size: var(--font-size-sm); font-weight: 700; color: var(--color-superset-text); }
+.serie-label { font-size: var(--font-size-base); font-weight: 700; color: var(--color-superset-text); }
 .serie-repos {
   display: inline-flex;
   align-items: center;
@@ -2895,7 +3029,7 @@ export default {
 }
 
 .serie-exo { display: flex; flex-direction: column; gap: var(--spacing-sm); }
-.serie-exo + .serie-exo { padding-top: var(--spacing-sm); border-top: 1px dashed var(--color-border); }
+.serie-exo + .serie-exo { padding-top: var(--spacing-md); border-top: 1px dashed var(--color-border); }
 .serie-exo-head { display: flex; align-items: center; gap: var(--spacing-sm); }
 .serie-exo-nom { font-size: var(--font-size-sm); font-weight: 600; color: var(--color-text-body); }
 .exo-letter-mini {
@@ -2908,30 +3042,39 @@ export default {
   flex-shrink: 0;
 }
 
-/* Prescrit : valeurs en gros, labels discrets */
-.prescrit-bloc { display: flex; flex-wrap: wrap; gap: var(--spacing-lg); align-items: baseline; }
-.prescrit-item { display: inline-flex; align-items: baseline; gap: 5px; }
-.prescrit-val { font-size: var(--font-size-xs); font-weight: 700; color: var(--color-text); line-height: 1.1; }
+/* Prescrit : LA valeur à viser — le plus gros texte de la carte, c'est ce
+   qu'on doit pouvoir lire à bout de bras avant de poser la barre. Tout le
+   reste (N-1, saisie) se repère par contraste en dessous. */
+.prescrit-bloc { display: flex; flex-wrap: wrap; gap: var(--spacing-xl); align-items: baseline; }
+.prescrit-item { display: inline-flex; align-items: baseline; gap: 6px; }
+.prescrit-val { font-size: var(--font-size-2xl); font-weight: 800; color: var(--color-text); line-height: 1; letter-spacing: -0.5px; }
 .prescrit-label {
   font-size: var(--font-size-xs);
   color: var(--color-text-secondary);
-  font-weight: 500;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.3px;
 }
 
-/* N-1 : dernière performance connue, discrète sous le prescrit */
-.n1-bloc { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; }
+/* N-1 : dernière performance connue — simple repère de mémoire, délibérément
+   discret pour ne jamais rivaliser avec le prescrit ou la saisie. */
+.n1-bloc {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-md);
+  width: fit-content;
+}
 .n1-tag {
   font-size: 10px;
   font-weight: 700;
   color: var(--color-text-muted);
-  background: var(--color-bg-tertiary);
-  padding: 1px 6px;
-  border-radius: var(--radius-sm);
   letter-spacing: 0.3px;
 }
-.n1-val { font-size: var(--font-size-xs); font-weight: 600; color: var(--color-text-muted); }
+.n1-val { font-size: var(--font-size-xs); font-weight: 600; color: var(--color-text-secondary); }
 .n1-unit { font-size: 10px; font-weight: 500; margin-left: 2px; }
 .n1-val.n1-nf { color: var(--color-danger-text); }
 
@@ -2968,29 +3111,33 @@ export default {
   color: var(--color-text-secondary);
 }
 .log-input-wrap { position: relative; flex: 1; min-width: 0; }
+/* La saisie réalisée est l'élément le plus actionnable de la carte : aussi
+   grande que le prescrit, pour qu'elle ne se perde pas au milieu du reste. */
 .log-input {
-  height: 32px;
+  height: var(--input-h);
   padding: 0 var(--spacing-sm);
-  font-size: var(--font-size-xs);
-  font-weight: 600;
+  font-size: var(--font-size-lg);
+  font-weight: 700;
   width: 100%;
   min-width: 0;
-  border: 1px solid var(--color-border-strong);
+  border: 1.5px solid var(--color-border-strong);
   border-radius: var(--radius-md);
   background: var(--color-bg);
   text-align: center;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast), background var(--transition-fast);
 }
-.log-input:focus { outline: none; border-color: var(--color-primary); }
+.log-input:focus { outline: none; border-color: var(--color-primary); box-shadow: var(--shadow-focus); }
 .log-input-diff {
   position: absolute;
-  top: -8px;
+  top: -9px;
   right: -6px;
-  font-size: 10px;
+  font-size: var(--font-size-xs);
   font-weight: 700;
-  padding: 1px 5px;
+  padding: 1px 6px;
   border-radius: var(--radius-full, 999px);
   line-height: 1.4;
   pointer-events: none;
+  box-shadow: 0 1px 4px rgba(31, 25, 84, 0.15);
 }
 .log-input-diff.diff-positif { background: var(--color-valid-bg); color: var(--color-valid-text-strong); }
 .log-input-diff.diff-negatif { background: var(--color-danger-bg); color: var(--color-danger-text); }
@@ -3001,33 +3148,37 @@ export default {
   cursor: not-allowed;
   border-color: var(--color-border);
 }
-.log-input-locked:focus { border-color: var(--color-border); }
+.log-input-locked:focus { border-color: var(--color-border); box-shadow: none; }
 .log-input-locked.done {
   background: var(--color-valid-bg-soft);
   color: var(--color-valid-text-strong);
   border-color: var(--color-valid-border);
 }
 
-/* Bouton valider série */
+/* Bouton valider série — même cible tactile que tout le reste de l'app
+   (--tap-min), et le vert "fait" rejoint celui des pastilles de progression
+   et du fond de carte, au lieu d'un violet qui se confondait avec "actif". */
 .btn-serie {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  min-height: 32px;
+  min-height: var(--tap-min);
   padding: 0 var(--spacing-md);
   border-radius: var(--radius-md);
   cursor: pointer;
-  font-size: var(--font-size-xs);
+  font-size: var(--font-size-sm);
   font-weight: 600;
-  border: 1px solid var(--color-border-strong);
+  border: 1.5px solid var(--color-border-strong);
   background: var(--color-bg);
   color: var(--color-text-body);
   width: 100%;
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
 }
+.btn-serie:active { transform: scale(0.97); }
 .btn-todo:hover { color: var(--color-primary-dark); border-color: var(--color-primary); }
-.btn-done { background: var(--color-primary); color: var(--color-on-primary); border-color: var(--color-primary-dark); }
-.btn-done:hover { background: var(--color-primary-dark); }
+.btn-done { background: var(--color-valid-text); color: #fff; border-color: var(--color-valid-text); }
+.btn-done:hover { background: var(--color-valid-text-strong); border-color: var(--color-valid-text-strong); }
 
 .serie-actions { display: flex; gap: var(--spacing-sm); }
 .serie-actions .btn-serie { flex: 1; }
@@ -3100,8 +3251,9 @@ export default {
   border-radius: 50%;
   background: var(--color-bg-tertiary);
   border: 1px solid var(--color-border-strong);
+  transition: background var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
 }
-.serie-dot.done { background: var(--color-valid-text); border-color: var(--color-valid-text); }
+.serie-dot.done { background: var(--color-valid-text); border-color: var(--color-valid-text); transform: scale(1.15); }
 .btn-saisir {
   flex-shrink: 0;
   min-height: 30px;
@@ -3109,6 +3261,76 @@ export default {
   padding: 0 var(--spacing-sm);
   font-size: var(--font-size-xs);
 }
+
+/* --- Feuille "Suivi" --- */
+.suivi-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(23, 21, 58, 0.45);
+  z-index: 150;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.suivi-sheet {
+  background: var(--color-bg);
+  width: 100%;
+  max-width: 480px;
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  box-shadow: var(--shadow-modal);
+  padding: var(--spacing-md) var(--spacing-lg) calc(var(--spacing-xl) + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+.suivi-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+  padding: var(--spacing-sm) var(--spacing-sm) var(--spacing-md);
+}
+.suivi-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  width: 100%;
+  min-height: 64px;
+  padding: var(--spacing-sm) var(--spacing-sm);
+  background: none;
+  border: none;
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--transition-fast);
+}
+.suivi-item:hover,
+.suivi-item:active { background: var(--color-bg-app); }
+.suivi-item.active .suivi-item-label { color: var(--color-primary-dark); }
+.suivi-item-icone {
+  flex-shrink: 0;
+  width: 42px;
+  height: 42px;
+  border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+}
+.suivi-item-texte { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.suivi-item-label { font-size: var(--font-size-base); font-weight: 600; color: var(--color-text); }
+.suivi-item-desc { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+.suivi-item-chevron { color: var(--color-text-muted); flex-shrink: 0; }
+
+.sheet-enter-active .suivi-sheet,
+.sheet-leave-active .suivi-sheet { transition: transform var(--transition-base); }
+.sheet-enter-active,
+.sheet-leave-active { transition: background var(--transition-base); }
+.sheet-enter-from,
+.sheet-leave-to { background: rgba(23, 21, 58, 0); }
+.sheet-enter-from .suivi-sheet,
+.sheet-leave-to .suivi-sheet { transform: translateY(100%); }
 
 /* --- Panneau de saisie (bottom sheet) --- */
 .saisie-overlay {
@@ -3222,7 +3444,11 @@ export default {
   gap: var(--spacing-lg);
   padding: var(--spacing-md) var(--spacing-lg);
   background: var(--color-bg);
+  background: color-mix(in srgb, var(--color-bg) 94%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   border-top: 1px solid var(--color-border);
+  box-shadow: 0 -4px 16px -4px rgba(31, 25, 84, 0.08);
 }
 /* Pleine largeur sous la barre : le message doit être lu avant de réessayer,
    pas comprimé entre la progression et le bouton. */
@@ -3235,19 +3461,20 @@ export default {
   font-size: var(--font-size-xs);
   color: var(--color-danger-text);
 }
-.valider-progress { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.valider-progress { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
 .valider-progress-track {
-  height: 6px;
+  height: 8px;
   background: var(--color-bg-tertiary);
   border-radius: var(--radius-full);
   overflow: hidden;
 }
 .valider-progress-fill {
   height: 100%;
-  background: var(--color-primary);
+  background: var(--gradient-primary-hover);
   border-radius: var(--radius-full);
-  transition: width 0.2s;
+  transition: width var(--transition-base), background var(--transition-base);
 }
+.valider-progress-fill.est-complete { background: var(--color-valid-text); }
 .valider-progress-label { font-size: var(--font-size-xs); font-weight: 600; color: var(--color-text-secondary); }
 .btn-valider { flex-shrink: 0; min-height: var(--input-h); }
 

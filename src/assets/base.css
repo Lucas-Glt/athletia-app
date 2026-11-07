@@ -24,17 +24,26 @@
   background: var(--color-bg);
   color: var(--color-text-body);
   white-space: nowrap;
-  transition: background 0.1s;
+  transition: background var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast);
 }
 .btn:hover { background: var(--color-bg-secondary); }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+/* Retour tactile systématique : la salle de sport se fait au toucher, pas à
+   l'œil — un bouton qui "s'enfonce" confirme l'appui avant même la réponse
+   réseau. Désactivé pour qui préfère moins de mouvement à l'écran. */
+.btn:not(:disabled):active { transform: scale(0.96); }
+@media (prefers-reduced-motion: reduce) {
+  .btn:not(:disabled):active { transform: none; }
+}
 
 .btn-primary {
-  background: var(--color-primary);
+  background: var(--gradient-primary);
   color: var(--color-on-primary);
-  border-color: var(--color-primary-dark);
+  border-color: transparent;
+  box-shadow: 0 2px 8px -2px rgba(83, 74, 183, 0.45);
 }
-.btn-primary:hover:not(:disabled) { background: var(--color-primary-dark); }
+.btn-primary:hover:not(:disabled) { background: var(--gradient-primary-hover); box-shadow: 0 4px 14px -2px rgba(83, 74, 183, 0.5); }
+.btn-primary:disabled { box-shadow: none; }
 
 .btn-danger {
   background: var(--color-danger-bg);
@@ -131,6 +140,7 @@
 .field select:focus {
   outline: none;
   border-color: var(--color-primary);
+  box-shadow: var(--shadow-focus);
 }
 
 /* iOS zoome automatiquement sur le champ au focus dès que sa police descend
@@ -248,10 +258,12 @@
   border: none;
   background: transparent;
   user-select: none;
+  transition: background var(--transition-fast), color var(--transition-fast);
 }
 .nav-item:hover { background: var(--color-bg-app); color: var(--color-text-body); }
 .nav-item.active { background: var(--color-primary-light); color: var(--color-primary-dark); }
-.nav-item i { font-size: var(--font-size-lg); }
+.nav-item i { font-size: var(--font-size-lg); transition: transform var(--transition-fast); }
+.nav-item.active i { transform: translateY(-1px); }
 
 /* --- Divers --- */
 .section-title {
@@ -273,4 +285,5 @@
   background: var(--color-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
 }

@@ -356,6 +356,7 @@ export default {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-sm);
+  box-shadow: var(--shadow-card);
 }
 /* Le liseré suffit à distinguer une blessure active dans une liste qui mêle
    en cours et guéries, sans répéter la couleur sur toute la carte. */

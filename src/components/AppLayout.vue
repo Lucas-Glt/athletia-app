@@ -17,24 +17,26 @@
         <slot name="actions" />
         <div class="avatar-wrapper" ref="avatarRef">
           <button class="avatar" @click="toggleMenu">{{ initiales }}</button>
-          <div v-if="menuOuvert" class="profile-dropdown">
-            <div class="profile-info">
-              <div class="profile-nom">{{ authStore.user?.nom }}</div>
-              <div class="profile-role">{{ roleLabel }}</div>
+          <Transition name="dropdown">
+            <div v-if="menuOuvert" class="profile-dropdown">
+              <div class="profile-info">
+                <div class="profile-nom">{{ authStore.user?.nom }}</div>
+                <div class="profile-role">{{ roleLabel }}</div>
+              </div>
+              <div class="dropdown-divider"></div>
+              <button class="dropdown-item" @click="ouvrirModalePassword">
+                <i class="ti ti-lock"></i> Changer le mot de passe
+              </button>
+              <button class="dropdown-item" @click="themeStore.toggleTheme()">
+                <i class="ti" :class="themeStore.theme === 'dark' ? 'ti-sun' : 'ti-moon'"></i>
+                {{ themeStore.theme === 'dark' ? 'Mode clair' : 'Mode sombre' }}
+              </button>
+              <div class="dropdown-divider"></div>
+              <button class="dropdown-item danger" @click="deconnexion">
+                <i class="ti ti-logout"></i> Se déconnecter
+              </button>
             </div>
-            <div class="dropdown-divider"></div>
-            <button class="dropdown-item" @click="ouvrirModalePassword">
-              <i class="ti ti-lock"></i> Changer le mot de passe
-            </button>
-            <button class="dropdown-item" @click="themeStore.toggleTheme()">
-              <i class="ti" :class="themeStore.theme === 'dark' ? 'ti-sun' : 'ti-moon'"></i>
-              {{ themeStore.theme === 'dark' ? 'Mode clair' : 'Mode sombre' }}
-            </button>
-            <div class="dropdown-divider"></div>
-            <button class="dropdown-item danger" @click="deconnexion">
-              <i class="ti ti-logout"></i> Se déconnecter
-            </button>
-          </div>
+          </Transition>
         </div>
       </div>
     </header>
@@ -284,12 +286,15 @@ export default {
 .app-header {
   height: var(--header-height-desktop);
   padding: 0 var(--spacing-2xl);
-  border-bottom: 1px solid var(--color-primary-light);
+  border-bottom: 1px solid var(--color-border);
   display: flex;
   align-items: center;
   justify-content: space-between;
   flex-shrink: 0;
   background: var(--color-bg);
+  background: color-mix(in srgb, var(--color-bg) 92%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   box-shadow: var(--shadow-header);
   z-index: 20;
   gap: var(--spacing-2xl);
@@ -300,6 +305,7 @@ export default {
   width: 38px; height: 38px; border-radius: var(--radius-md);
   color: #fff; font-size: var(--font-size-lg); font-weight: 700;
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  box-shadow: 0 2px 8px -2px rgba(31, 25, 84, 0.35);
 }
 .brand-text h1 { font-size: var(--font-size-lg); font-weight: 700; color: var(--color-text); letter-spacing: -0.3px; margin: 0; line-height: 1.2; }
 .brand-text span { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
@@ -320,19 +326,31 @@ export default {
   padding: 0;
   transition: opacity 0.15s;
 }
-.avatar:hover { opacity: 0.85; }
+.avatar:hover { box-shadow: 0 2px 10px -2px rgba(31, 25, 84, 0.4); }
+.avatar:active { transform: scale(0.94); }
 
 .profile-dropdown {
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
   background: var(--color-bg);
-  border: 1px solid var(--color-primary-light);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-dropdown);
   min-width: 230px;
   z-index: 100;
   overflow: hidden;
+  transform-origin: top right;
+}
+
+.dropdown-enter-active,
+.dropdown-leave-active {
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
+}
+.dropdown-enter-from,
+.dropdown-leave-to {
+  opacity: 0;
+  transform: scale(0.95) translateY(-4px);
 }
 
 .profile-info { padding: var(--spacing-md) var(--spacing-lg); }
@@ -364,7 +382,11 @@ export default {
   left: 0;
   right: 0;
   background: var(--color-bg);
+  background: color-mix(in srgb, var(--color-bg) 94%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   border-top: 1px solid var(--color-border);
+  box-shadow: 0 -4px 16px -4px rgba(31, 25, 84, 0.08);
   z-index: 90;
   padding-bottom: env(safe-area-inset-bottom);
 }

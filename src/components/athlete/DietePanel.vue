@@ -1105,6 +1105,7 @@ export default {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-sm);
+  box-shadow: var(--shadow-card);
 }
 .repas-head { display: flex; align-items: center; gap: var(--spacing-sm); }
 .repas-nom { flex: 1; margin: 0; font-size: var(--font-size-base); font-weight: 700; }

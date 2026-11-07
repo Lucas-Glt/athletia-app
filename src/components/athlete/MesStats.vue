@@ -484,6 +484,7 @@ export default {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-sm);
+  box-shadow: var(--shadow-card);
 }
 .stat-card-titre { display: flex; align-items: center; gap: 8px; font-size: var(--font-size-base); font-weight: 700; }
 .stat-card-sub { font-size: var(--font-size-sm); color: var(--color-text-secondary); margin: 0; }
@@ -499,8 +500,10 @@ export default {
   background: var(--color-bg);
   font-weight: 700;
   cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
 }
-.rpe-btn.active { background: var(--color-primary); border-color: var(--color-primary); color: var(--color-on-primary); }
+.rpe-btn:active { transform: scale(0.92); }
+.rpe-btn.active { background: var(--gradient-primary-hover); border-color: var(--color-primary-dark); color: var(--color-on-primary); }
 .rpe-label { font-size: var(--font-size-sm); font-weight: 600; color: var(--color-primary-text); margin: 0; }
 
 .field-inline { display: flex; align-items: center; gap: var(--spacing-sm); }
@@ -524,14 +527,16 @@ export default {
 .wellness-picker { display: flex; gap: 6px; }
 .wellness-btn {
   flex: 1;
-  height: 36px;
+  height: var(--tap-min);
   border-radius: var(--radius-md);
   border: 1px solid var(--color-border);
   background: var(--color-bg);
   font-weight: 600;
   cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
 }
-.wellness-btn.active { background: var(--color-primary); border-color: var(--color-primary); color: var(--color-on-primary); }
+.wellness-btn:active { transform: scale(0.92); }
+.wellness-btn.active { background: var(--gradient-primary-hover); border-color: var(--color-primary-dark); color: var(--color-on-primary); }
 
 .sommeil-stepper { display: flex; align-items: center; gap: var(--spacing-sm); }
 .sommeil-btn {
@@ -546,7 +551,9 @@ export default {
   background: var(--color-bg);
   font-size: var(--font-size-base);
   cursor: pointer;
+  transition: background var(--transition-fast), transform var(--transition-fast);
 }
+.sommeil-btn:active:not(:disabled) { transform: scale(0.92); }
 .sommeil-btn:disabled { opacity: 0.4; cursor: default; }
 .sommeil-valeur { flex: 1; text-align: center; font-size: var(--font-size-lg); font-weight: 700; }
 .sommeil-valeur.vide { color: var(--color-text-muted); font-weight: 500; }
