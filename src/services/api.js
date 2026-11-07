@@ -3,15 +3,27 @@ import router from '../router'
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
+// fetch natif n'a pas de timeout : une connexion qui stagne (4G qui dégrade
+// plutôt que de couper franchement, salle en sous-sol) laisse la promesse
+// pendue indéfiniment au lieu de rejeter — le bouton reste bloqué "en cours"
+// sans jamais signaler d'erreur à l'athlète.
+const TIMEOUT_MS = 15000
+
 // fetch ne rejette que sur une erreur réseau (hors ligne, serveur arrêté
 // pendant un déploiement, CORS) avec un message brut et propre à chaque
 // navigateur : « Failed to fetch » (Chrome), « Load failed » (Safari),
-// « NetworkError when attempting to fetch resource » (Firefox).
+// « NetworkError when attempting to fetch resource » (Firefox). Un abandon
+// par timeout rejette de la même façon (AbortError) et tombe dans le même
+// message : du point de vue de l'athlète, stagner ou échouer, c'est pareil.
 export async function requeteReseau(path, options) {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS)
   try {
-    return await fetch(`${BASE_URL}${path}`, options)
+    return await fetch(`${BASE_URL}${path}`, { ...options, signal: controller.signal })
   } catch {
     throw new Error('Serveur injoignable. Vérifiez votre connexion internet.')
+  } finally {
+    clearTimeout(timeoutId)
   }
 }
 
