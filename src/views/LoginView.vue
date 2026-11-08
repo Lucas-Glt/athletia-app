@@ -42,6 +42,43 @@
         </button>
       </form>
     </div>
+
+    <!-- Mot du prépa et notes de mise à jour (contenu : src/data/notesMaj.js) -->
+    <aside class="maj-card" aria-labelledby="maj-titre">
+      <div class="maj-entete">
+        <span class="maj-icone"><i class="ti ti-speakerphone"></i></span>
+        <h2 id="maj-titre">Le mot du prépa</h2>
+      </div>
+      <div class="maj-mot">
+        <p v-for="(paragraphe, i) in MOT_DU_PREPA" :key="i">{{ paragraphe }}</p>
+        <p class="maj-signature">{{ SIGNATURE_MOT }}</p>
+      </div>
+
+      <div v-if="derniereNote" class="maj-notes">
+        <span class="section-title">Notes de mise à jour</span>
+        <article class="maj-note maj-note-recente">
+          <div class="maj-note-tete">
+            <span class="maj-badge"><i class="ti ti-sparkles"></i> Nouveau</span>
+            <span class="maj-date">{{ derniereNote.date }}</span>
+          </div>
+          <h3>{{ derniereNote.titre }}</h3>
+          <ul>
+            <li v-for="(point, i) in derniereNote.points" :key="i">{{ point }}</li>
+          </ul>
+        </article>
+
+        <details v-if="notesPrecedentes.length" class="maj-precedentes">
+          <summary><i class="ti ti-history"></i> Mises à jour précédentes</summary>
+          <article v-for="note in notesPrecedentes" :key="note.date" class="maj-note">
+            <span class="maj-date">{{ note.date }}</span>
+            <h3>{{ note.titre }}</h3>
+            <ul>
+              <li v-for="(point, i) in note.points" :key="i">{{ point }}</li>
+            </ul>
+          </article>
+        </details>
+      </div>
+    </aside>
   </div>
 </template>
 
@@ -50,6 +87,7 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { lireCorps, messageErreur, requeteReseau } from '../services/api'
+import { MOT_DU_PREPA, SIGNATURE_MOT, NOTES_MAJ } from '../data/notesMaj'
 
 const ROUTES_PAR_ROLE = {
   athlete: '/athlete',
@@ -112,18 +150,27 @@ export default {
       }
     }
 
-    return { email, password, error, loading, handleLogin }
+    const [derniereNote, ...notesPrecedentes] = NOTES_MAJ
+
+    return {
+      email, password, error, loading, handleLogin,
+      MOT_DU_PREPA, SIGNATURE_MOT, derniereNote, notesPrecedentes
+    }
   }
 }
 </script>
 
 <style scoped>
+/* Connexion et mot du prépa côte à côte sur grand écran ; sur mobile, la
+   connexion d'abord, le mot du prépa en dessous. */
 .login-container {
   min-height: 100vh;
   min-height: 100dvh;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: center;
+  gap: var(--spacing-xl);
   background: var(--color-bg-app);
   padding: var(--spacing-xl);
 }
@@ -152,5 +199,66 @@ export default {
   min-height: var(--input-h);
   font-size: var(--font-size-base);
   margin-top: var(--spacing-xs);
+}
+
+/* --- Mot du prépa et notes de mise à jour --- */
+.maj-card {
+  width: 100%;
+  max-width: 440px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+  padding: var(--spacing-2xl);
+  background: var(--color-bg);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-card);
+}
+.maj-entete { display: flex; align-items: center; gap: var(--spacing-md); }
+.maj-entete h2 { margin: 0; font-size: var(--font-size-lg); font-weight: 700; letter-spacing: -0.3px; }
+.maj-icone {
+  width: 40px; height: 40px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: var(--radius-lg);
+  background: var(--gradient-primary); color: var(--color-on-primary);
+  font-size: 20px;
+}
+.maj-mot { display: flex; flex-direction: column; gap: var(--spacing-sm); }
+.maj-mot p { margin: 0; font-size: var(--font-size-sm); line-height: 1.6; color: var(--color-text-body); }
+.maj-mot .maj-signature { font-weight: 700; color: var(--color-primary-dark); }
+
+.maj-notes {
+  display: flex; flex-direction: column; gap: var(--spacing-md);
+  padding-top: var(--spacing-lg); border-top: 1px solid var(--color-border);
+}
+.maj-note { display: flex; flex-direction: column; gap: 4px; }
+.maj-note-recente {
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-radius: var(--radius-lg);
+  background: var(--color-primary-light);
+}
+.maj-note-tete { display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-sm); flex-wrap: wrap; }
+.maj-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px; border-radius: var(--radius-full);
+  background: var(--color-primary); color: var(--color-on-primary);
+  font-size: var(--font-size-xs); font-weight: 700;
+}
+.maj-date { font-size: var(--font-size-xs); font-weight: 600; color: var(--color-text-muted); }
+.maj-note h3 { margin: 2px 0 0; font-size: var(--font-size-base); font-weight: 700; color: var(--color-text); }
+.maj-note ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+.maj-note li { font-size: var(--font-size-sm); line-height: 1.5; color: var(--color-text-body); }
+
+.maj-precedentes summary {
+  display: flex; align-items: center; gap: 6px;
+  min-height: var(--tap-min);
+  font-size: var(--font-size-sm); font-weight: 600; color: var(--color-primary-dark);
+  cursor: pointer; list-style: none;
+}
+.maj-precedentes summary::-webkit-details-marker { display: none; }
+.maj-precedentes[open] summary { margin-bottom: var(--spacing-sm); }
+.maj-precedentes .maj-note + .maj-note { margin-top: var(--spacing-md); padding-top: var(--spacing-md); border-top: 1px solid var(--color-border); }
+
+@media (max-width: 480px) {
+  .maj-card { padding: var(--spacing-xl) var(--spacing-lg); }
 }
 </style>
