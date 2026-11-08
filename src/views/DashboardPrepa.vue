@@ -35,21 +35,30 @@
         <div v-if="vue === 'liste'" class="content-body" :class="{ 'detail-ouvert': mobileDetail }">
           <!-- Liste des programmes : colonne desktop, écran plein mobile -->
           <div class="panel-list">
-            <div class="section-title">Mes programmes</div>
-            <div v-if="programmes.length === 0" class="empty">Aucun programme.</div>
-            <div
+            <div class="panel-list-entete">
+              <span class="section-title">Mes programmes</span>
+              <span class="panel-list-compte" v-if="programmes.length > 0">{{ programmes.length }}</span>
+            </div>
+            <div v-if="programmes.length === 0" class="empty">Aucun programme pour l'instant.</div>
+            <button
               v-for="p in programmes"
               :key="p.id"
+              type="button"
               class="prog-card"
               :class="{ active: programmeActif?.id === p.id }"
               @click="selectProgramme(p); mobileDetail = true"
             >
-              <div class="prog-name">{{ p.nom }}</div>
-              <div class="prog-meta">
+              <span class="prog-card-haut">
+                <span class="prog-name">{{ p.nom }}</span>
                 <span class="badge" :class="p.statut === 'actif' ? 'badge-green' : 'badge-gray'">{{ p.statut }}</span>
-                <span>{{ p.athletes.length }} athlète{{ p.athletes.length > 1 ? 's' : '' }}</span>
-              </div>
-            </div>
+              </span>
+              <span class="prog-meta">
+                <span class="avatars-pile" v-if="p.athletes.length > 0">
+                  <span class="avatar-pile" v-for="a in p.athletes.slice(0, 3)" :key="a.id" :title="a.nom">{{ initiales(a.nom) }}</span>
+                </span>
+                <span>{{ p.athletes.length > 0 ? `${p.athletes.length} athlète${p.athletes.length > 1 ? 's' : ''}` : 'Aucun athlète' }}</span>
+              </span>
+            </button>
             <button class="btn btn-dashed" @click="vue = 'form'">
               <i class="ti ti-plus"></i> Nouveau
             </button>
@@ -57,7 +66,7 @@
 
           <!-- Panel detail -->
           <div class="panel-detail" v-if="programmeActif">
-            <button class="btn btn-sm retour-mobile" @click="mobileDetail = false">
+            <button class="btn btn-sm btn-ghost retour-mobile" @click="mobileDetail = false">
               <i class="ti ti-arrow-left"></i> Programmes
             </button>
 
@@ -96,13 +105,24 @@
                 </span>
               </div>
               <div class="info-cell">
-                <label>Nombre de semaines</label>
-                <span>{{ semainesDisponibles.length }}</span>
+                <label>Semaines</label>
+                <span class="info-valeur">{{ semainesDisponibles.length }}</span>
+              </div>
+              <div class="info-cell">
+                <label>Séances</label>
+                <span class="info-valeur">{{ seances.length }}</span>
+              </div>
+              <div class="info-cell">
+                <label>Athlètes</label>
+                <span class="info-valeur">{{ programmeActif.athletes.length }}</span>
               </div>
             </div>
 
             <div class="section-title">Athlètes assignés</div>
             <div class="athletes-row">
+              <span v-if="programmeActif.athletes.length === 0 && !editMode" class="athletes-vide">
+                Personne pour l'instant : « Assigner » pour l'attribuer à un athlète ou un groupe.
+              </span>
               <div class="athlete-chip" v-for="a in programmeActif.athletes" :key="a.id">
                 <div class="mini-av">{{ initiales(a.nom) }}</div>
                 {{ a.nom }}
@@ -140,32 +160,38 @@
                 class="seance-block"
               >
                 <div class="seance-head" @click="toggleSeance(seance.id)">
-                  <span class="type-badge" :class="`type-badge-${seance.type_seance || 'musculation'}`">
-                    {{ labelType(seance.type_seance) }}
+                  <span class="type-icone" :class="`type-icone-${typeSeance(seance.type_seance)}`" :title="labelTypeSeance(seance.type_seance)">
+                    <i class="ti" :class="iconeTypeSeance(seance.type_seance)"></i>
                   </span>
-                  <span class="badge badge-purple" v-if="seance.jour && !editMode">{{ seance.jour }}</span>
-                  <select
-                    v-if="editMode"
-                    v-model="seance.jour"
-                    @focus="onFocusSeanceChamp(seance)"
-                    @change="mettreAJourSeance(seance)"
-                    @click.stop
-                    class="select-jour"
-                  >
-                    <option value="">Jour</option>
-                    <option v-for="j in jours" :key="j" :value="j">{{ j }}</option>
-                  </select>
-                  <input
-                    v-if="editMode"
-                    v-model="seance.nom"
-                    @focus="onFocusSeanceChamp(seance)"
-                    @change="mettreAJourSeance(seance)"
-                    @click.stop
-                    class="input-inline"
-                    placeholder="Nom de la séance"
-                  />
-                  <span v-else class="seance-nom">{{ seance.nom }}</span>
-                  <span class="exo-count-badge">{{ seance.exercices?.length || 0 }} exo{{ seance.exercices?.length > 1 ? 's' : '' }}</span>
+                  <span v-if="!editMode" class="seance-titre">
+                    <span class="seance-nom">{{ seance.nom }}</span>
+                    <span class="seance-meta">
+                      <span class="type-badge" :class="`type-badge-${typeSeance(seance.type_seance)}`">{{ labelTypeSeance(seance.type_seance) }}</span>
+                      <span class="seance-jour" v-if="seance.jour">{{ seance.jour }}</span>
+                      <span>{{ seance.exercices?.length || 0 }} exercice{{ seance.exercices?.length > 1 ? 's' : '' }}</span>
+                    </span>
+                  </span>
+                  <template v-else>
+                    <select
+                      v-model="seance.jour"
+                      @focus="onFocusSeanceChamp(seance)"
+                      @change="mettreAJourSeance(seance)"
+                      @click.stop
+                      class="select-jour"
+                    >
+                      <option value="">Jour</option>
+                      <option v-for="j in jours" :key="j" :value="j">{{ j }}</option>
+                    </select>
+                    <input
+                      v-model="seance.nom"
+                      @focus="onFocusSeanceChamp(seance)"
+                      @change="mettreAJourSeance(seance)"
+                      @click.stop
+                      class="input-inline"
+                      placeholder="Nom de la séance"
+                    />
+                    <span class="exo-count-badge">{{ seance.exercices?.length || 0 }} exo{{ seance.exercices?.length > 1 ? 's' : '' }}</span>
+                  </template>
                   <i class="ti seance-chevron" :class="isSeanceOuverte(seance.id) ? 'ti-chevron-up' : 'ti-chevron-down'"></i>
                   <button v-if="editMode" class="btn btn-sm btn-danger" @click.stop="supprimerSeance(seance)">
                     <i class="ti ti-trash"></i>
@@ -451,6 +477,7 @@ import TestsPanel from '../components/prepa/TestsPanel.vue'
 import ExerciceAutocomplete from '../components/prepa/ExerciceAutocomplete.vue'
 import ExerciceImage from '../components/ExerciceImage.vue'
 import { TYPES_GROUPE, TYPE_GROUPE_DEFAUT, typeGroupe, labelTypeGroupe } from '../data/typesGroupe'
+import { typeSeance, labelTypeSeance, iconeTypeSeance } from '../data/typesSeance'
 
 // Distance horizontale minimale pour valider un swipe. Volontairement haute :
 // un doigt qui ripe sur un simple appui ne doit jamais changer d'onglet.
@@ -514,11 +541,6 @@ export default {
       const idx = ONGLETS_PREPA.indexOf(onglet.value)
       if (dx <= -SEUIL_SWIPE && idx < ONGLETS_PREPA.length - 1) onglet.value = ONGLETS_PREPA[idx + 1]
       else if (dx >= SEUIL_SWIPE && idx > 0) onglet.value = ONGLETS_PREPA[idx - 1]
-    }
-
-    const labelType = (t) => {
-      const map = { musculation: 'Musculation', natation: 'Natation', athletisme: 'Athlétisme', pliometrie: 'Pliométrie' }
-      return map[t] || 'Musculation'
     }
 
     const letterFor = (idx) => String.fromCharCode(65 + idx)
@@ -902,7 +924,7 @@ export default {
       loadingSeances, modalAssigner, vue, onglet, vueLabel,
       onTabSwipeStart, onTabSwipeEnd, onTabSwipeCancel,
       editMode, editNom, editDesc,
-      nouvelleSeance, jours, labelType, letterFor, grouperExercices,
+      nouvelleSeance, jours, typeSeance, labelTypeSeance, iconeTypeSeance, letterFor, grouperExercices,
       TYPES_GROUPE, typeGroupe, labelTypeGroupe, changerTypeGroupe,
       semaineActive, semainesDisponibles, seancesFiltrees,
       groupeForms, getGroupeForm, genererSeriesGroupeEdit,
@@ -929,14 +951,21 @@ export default {
 
 /* --- Liste des programmes --- */
 .panel-list {
-  width: 260px;
+  width: 280px;
   border-right: 1px solid var(--color-border);
+  background: var(--color-bg);
   overflow-y: auto;
   padding: var(--spacing-lg);
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
   gap: var(--spacing-sm);
+}
+.panel-list-entete { display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-sm); margin-bottom: 2px; }
+.panel-list-compte {
+  min-width: 22px; padding: 1px 7px; border-radius: var(--radius-full);
+  background: var(--color-bg-tertiary); color: var(--color-text-secondary);
+  font-size: var(--font-size-xs); font-weight: 700; text-align: center;
 }
 .panel-detail {
   flex: 1;
@@ -973,17 +1002,35 @@ export default {
 }
 
 .prog-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  width: 100%;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  padding: var(--spacing-md) var(--spacing-lg);
+  padding: var(--spacing-md);
   cursor: pointer;
   background: var(--color-bg);
+  font-family: inherit;
+  color: inherit;
+  text-align: left;
+  transition: border-color var(--transition-fast), background var(--transition-fast), box-shadow var(--transition-fast);
 }
-.prog-card:hover { border-color: var(--color-border-strong); background: var(--color-bg-secondary); }
-.prog-card.active { border-color: var(--color-primary); background: var(--color-primary-light); }
+.prog-card:hover { border-color: var(--color-border-strong); background: var(--color-bg-hover); }
+.prog-card.active { border-color: var(--color-primary); background: var(--color-primary-light); box-shadow: inset 3px 0 0 var(--color-primary); }
 .prog-card.active .prog-name { color: var(--color-primary-text); }
-.prog-name { font-size: var(--font-size-base); font-weight: 600; margin-bottom: 4px; }
-.prog-meta { display: flex; gap: 6px; align-items: center; font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+.prog-card-haut { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--spacing-sm); }
+.prog-name { font-size: var(--font-size-base); font-weight: 600; overflow-wrap: anywhere; }
+.prog-meta { display: flex; gap: var(--spacing-sm); align-items: center; font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+.avatars-pile { display: inline-flex; padding-left: 3px; }
+.avatar-pile {
+  width: 24px; height: 24px; margin-left: -3px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--color-avatar-athlete-bg); color: var(--color-avatar-athlete-text);
+  border: 2px solid var(--color-bg);
+  font-size: 9px; font-weight: 700;
+}
+.prog-card.active .avatar-pile { border-color: var(--color-primary-light); }
 
 .detail-top { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--spacing-md); flex-shrink: 0; flex-wrap: wrap; }
 .detail-info h3 { font-size: var(--font-size-xl); font-weight: 700; margin: 0 0 3px; }
@@ -999,12 +1046,20 @@ export default {
 }
 .detail-actions { display: flex; gap: 6px; flex-shrink: 0; flex-wrap: wrap; }
 
-.info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-sm); flex-shrink: 0; }
-.info-cell { background: var(--color-bg-secondary); border-radius: var(--radius-md); padding: var(--spacing-sm) var(--spacing-md); }
-.info-cell label { font-size: var(--font-size-xs); color: var(--color-text-secondary); display: block; margin-bottom: 2px; }
-.info-cell span { font-size: var(--font-size-sm); font-weight: 500; }
+.info-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--spacing-sm); flex-shrink: 0; }
+.info-cell {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 4px;
+  background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-lg);
+  padding: var(--spacing-sm) var(--spacing-md);
+}
+.info-cell label {
+  font-size: var(--font-size-xs); font-weight: 600; color: var(--color-text-muted);
+  text-transform: uppercase; letter-spacing: 0.4px;
+}
+.info-valeur { font-size: var(--font-size-lg); font-weight: 700; font-variant-numeric: tabular-nums; }
 
 .athletes-row { display: flex; gap: 6px; flex-wrap: wrap; flex-shrink: 0; }
+.athletes-vide { font-size: var(--font-size-sm); color: var(--color-text-muted); }
 .athlete-chip {
   display: flex;
   align-items: center;
@@ -1034,13 +1089,15 @@ export default {
   align-items: center;
   gap: 6px;
   min-height: 40px;
-  padding: 0 var(--spacing-md);
+  padding: 0 var(--spacing-lg);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-full);
+  font-family: inherit;
   font-size: var(--font-size-sm);
   cursor: pointer;
   background: var(--color-bg);
   color: var(--color-text-secondary);
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
 }
 .semaine-tab:hover { border-color: var(--color-primary); }
 .semaine-tab.active { background: var(--color-primary-light); border-color: var(--color-primary); color: var(--color-primary-text); font-weight: 600; }
@@ -1069,22 +1126,27 @@ export default {
   overflow: hidden;
   flex-shrink: 0;
   background: var(--color-bg);
+  box-shadow: var(--shadow-card);
 }
 .seance-head {
   padding: var(--spacing-md) var(--spacing-lg);
-  min-height: 56px;
-  background: var(--color-bg-secondary);
+  min-height: 64px;
+  background: var(--color-bg);
   display: flex;
   align-items: center;
-  gap: var(--spacing-sm);
+  gap: var(--spacing-md);
   font-size: var(--font-size-sm);
   font-weight: 500;
   cursor: pointer;
   user-select: none;
   flex-wrap: wrap;
+  transition: background var(--transition-fast);
 }
-.seance-head:hover { background: var(--color-bg-tertiary); }
-.seance-nom { flex: 1; font-size: var(--font-size-base); font-weight: 600; }
+.seance-head:hover { background: var(--color-bg-hover); }
+.seance-titre { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.seance-nom { font-size: var(--font-size-base); font-weight: 600; overflow-wrap: anywhere; }
+.seance-meta { display: flex; align-items: center; gap: var(--spacing-sm); flex-wrap: wrap; font-size: var(--font-size-xs); color: var(--color-text-secondary); font-weight: 400; }
+.seance-jour { text-transform: capitalize; }
 .seance-chevron { color: var(--color-text-muted); font-size: var(--font-size-base); }
 .seance-body { padding: var(--spacing-md) var(--spacing-lg); display: flex; flex-direction: column; gap: var(--spacing-md); border-top: 1px solid var(--color-border); }
 .exo-count-badge {
@@ -1362,7 +1424,8 @@ export default {
   }
   .content-body.detail-ouvert .panel-list { display: none; }
   .content-body.detail-ouvert .panel-detail { display: flex; }
-  .retour-mobile { display: inline-flex; }
+  .retour-mobile { display: inline-flex; margin-left: calc(-1 * var(--spacing-md)); }
+  .info-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
   .serie-group-row { flex-direction: column; gap: var(--spacing-sm); }
 }

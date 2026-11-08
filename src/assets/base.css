@@ -61,6 +61,11 @@
 
 .btn-dashed { border-style: dashed; }
 
+/* Action secondaire (retour, retrait) qui ne doit pas rivaliser avec
+   l'action principale de l'écran. */
+.btn-ghost { background: transparent; border-color: transparent; color: var(--color-text-secondary); }
+.btn-ghost:hover:not(:disabled) { background: var(--color-bg-tertiary); color: var(--color-text-body); }
+
 .btn-sm {
   min-height: 36px;
   padding: 0 var(--spacing-md);
@@ -113,6 +118,26 @@
 .type-badge-natation { background: var(--color-type-natation-bg); color: var(--color-type-natation-text); }
 .type-badge-athletisme { background: var(--color-type-athletisme-bg); color: var(--color-type-athletisme-text); }
 .type-badge-pliometrie { background: var(--color-type-pliometrie-bg); color: var(--color-type-pliometrie-text); }
+
+/* Pastille d'icône d'un type de séance (cf. src/data/typesSeance.js), sur
+   les couleurs des badges de type ; variante « programme » en couleur marque. */
+.type-icone {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-secondary);
+}
+.type-icone-musculation { background: var(--color-type-musculation-bg); color: var(--color-type-musculation-text); }
+.type-icone-natation { background: var(--color-type-natation-bg); color: var(--color-type-natation-text); }
+.type-icone-athletisme { background: var(--color-type-athletisme-bg); color: var(--color-type-athletisme-text); }
+.type-icone-pliometrie { background: var(--color-type-pliometrie-bg); color: var(--color-type-pliometrie-text); }
+.type-icone-programme { background: var(--color-primary-light); color: var(--color-primary-dark); }
 
 /* --- Champs --- */
 .field {

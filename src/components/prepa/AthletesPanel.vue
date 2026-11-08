@@ -1,48 +1,122 @@
 <template>
-  <div class="athletes-panel">
+  <div class="athletes-panel" :class="{ 'avec-fiche': athleteSelectionne }">
     <!-- VUE LISTE -->
     <template v-if="!athleteSelectionne">
-      <div class="athletes-panel-header">
-        <h2 class="athletes-panel-titre">Athlètes</h2>
+      <div class="panel-header">
+        <div>
+          <h2 class="panel-titre">Mes athlètes</h2>
+          <p class="panel-sous-titre" v-if="monCercle.length > 0">
+            {{ monCercle.length }} athlète{{ monCercle.length > 1 ? 's' : '' }} suivi{{ monCercle.length > 1 ? 's' : '' }},
+            du plus actif au moins actif
+          </p>
+        </div>
         <div class="header-actions">
-          <button class="btn btn-sm" @click="ouvrirGestionGroupes()"><i class="ti ti-tags"></i> Gérer mes groupes</button>
-          <button class="btn-aide" @click="aideOuverte = true">
-            <i class="ti ti-help-circle"></i> Comment lire ces indicateurs ?
+          <button class="btn" @click="ouvrirGestionGroupes()"><i class="ti ti-tags"></i> Groupes</button>
+          <button class="btn btn-primary" @click="basculerAjout" :aria-expanded="ajoutOuvert">
+            <i class="ti" :class="ajoutOuvert ? 'ti-x' : 'ti-user-plus'"></i> {{ ajoutOuvert ? 'Fermer' : 'Ajouter' }}
           </button>
         </div>
       </div>
 
-      <div class="resume-cercle" v-if="!loading && resumes.length > 0">
-        <div class="resume-groupe" v-for="groupe in GROUPES_INDICATEURS" :key="groupe.titre">
-          <div class="resume-groupe-titre">{{ groupe.titre }}</div>
-          <div class="resume-grid">
-            <button
-              v-for="cle in groupe.cles"
-              :key="cle"
-              type="button"
-              class="resume-tile"
-              :class="[compteurs[cle] > 0 ? `resume-tile-${INDICATEURS[cle].ton}` : '', { active: indicateurFiltre === cle }]"
-              :disabled="cle !== 'tous' && compteurs[cle] === 0"
-              @click="filtrerPar(cle)"
-            >
-              <div class="resume-valeur">
-                {{ compteurs[cle] }}<span v-if="INDICATEURS[cle].surTotal" class="resume-total">/{{ compteurs.tous }}</span>
-              </div>
-              <div class="resume-label">{{ INDICATEURS[cle].label }}</div>
-              <div class="resume-aide">{{ INDICATEURS[cle].aide }}</div>
-            </button>
+      <Transition name="deplier">
+        <form v-if="ajoutOuvert" class="ajout-athlete" @submit.prevent="rechercherAthlète">
+          <label class="ajout-athlete-titre" for="email-athlete">Ajouter un athlète à votre cercle</label>
+          <div class="ajout-athlete-ligne">
+            <input id="email-athlete" v-model="searchEmail" placeholder="Email de l'athlète" type="email" autocomplete="off" />
+            <button class="btn" type="submit" :disabled="!searchEmail">Rechercher</button>
+          </div>
+          <div v-if="athleteTrouve" class="athlete-trouve">
+            <span class="avatar-athlete">{{ initiales(athleteTrouve.nom) }}</span>
+            <div class="athlete-trouve-info">
+              <div class="athlete-trouve-nom">{{ athleteTrouve.nom }}</div>
+              <div class="athlete-trouve-email">{{ athleteTrouve.email }}</div>
+            </div>
+            <button class="btn btn-sm btn-primary" type="button" @click="ajouterAuCercle"><i class="ti ti-plus"></i> Ajouter</button>
+          </div>
+          <div v-if="searchError" class="error">{{ searchError }}</div>
+        </form>
+      </Transition>
+
+      <section class="indicateurs" v-if="!loading && resumes.length > 0">
+        <div class="indicateurs-entete">
+          <span class="section-title">Vue d'ensemble</span>
+          <button type="button" class="lien-aide" @click="aideOuverte = true">
+            <i class="ti ti-help-circle"></i> Comment lire ces indicateurs ?
+          </button>
+        </div>
+
+        <div class="kpi-grid">
+          <button
+            v-for="cle in GROUPES_INDICATEURS[0].cles"
+            :key="cle"
+            type="button"
+            class="kpi"
+            :class="[`ton-${INDICATEURS[cle].ton}`, { active: indicateurFiltre === cle, vide: compteurs[cle] === 0 }]"
+            :disabled="cle !== 'tous' && compteurs[cle] === 0"
+            @click="filtrerPar(cle)"
+          >
+            <span class="kpi-label"><span class="ton-dot"></span>{{ INDICATEURS[cle].label }}</span>
+            <span class="kpi-valeur">{{ compteurs[cle] }}</span>
+            <span class="kpi-aide">{{ INDICATEURS[cle].aide }}</span>
+          </button>
+        </div>
+
+        <!-- Mobile : le détail est replié pour que la liste arrive vite à l'écran -->
+        <button type="button" class="details-toggle" :aria-expanded="detailsOuverts" @click="detailsOuverts = !detailsOuverts">
+          <i class="ti ti-chart-bar"></i>
+          <span>Charge &amp; wellness</span>
+          <i class="ti" :class="detailsOuverts ? 'ti-chevron-up' : 'ti-chevron-down'"></i>
+        </button>
+        <div class="indicateurs-details" :class="{ ouvert: detailsOuverts }">
+          <div class="detail-bloc" v-for="groupe in GROUPES_INDICATEURS.slice(1)" :key="groupe.titre">
+            <div class="detail-bloc-titre">{{ groupe.titre }}</div>
+            <div v-if="groupe.repartition" class="repartition" aria-hidden="true">
+              <span
+                v-for="cle in groupe.cles"
+                v-show="compteurs[cle] > 0"
+                :key="cle"
+                class="repartition-seg"
+                :class="`ton-${INDICATEURS[cle].ton}`"
+                :style="{ flexGrow: compteurs[cle] }"
+              ></span>
+              <span v-if="sansZoneAcwr > 0" class="repartition-seg" :style="{ flexGrow: sansZoneAcwr }"></span>
+            </div>
+            <div class="detail-items">
+              <button
+                v-for="cle in groupe.cles"
+                :key="cle"
+                type="button"
+                class="detail-item"
+                :class="[`ton-${INDICATEURS[cle].ton}`, { active: indicateurFiltre === cle }]"
+                :disabled="compteurs[cle] === 0"
+                @click="filtrerPar(cle)"
+              >
+                <span class="ton-dot"></span>
+                <span class="detail-item-label">{{ INDICATEURS[cle].label }} <small>{{ INDICATEURS[cle].aide }}</small></span>
+                <span class="detail-item-valeur">
+                  {{ compteurs[cle] }}<small v-if="INDICATEURS[cle].surTotal">/{{ compteurs.tous }}</small>
+                </span>
+              </button>
+            </div>
+            <p v-if="groupe.repartition && sansZoneAcwr > 0" class="detail-note">
+              {{ sansZoneAcwr }} sans ACWR calculable (moins de 28 jours de données)
+            </p>
           </div>
         </div>
+
         <div class="filtre-actif" v-if="indicateurFiltre !== 'tous'">
           <i class="ti ti-filter"></i>
           <span>{{ INDICATEURS[indicateurFiltre].label }} — {{ INDICATEURS[indicateurFiltre].aide }}</span>
           <button class="btn-effacer-filtre" @click="filtrerPar('tous')"><i class="ti ti-x"></i> Tout afficher</button>
         </div>
-      </div>
+      </section>
 
       <div class="filtres-row">
-        <input v-model="rechercheNom" class="input-recherche" placeholder="Rechercher un athlète" />
-        <div class="groupe-filtre-chips" v-if="groupes.length > 0">
+        <label class="recherche">
+          <i class="ti ti-search"></i>
+          <input v-model="rechercheNom" type="search" placeholder="Rechercher un athlète" aria-label="Rechercher un athlète" />
+        </label>
+        <div class="chips" v-if="groupes.length > 0">
           <button class="chip-filtre" :class="{ active: groupeFiltre === 'tous' }" @click="groupeFiltre = 'tous'">Tous</button>
           <button
             v-for="g in groupes"
@@ -63,90 +137,118 @@
       </div>
 
       <div v-if="loading" class="empty">Chargement...</div>
+      <div v-else-if="monCercle.length === 0" class="empty">
+        Aucun athlète dans votre cercle pour l'instant : ajoutez-en un avec le bouton « Ajouter ».
+      </div>
       <div v-else-if="athletesFiltres.length === 0" class="empty">Aucun athlète pour ce filtre.</div>
 
-      <div class="athlete-monitoring-list">
-        <div class="athlete-monitoring-card" v-for="a in athletesFiltres" :key="a.id" @click="ouvrirFiche(a)">
-          <div class="amc-clic">
-            <div class="amc-head">
-              <div class="mini-av-lg">{{ initiales(a.nom) }}</div>
-              <div class="amc-info">
-                <div class="amc-nom">
-                  {{ a.nom }}
-                  <span class="badge badge-gray org-badge" v-if="estSuperPrepa">{{ a.organisation?.nom || 'Indépendant' }}</span>
-                </div>
-                <div class="amc-meta" v-if="a.resume">
-                  <span>Charge semaine : <strong>{{ Math.round(a.resume.charge_semaine) }}</strong></span>
-                  <i class="ti tendance-icon" :class="iconeTendance(a.resume.tendance)"></i>
-                  <span class="wellness-statut" :class="{ ok: a.resume.wellness_repondu_aujourdhui }">
-                    <i class="ti" :class="a.resume.wellness_repondu_aujourdhui ? 'ti-circle-check' : 'ti-circle-dashed'"></i>
-                    wellness
-                  </span>
-                </div>
-                <div class="amc-infos-recentes" v-if="a.resume">
-                  <span><i class="ti ti-run"></i> Dernière séance : <strong>{{ formatDateRecente(a.resume.derniere_seance) }}</strong></span>
-                  <span>
-                    <i class="ti ti-mood-check"></i> Wellness : <strong>{{ formatDateRecente(a.resume.dernier_wellness) }}</strong>
-                    <span v-if="a.resume.hooper_dernier" class="hooper-badge" :class="'wellness-' + a.resume.wellness_zone">{{ a.resume.hooper_dernier }}/28</span>
-                  </span>
-                  <span>
-                    <i class="ti ti-zzz"></i> Sommeil 7 j :
-                    <strong>{{ a.resume.sommeil.moyenne !== null ? formatHeures(a.resume.sommeil.moyenne) : '—' }}</strong>
-                    <span v-if="a.resume.sommeil.nuits_courtes > 0" class="sommeil-badge" :class="'sommeil-' + a.resume.sommeil.niveau">
-                      {{ a.resume.sommeil.nuits_courtes }} nuit{{ a.resume.sommeil.nuits_courtes > 1 ? 's' : '' }} &lt; 7 h
-                    </span>
-                  </span>
-                  <span><i class="ti ti-weight"></i> Poids : <strong>{{ a.resume.dernier_poids ? `${a.resume.dernier_poids.poids}kg (${formatDateRecente(a.resume.dernier_poids.date)})` : '—' }}</strong></span>
-                </div>
-                <div class="groupes-badges" v-if="groupesDe(a.id).length > 0">
-                  <span
-                    class="groupe-badge"
-                    v-for="g in groupesDe(a.id)"
-                    :key="g.id"
-                    :style="{ background: (g.couleur || '#7F77DD') + '22', color: g.couleur || 'var(--color-primary-dark)' }"
-                  >{{ g.nom }}</span>
-                </div>
-              </div>
-              <span class="acwr-badge" v-if="a.resume" :class="'zone-' + (a.resume.acwr.zone || 'insuffisant')">
-                {{ a.resume.acwr.valeur !== null ? a.resume.acwr.valeur.toFixed(2) : '—' }}
-              </span>
-            </div>
-            <div class="amc-signaux" v-if="a.resume">
-              <span class="signal-badge signal-blessure" v-if="a.resume.blessures_en_cours > 0">
-                <i class="ti ti-bandage"></i>
-                {{ a.resume.blessures_en_cours }} blessure{{ a.resume.blessures_en_cours > 1 ? 's' : '' }} en cours
-              </span>
-              <span class="signal-badge" v-for="(s, i) in a.resume.signaux" :key="i">
-                <i class="ti ti-alert-triangle"></i> {{ s }}
-              </span>
-              <span class="signal-badge signal-ras" v-if="estRAS(a.resume)">
-                <i class="ti ti-circle-check"></i> RAS
-              </span>
-              <span class="signal-badge signal-attente" v-else-if="a.resume.signaux.length === 0">
-                <i class="ti ti-hourglass"></i> ACWR pas encore calculable
-              </span>
-            </div>
-          </div>
-          <div class="amc-actions">
-            <button class="btn-icon-tiny" title="Voir/modifier ses groupes" @click.stop="ouvrirGestionGroupes(a)"><i class="ti ti-tags"></i></button>
-            <button class="btn btn-sm btn-danger" @click.stop="retirerDuCercle(a)">Retirer</button>
-          </div>
+      <template v-else>
+        <div class="liste-entete">
+          <span class="section-title">{{ athletesFiltres.length }} athlète{{ athletesFiltres.length > 1 ? 's' : '' }}</span>
+          <span class="tri-info"><i class="ti ti-sort-descending"></i> Les plus actifs en premier</span>
         </div>
-      </div>
 
-      <div class="add-athlete-row">
-        <input v-model="searchEmail" placeholder="Email de l'athlète" type="email" />
-        <button class="btn" @click="rechercherAthlète" :disabled="!searchEmail">Rechercher</button>
-      </div>
-      <div v-if="athleteTrouve" class="athlete-row found">
-        <div class="mini-av-lg">{{ initiales(athleteTrouve.nom) }}</div>
-        <div class="athlete-info">
-          <div class="athlete-nom">{{ athleteTrouve.nom }}</div>
-          <div class="athlete-email">{{ athleteTrouve.email }}</div>
+        <div class="athlete-liste">
+          <button
+            v-for="a in athletesFiltres"
+            :key="a.id"
+            type="button"
+            class="athlete-carte"
+            :class="`activite-${niveauActivite(a.resume)}`"
+            @click="ouvrirFiche(a)"
+          >
+            <span class="carte-haut">
+              <span class="avatar-athlete">
+                {{ initiales(a.nom) }}
+                <span class="avatar-pastille" :title="LABELS_NIVEAU_ACTIVITE[niveauActivite(a.resume)]"></span>
+              </span>
+              <span class="carte-identite">
+                <span class="carte-nom">
+                  {{ a.nom }}
+                  <span class="badge badge-gray" v-if="estSuperPrepa">{{ a.organisation?.nom || 'Indépendant' }}</span>
+                </span>
+                <span class="carte-activite" v-if="a.resume">
+                  <span class="activite-libelle">{{ libelleActivite(a.resume) }}</span>
+                  <span class="activite-jours" v-if="a.resume.jours_actifs_28j">
+                    · {{ a.resume.jours_actifs_28j }} j actif{{ a.resume.jours_actifs_28j > 1 ? 's' : '' }} sur {{ FENETRE_ACTIVITE }}
+                  </span>
+                </span>
+              </span>
+              <span
+                class="acwr-badge"
+                v-if="a.resume"
+                :class="'zone-' + (a.resume.acwr.zone || 'insuffisant')"
+                title="ACWR : charge des 7 derniers jours / moyenne des 28"
+              >
+                <small>ACWR</small>{{ a.resume.acwr.valeur !== null ? a.resume.acwr.valeur.toFixed(2) : '—' }}
+              </span>
+              <i class="ti ti-chevron-right carte-chevron"></i>
+            </span>
+
+            <span class="carte-stats" v-if="a.resume">
+              <span class="stat">
+                <span class="stat-label"><i class="ti ti-run"></i> Séance</span>
+                <span class="stat-valeur">{{ formatJourRelatif(a.resume.derniere_seance) }}</span>
+              </span>
+              <span class="stat">
+                <span class="stat-label"><i class="ti ti-activity"></i> Charge 7 j</span>
+                <span class="stat-valeur">
+                  {{ Math.round(a.resume.charge_semaine) }}
+                  <i class="ti tendance" :class="iconeTendance(a.resume.tendance)"></i>
+                </span>
+              </span>
+              <span class="stat">
+                <span class="stat-label"><i class="ti ti-mood-check"></i> Wellness</span>
+                <span class="stat-valeur">
+                  {{ formatJourRelatif(a.resume.dernier_wellness) }}
+                  <span v-if="a.resume.hooper_dernier" class="mini-badge" :class="'wellness-' + a.resume.wellness_zone">{{ a.resume.hooper_dernier }}/28</span>
+                </span>
+              </span>
+              <span class="stat">
+                <span class="stat-label"><i class="ti ti-zzz"></i> Sommeil 7 j</span>
+                <span class="stat-valeur">
+                  {{ a.resume.sommeil.moyenne !== null ? formatHeures(a.resume.sommeil.moyenne) : '—' }}
+                  <span v-if="a.resume.sommeil.nuits_courtes > 0" class="mini-badge" :class="'sommeil-' + a.resume.sommeil.niveau">
+                    {{ a.resume.sommeil.nuits_courtes }} nuit{{ a.resume.sommeil.nuits_courtes > 1 ? 's' : '' }} &lt; 7 h
+                  </span>
+                </span>
+              </span>
+              <span class="stat">
+                <span class="stat-label"><i class="ti ti-scale"></i> Poids</span>
+                <span class="stat-valeur" :title="a.resume.dernier_poids ? `Pesée : ${formatJourRelatif(a.resume.dernier_poids.date)}` : null">
+                  {{ a.resume.dernier_poids ? `${a.resume.dernier_poids.poids} kg` : '—' }}
+                </span>
+              </span>
+            </span>
+
+            <span class="carte-bas" v-if="a.resume || groupesDe(a.id).length > 0">
+              <span class="signaux" v-if="a.resume">
+                <span class="signal signal-blessure" v-if="a.resume.blessures_en_cours > 0">
+                  <i class="ti ti-bandage"></i>
+                  {{ a.resume.blessures_en_cours }} blessure{{ a.resume.blessures_en_cours > 1 ? 's' : '' }} en cours
+                </span>
+                <span class="signal" v-for="(s, i) in a.resume.signaux" :key="i">
+                  <i class="ti ti-alert-triangle"></i> {{ s }}
+                </span>
+                <span class="signal signal-ras" v-if="estRAS(a.resume)">
+                  <i class="ti ti-circle-check"></i> RAS
+                </span>
+                <span class="signal signal-attente" v-else-if="a.resume.signaux.length === 0 && !a.resume.acwr.zone">
+                  <i class="ti ti-hourglass"></i> ACWR pas encore calculable
+                </span>
+              </span>
+              <span class="groupes-badges" v-if="groupesDe(a.id).length > 0">
+                <span
+                  class="groupe-badge"
+                  v-for="g in groupesDe(a.id)"
+                  :key="g.id"
+                  :style="{ background: (g.couleur || '#7F77DD') + '22', color: g.couleur || 'var(--color-primary-dark)' }"
+                >{{ g.nom }}</span>
+              </span>
+            </span>
+          </button>
         </div>
-        <button class="btn btn-sm btn-primary" @click="ajouterAuCercle">+ Ajouter</button>
-      </div>
-      <div v-if="searchError" class="error">{{ searchError }}</div>
+      </template>
     </template>
 
     <!-- FICHE ATHLÈTE -->
@@ -179,11 +281,20 @@
         </div>
         <div class="modal-body">
           <div class="aide-section">
+            <h4>Activité &amp; ordre de la liste</h4>
+            <p>La liste est classée <strong>du plus actif au moins actif</strong> : nombre de jours, sur les {{ FENETRE_ACTIVITE }} derniers, où l'athlète a fait au moins une action dans l'app (série cochée, séance validée, wellness, pesée ou repas), puis date de sa dernière action. Les athlètes inactifs passent toujours en bas.</p>
+            <ul class="aide-zones">
+              <li><span class="aide-dot aide-dot-optimale"></span><strong>Régulier</strong> — actif au moins {{ SEUIL_REGULIER }} jours sur {{ FENETRE_ACTIVITE }} (3 par semaine).</li>
+              <li><span class="aide-dot aide-dot-vigilance"></span><strong>Irrégulier</strong> — actif ces {{ SEUIL_INACTIF_JOURS }} derniers jours, mais moins souvent.</li>
+              <li><span class="aide-dot aide-dot-sous_charge"></span><strong>Inactif</strong> — aucune action depuis au moins {{ SEUIL_INACTIF_JOURS }} jours : à relancer.</li>
+            </ul>
+          </div>
+          <div class="aide-section">
             <h4>Les indicateurs du tableau de bord</h4>
             <p>Chaque indicateur est cliquable : il filtre la liste sur les athlètes qu'il compte.</p>
             <ul class="aide-indicateurs">
               <li v-for="cle in CLES_INDICATEURS" :key="cle">
-                <span class="aide-pastille" :class="`resume-tile-${INDICATEURS[cle].ton}`">{{ compteurs[cle] }}</span>
+                <span class="aide-pastille" :class="`ton-${INDICATEURS[cle].ton}`">{{ compteurs[cle] }}</span>
                 <span><strong>{{ INDICATEURS[cle].label }}</strong> — {{ INDICATEURS[cle].definition }}</span>
               </li>
             </ul>
@@ -226,7 +337,7 @@
             <h4>Signaux &amp; RAS</h4>
             <p>Les signaux sont générés automatiquement, sans action du prépa : zone de vigilance ou surcharge sur l'ACWR, wellness dégradé 3 jours de suite, sommeil chronique insuffisant, ou <strong>charge en hausse sur sommeil insuffisant</strong>.</p>
             <p>Ce dernier est le plus important : sommeil réduit <em>pendant</em> une montée de charge est le facteur le plus fortement associé à la blessure (OR ≈ 2,25, contre ~1,5 pour chacun pris isolément). Les deux signaux séparés peuvent être verts alors que leur croisement ne l'est pas.</p>
-            <p>Un athlète est marqué <strong>RAS</strong> quand il n'a aucun signal <em>et</em> que son ACWR est calculable. Sans signal mais avec moins de 28 jours de données, il porte le badge <strong>« ACWR pas encore calculable »</strong> : rien ne le signale, mais rien ne prouve non plus que tout va bien.</p>
+            <p>Un athlète est marqué <strong>RAS</strong> quand il n'a aucun signal, que son ACWR est calculable <em>et</em> qu'il a été actif ces {{ SEUIL_INACTIF_JOURS }} derniers jours. Sans signal mais avec moins de 28 jours de données, il porte le badge <strong>« ACWR pas encore calculable »</strong> : rien ne le signale, mais rien ne prouve non plus que tout va bien.</p>
           </div>
         </div>
       </div>
@@ -241,17 +352,22 @@ import { useAuthStore } from '../../stores/auth'
 import FicheAthlete from './FicheAthlete.vue'
 import GroupesManagerModal from './GroupesManagerModal.vue'
 import { formatHeures, estSommeilInsuffisant } from '../../data/sommeil'
+import {
+  FENETRE_ACTIVITE, SEUIL_REGULIER, SEUIL_INACTIF_JOURS, LABELS_NIVEAU_ACTIVITE,
+  joursDepuis, formatJourRelatif, estInactif, niveauActivite, libelleActivite, comparerActivite
+} from '../../data/activite'
 
 // Au-delà, un relevé wellness ne dit plus rien de l'état actuel de l'athlète :
 // on ne le compte plus comme « wellness bon ».
 const FRAICHEUR_WELLNESS_JOURS = 3
-const joursDepuis = (date) => Math.floor((Date.now() - new Date(date).getTime()) / 86400000)
 
 // « Rien à signaler » : aucun signal ET assez d'historique pour que l'ACWR soit
 // calculable — sans ça, l'absence de signal ne prouve rien. Une blessure
 // déclarée disqualifie aussi le RAS : elle n'est pas un signal automatique,
-// mais afficher « rien à signaler » sur un athlète blessé serait faux.
-const estRAS = (r) => r.signaux.length === 0 && !!r.acwr.zone && !r.blessures_en_cours
+// mais afficher « rien à signaler » sur un athlète blessé serait faux. Même
+// chose pour un athlète qui a décroché : sans activité depuis une semaine,
+// l'absence de signal vient du silence, pas de la forme.
+const estRAS = (r) => r.signaux.length === 0 && !!r.acwr.zone && !r.blessures_en_cours && !estInactif(r)
 
 // Source unique des tuiles du bandeau, de leur définition (aide affichée sous
 // le libellé + modale) et du filtre appliqué au clic.
@@ -263,7 +379,7 @@ const INDICATEURS = {
   },
   ras: {
     label: 'RAS', ton: 'optimale', aide: 'rien à signaler',
-    definition: "aucun signal actif et ACWR calculable : l'athlète est dans la norme.",
+    definition: `aucun signal actif, ACWR calculable et actif ces ${SEUIL_INACTIF_JOURS} derniers jours : l'athlète est dans la norme.`,
     test: estRAS
   },
   signaux: {
@@ -275,6 +391,11 @@ const INDICATEURS = {
     label: 'Blessés', ton: 'surcharge', aide: 'blessure en cours',
     definition: "ont déclaré une blessure qu'ils n'ont pas encore marquée guérie. Déclaratif : c'est l'athlète qui saisit, jamais un calcul.",
     test: (r) => r.blessures_en_cours > 0
+  },
+  inactifs: {
+    label: 'Inactifs', ton: 'neutre', aide: `rien depuis ${SEUIL_INACTIF_JOURS} j`,
+    definition: `aucune action dans l'app (séance, wellness, pesée, repas) depuis au moins ${SEUIL_INACTIF_JOURS} jours : à relancer.`,
+    test: estInactif
   },
   optimale: {
     label: 'Zone optimale', ton: 'optimale', aide: 'ACWR 0,8 à 1,3',
@@ -313,12 +434,15 @@ const INDICATEURS = {
   }
 }
 
+// Le premier groupe s'affiche en tuiles, les suivants en blocs compacts ; la
+// charge ajoute une barre de répartition du cercle entre les zones d'ACWR.
 const GROUPES_INDICATEURS = [
-  { titre: "Vue d'ensemble", cles: ['tous', 'ras', 'signaux', 'blessures'] },
-  { titre: 'Charge — ACWR', cles: ['optimale', 'vigilance', 'surcharge', 'sous_charge'] },
+  { titre: "Vue d'ensemble", cles: ['tous', 'ras', 'signaux', 'blessures', 'inactifs'] },
+  { titre: 'Charge — ACWR', cles: ['optimale', 'vigilance', 'surcharge', 'sous_charge'], repartition: true },
   { titre: 'Wellness', cles: ['wellness_jour', 'wellness_bon', 'sommeil_insuffisant'] }
 ]
 const CLES_INDICATEURS = GROUPES_INDICATEURS.flatMap(g => g.cles)
+const CLES_ZONES_ACWR = GROUPES_INDICATEURS[1].cles
 
 export default {
   components: { FicheAthlete, GroupesManagerModal },
@@ -341,6 +465,7 @@ export default {
     const organisationFiltre = ref('toutes')
     const indicateurFiltre = ref('tous')
     const aideOuverte = ref(false)
+    const detailsOuverts = ref(false)
 
     const modalGroupes = ref(false)
     const athleteFocusGroupes = ref(null)
@@ -349,9 +474,16 @@ export default {
       modalGroupes.value = true
     }
 
+    const ajoutOuvert = ref(false)
     const searchEmail = ref('')
     const athleteTrouve = ref(null)
     const searchError = ref('')
+    const basculerAjout = () => {
+      ajoutOuvert.value = !ajoutOuvert.value
+      searchEmail.value = ''
+      athleteTrouve.value = null
+      searchError.value = ''
+    }
 
     const groupesDe = (athleteId) => props.groupes.filter(g => g.athletes.find(a => a.id === athleteId))
 
@@ -362,8 +494,8 @@ export default {
     })
 
     // Fusionne l'identité du cercle (nom, email, organisation) avec les
-    // résumés monitoring (charge, ACWR, wellness, signaux) : les deux
-    // listes couvrent toujours le même ensemble d'athlètes côté API.
+    // résumés monitoring (charge, ACWR, wellness, signaux, activité) : les
+    // deux listes couvrent toujours le même ensemble d'athlètes côté API.
     const athletesEnrichis = computed(() =>
       props.monCercle.map(a => ({ ...a, resume: resumes.value.find(r => r.athlete_id === a.id) || null }))
     )
@@ -375,6 +507,8 @@ export default {
     const athleteSelectionneId = ref(null)
     const athleteSelectionne = computed(() => athletesEnrichis.value.find(a => a.id === athleteSelectionneId.value) || null)
 
+    // Toujours classée par activité, quel que soit le filtre : les athlètes
+    // qui utilisent l'app en haut, ceux qui ne s'y connectent presque jamais en bas.
     const athletesFiltres = computed(() => {
       const indicateur = INDICATEURS[indicateurFiltre.value]
       return athletesEnrichis.value.filter(a => {
@@ -384,13 +518,18 @@ export default {
         if (organisationFiltre.value !== 'toutes' && organisationFiltre.value !== 'independant' && a.organisation_id !== organisationFiltre.value) return false
         if (indicateurFiltre.value !== 'tous' && !(a.resume && indicateur.test(a.resume))) return false
         return true
-      })
+      }).sort(comparerActivite)
     })
 
     // Vue d'ensemble du cercle entier (indépendante des filtres de la liste,
     // pour garder un instantané stable de tout le groupe).
     const compteurs = computed(() =>
       Object.fromEntries(CLES_INDICATEURS.map(cle => [cle, resumes.value.filter(r => INDICATEURS[cle].test(r)).length]))
+    )
+    // Reste de la barre de répartition : athlètes sans zone d'ACWR (moins de
+    // 28 jours de données), pour que la barre représente bien tout le cercle.
+    const sansZoneAcwr = computed(() =>
+      compteurs.value.tous - CLES_ZONES_ACWR.reduce((total, cle) => total + compteurs.value[cle], 0)
     )
 
     // Une tuile à 0 est désactivée côté template : filtrer dessus n'aurait
@@ -413,11 +552,6 @@ export default {
       await fetchResumes()
     }
 
-    const retirerDuCercle = async (athlete) => {
-      await api.del(`/users/mes-athletes/${athlete.id}`)
-      await onModifie()
-    }
-
     const rechercherAthlète = async () => {
       searchError.value = ''
       athleteTrouve.value = null
@@ -431,72 +565,149 @@ export default {
 
     const ajouterAuCercle = async () => {
       await api.post(`/users/mes-athletes/${athleteTrouve.value.id}`)
-      athleteTrouve.value = null
-      searchEmail.value = ''
+      basculerAjout()
       await onModifie()
     }
 
     const iconeTendance = (t) => ({ hausse: 'ti-trending-up', baisse: 'ti-trending-down', stable: 'ti-minus' }[t] || 'ti-minus')
     const initiales = (nom) => nom.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
-    const formatDateRecente = (d) => d ? new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : '—'
 
     watch(() => props.actif, (actif) => { if (actif && resumes.value.length === 0 && !loading.value) fetchResumes() })
     onMounted(() => { if (props.actif) fetchResumes() })
 
     return {
-      INDICATEURS, GROUPES_INDICATEURS, CLES_INDICATEURS, compteurs, indicateurFiltre, filtrerPar, estRAS,
+      INDICATEURS, GROUPES_INDICATEURS, CLES_INDICATEURS, compteurs, sansZoneAcwr, indicateurFiltre, filtrerPar, estRAS, detailsOuverts,
+      FENETRE_ACTIVITE, SEUIL_REGULIER, SEUIL_INACTIF_JOURS, LABELS_NIVEAU_ACTIVITE,
+      niveauActivite, libelleActivite, formatJourRelatif,
       resumes, loading, rechercheNom, groupeFiltre, organisationFiltre, organisationsCercle, athletesFiltres,
       estSuperPrepa, athleteSelectionneId, athleteSelectionne, ouvrirFiche, aideOuverte,
       modalGroupes, athleteFocusGroupes, ouvrirGestionGroupes, groupesDe,
-      searchEmail, athleteTrouve, searchError, rechercherAthlète, ajouterAuCercle, retirerDuCercle,
-      onModifie, iconeTendance, initiales, formatDateRecente, formatHeures
+      ajoutOuvert, basculerAjout, searchEmail, athleteTrouve, searchError, rechercherAthlète, ajouterAuCercle,
+      onModifie, iconeTendance, initiales, formatHeures
     }
   }
 }
 </script>
 
 <style scoped>
-.athletes-panel { display: flex; flex-direction: column; gap: var(--spacing-lg); padding: var(--spacing-xl) var(--spacing-2xl); overflow-y: auto; flex: 1; }
+/* Colonne centrée sur grand écran, sans déplacer la barre de défilement. */
+.athletes-panel {
+  display: flex; flex-direction: column; gap: var(--spacing-lg);
+  padding: var(--spacing-xl) max(var(--spacing-2xl), calc((100% - 1080px) / 2));
+  overflow-y: auto; flex: 1; min-height: 0;
+}
+/* La fiche gère elle-même son défilement et ses marges. */
+.athletes-panel.avec-fiche { padding: 0; overflow: hidden; }
 
-.athletes-panel-header { display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-md); flex-wrap: wrap; }
-.athletes-panel-titre { margin: 0; font-size: var(--font-size-lg); font-weight: 700; }
+/* --- En-tête --- */
+.panel-header { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--spacing-md); flex-wrap: wrap; }
+.panel-titre { margin: 0; font-size: var(--font-size-xl); font-weight: 700; letter-spacing: -0.3px; }
+.panel-sous-titre { margin: 2px 0 0; font-size: var(--font-size-sm); color: var(--color-text-secondary); }
 .header-actions { display: flex; align-items: center; gap: var(--spacing-sm); flex-wrap: wrap; }
-.btn-aide {
-  display: inline-flex; align-items: center; gap: 6px;
-  min-height: 36px; padding: 0 var(--spacing-md);
-  border: 1px solid var(--color-border); border-radius: var(--radius-full);
-  font-size: var(--font-size-sm); font-weight: 600;
-  background: var(--color-bg); color: var(--color-primary-text); cursor: pointer;
-}
-.btn-aide:hover { background: var(--color-bg-secondary); }
 
-.resume-cercle { display: flex; flex-direction: column; gap: var(--spacing-md); }
-.resume-groupe { display: flex; flex-direction: column; gap: 6px; }
-.resume-groupe-titre {
-  font-size: var(--font-size-xs); font-weight: 700; text-transform: uppercase;
-  letter-spacing: 0.4px; color: var(--color-text-muted);
+/* --- Ajout d'un athlète --- */
+.ajout-athlete {
+  display: flex; flex-direction: column; gap: var(--spacing-md);
+  padding: var(--spacing-lg);
+  background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
 }
-.resume-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: var(--spacing-sm); }
-.resume-tile {
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
-  padding: var(--spacing-md) var(--spacing-sm);
-  border: 1px solid var(--color-border); border-radius: var(--radius-lg);
-  background: var(--color-bg); text-align: center; cursor: pointer;
-  font-family: inherit; color: inherit;
+.ajout-athlete-titre { font-size: var(--font-size-sm); font-weight: 600; }
+.ajout-athlete-ligne { display: flex; gap: var(--spacing-sm); flex-wrap: wrap; }
+.ajout-athlete-ligne input {
+  flex: 1; min-width: 200px; min-height: var(--tap-min);
+  padding: 0 var(--spacing-md); border: 1px solid var(--color-border);
+  border-radius: var(--radius-md); font-size: var(--font-size-base); background: var(--color-bg);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
-.resume-tile:hover:not(:disabled) { border-color: var(--color-primary); }
-.resume-tile.active { box-shadow: 0 0 0 2px var(--color-primary); border-color: var(--color-primary); }
-.resume-tile:disabled { opacity: 0.5; cursor: default; }
-.resume-valeur { font-size: var(--font-size-xl); font-weight: 700; }
-.resume-total { font-size: var(--font-size-sm); font-weight: 600; color: var(--color-text-muted); }
-.resume-label { font-size: var(--font-size-xs); font-weight: 600; color: var(--color-text-secondary); }
-.resume-aide { font-size: 10px; color: var(--color-text-muted); line-height: 1.3; }
-.resume-tile-optimale { border-color: var(--color-valid-text-strong); background: var(--color-valid-bg); }
-.resume-tile-optimale .resume-valeur { color: var(--color-valid-text-strong); }
-.resume-tile-vigilance { border-color: var(--color-warning-text-strong); background: var(--color-warning-bg); }
-.resume-tile-vigilance .resume-valeur { color: var(--color-warning-text-strong); }
-.resume-tile-surcharge { border-color: var(--color-danger-text); background: var(--color-danger-bg); }
-.resume-tile-surcharge .resume-valeur { color: var(--color-danger-text); }
+.ajout-athlete-ligne input:focus { outline: none; border-color: var(--color-primary); box-shadow: var(--shadow-focus); }
+.athlete-trouve {
+  display: flex; align-items: center; gap: var(--spacing-md);
+  padding: var(--spacing-md); border-radius: var(--radius-md);
+  background: var(--color-primary-light);
+}
+.athlete-trouve-info { flex: 1; min-width: 0; }
+.athlete-trouve-nom { font-size: var(--font-size-sm); font-weight: 600; }
+.athlete-trouve-email { font-size: var(--font-size-xs); color: var(--color-text-secondary); overflow-wrap: anywhere; }
+
+.deplier-enter-active, .deplier-leave-active { transition: opacity var(--transition-base), transform var(--transition-base); }
+.deplier-enter-from, .deplier-leave-to { opacity: 0; transform: translateY(-6px); }
+
+/* --- Indicateurs --- */
+.indicateurs { display: flex; flex-direction: column; gap: var(--spacing-sm); }
+.indicateurs-entete { display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-sm); flex-wrap: wrap; }
+.lien-aide {
+  display: inline-flex; align-items: center; gap: 4px;
+  min-height: 32px; padding: 0; border: none; background: none;
+  font-family: inherit; font-size: var(--font-size-sm); font-weight: 500;
+  color: var(--color-primary-dark); cursor: pointer;
+}
+.lien-aide:hover { text-decoration: underline; }
+
+.ton-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: var(--color-text-muted); }
+.ton-optimale .ton-dot { background: var(--color-valid-text); }
+.ton-vigilance .ton-dot { background: var(--color-warning-icon); }
+.ton-surcharge .ton-dot { background: var(--color-danger-text); }
+
+.kpi-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--spacing-sm); }
+.kpi {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  padding: var(--spacing-md) var(--spacing-lg);
+  background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  font-family: inherit; color: inherit; text-align: left; cursor: pointer;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
+}
+.kpi:hover:not(:disabled) { border-color: var(--color-primary); box-shadow: var(--shadow-card-hover); }
+.kpi:active:not(:disabled) { transform: scale(0.98); }
+.kpi.active { border-color: var(--color-primary); box-shadow: 0 0 0 2px var(--color-primary); }
+.kpi:disabled { cursor: default; box-shadow: none; background: var(--color-bg-secondary); }
+.kpi-label { display: inline-flex; align-items: center; gap: 6px; font-size: var(--font-size-xs); font-weight: 600; color: var(--color-text-secondary); }
+.kpi-valeur { font-size: var(--font-size-2xl); font-weight: 700; line-height: 1.15; letter-spacing: -0.5px; font-variant-numeric: tabular-nums; }
+.kpi-aide { font-size: var(--font-size-xs); color: var(--color-text-muted); }
+.kpi.vide .kpi-valeur { color: var(--color-text-muted); }
+.kpi.ton-optimale:not(.vide) .kpi-valeur { color: var(--color-valid-text-strong); }
+.kpi.ton-vigilance:not(.vide) .kpi-valeur { color: var(--color-warning-text-strong); }
+.kpi.ton-surcharge:not(.vide) .kpi-valeur { color: var(--color-danger-text); }
+
+.indicateurs-details { display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-sm); }
+.details-toggle {
+  display: none; align-items: center; gap: var(--spacing-sm);
+  width: 100%; min-height: var(--tap-min); padding: 0 var(--spacing-md);
+  border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-bg);
+  font-family: inherit; font-size: var(--font-size-sm); font-weight: 600; color: var(--color-text-body);
+  cursor: pointer;
+}
+.details-toggle span { flex: 1; text-align: left; }
+.details-toggle .ti { font-size: var(--font-size-base); color: var(--color-text-secondary); }
+.detail-bloc {
+  display: flex; flex-direction: column; gap: var(--spacing-sm);
+  padding: var(--spacing-md) var(--spacing-lg);
+  background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-lg);
+}
+.detail-bloc-titre { font-size: var(--font-size-xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; color: var(--color-text-muted); }
+.repartition { display: flex; gap: 2px; height: 8px; border-radius: var(--radius-full); overflow: hidden; background: var(--color-bg-tertiary); }
+.repartition-seg { min-width: 6px; background: var(--color-bg-tertiary); }
+.repartition-seg.ton-optimale { background: var(--color-valid-text); }
+.repartition-seg.ton-vigilance { background: var(--color-warning-icon); }
+.repartition-seg.ton-surcharge { background: var(--color-danger-text); }
+.repartition-seg.ton-neutre { background: var(--color-text-muted); }
+.detail-items { display: flex; flex-direction: column; margin: 0 calc(-1 * var(--spacing-sm)); }
+.detail-item {
+  display: flex; align-items: center; gap: var(--spacing-sm);
+  min-height: var(--tap-min); padding: 0 var(--spacing-sm);
+  border: none; border-radius: var(--radius-md); background: transparent;
+  font-family: inherit; color: inherit; text-align: left; cursor: pointer;
+  transition: background var(--transition-fast);
+}
+.detail-item:hover:not(:disabled) { background: var(--color-bg-secondary); }
+.detail-item.active { background: var(--color-primary-light); }
+.detail-item:disabled { cursor: default; opacity: 0.55; }
+.detail-item-label { flex: 1; min-width: 0; font-size: var(--font-size-sm); font-weight: 500; }
+.detail-item-label small { font-size: var(--font-size-xs); font-weight: 400; color: var(--color-text-muted); }
+.detail-item-valeur { font-size: var(--font-size-base); font-weight: 700; font-variant-numeric: tabular-nums; }
+.detail-item-valeur small { font-size: var(--font-size-xs); font-weight: 600; color: var(--color-text-muted); }
+.detail-note { margin: 0; font-size: var(--font-size-xs); color: var(--color-text-muted); }
 
 .filtre-actif {
   display: flex; align-items: center; gap: var(--spacing-sm); flex-wrap: wrap;
@@ -514,6 +725,131 @@ export default {
   font-size: var(--font-size-xs); font-weight: 600; cursor: pointer;
 }
 
+/* --- Filtres --- */
+.filtres-row { display: flex; align-items: center; gap: var(--spacing-sm) var(--spacing-md); flex-wrap: wrap; }
+.recherche { position: relative; flex: 1; min-width: 200px; display: flex; align-items: center; }
+.recherche i { position: absolute; left: 14px; font-size: var(--font-size-lg); color: var(--color-text-muted); pointer-events: none; }
+.recherche input {
+  width: 100%; min-height: var(--tap-min);
+  padding: 0 var(--spacing-lg) 0 42px;
+  border: 1px solid var(--color-border); border-radius: var(--radius-full);
+  font-size: var(--font-size-base); background: var(--color-bg);
+  appearance: none;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+.recherche input:focus { outline: none; border-color: var(--color-primary); box-shadow: var(--shadow-focus); }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip-filtre {
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: 36px; padding: 0 var(--spacing-md);
+  border: 1px solid var(--color-border); border-radius: var(--radius-full);
+  font-family: inherit; font-size: var(--font-size-sm);
+  background: var(--color-bg); color: var(--color-text-secondary); cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+}
+.chip-filtre:hover { border-color: var(--color-border-strong); }
+.chip-filtre.active { background: var(--color-primary-light); border-color: var(--color-primary); color: var(--color-primary-text); font-weight: 600; }
+.groupe-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.select-org-filtre {
+  min-height: 36px; padding: 0 var(--spacing-md);
+  border: 1px solid var(--color-border); border-radius: var(--radius-md);
+  font-size: var(--font-size-sm); background: var(--color-bg);
+}
+
+/* --- Liste --- */
+.liste-entete { display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-sm); flex-wrap: wrap; margin-bottom: calc(-1 * var(--spacing-sm)); }
+.tri-info { display: inline-flex; align-items: center; gap: 4px; font-size: var(--font-size-xs); color: var(--color-text-muted); }
+.athlete-liste { display: flex; flex-direction: column; gap: var(--spacing-sm); }
+
+.athlete-carte {
+  display: flex; flex-direction: column; gap: var(--spacing-md);
+  width: 100%; padding: var(--spacing-lg);
+  background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  font-family: inherit; font-size: var(--font-size-sm); color: inherit; text-align: left; cursor: pointer;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
+}
+.athlete-carte:hover { border-color: var(--color-primary); box-shadow: var(--shadow-card-hover); }
+.athlete-carte:active { transform: scale(0.995); }
+.athlete-carte:focus-visible { outline: none; border-color: var(--color-primary); box-shadow: var(--shadow-focus); }
+/* Inactif : la carte recule visuellement, sans baisser le contraste du texte. */
+.athlete-carte.activite-inactif { background: var(--color-bg-secondary); box-shadow: none; }
+.athlete-carte.activite-inactif:hover { box-shadow: var(--shadow-card); }
+
+.carte-haut { display: flex; align-items: center; gap: var(--spacing-md); }
+.avatar-athlete {
+  position: relative; flex-shrink: 0;
+  width: 44px; height: 44px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--color-avatar-athlete-bg); color: var(--color-avatar-athlete-text);
+  font-size: var(--font-size-sm); font-weight: 700;
+}
+.activite-inactif .avatar-athlete { background: var(--color-bg-tertiary); color: var(--color-text-muted); }
+.avatar-pastille {
+  position: absolute; right: -1px; bottom: -1px;
+  width: 14px; height: 14px; border-radius: 50%;
+  border: 2px solid var(--color-bg); background: var(--color-border-strong);
+}
+.activite-inactif .avatar-pastille { border-color: var(--color-bg-secondary); }
+.activite-regulier .avatar-pastille, .activite-actif .avatar-pastille { background: var(--color-valid-text); }
+.activite-irregulier .avatar-pastille { background: var(--color-warning-icon); }
+
+.carte-identite { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.carte-nom { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: var(--font-size-base); font-weight: 600; color: var(--color-text); }
+/* Les deux morceaux passent à la ligne en bloc, jamais au milieu. */
+.carte-activite { display: flex; flex-wrap: wrap; column-gap: 4px; font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+.activite-libelle, .activite-jours { white-space: nowrap; }
+.activite-regulier .activite-libelle { color: var(--color-valid-text-strong); font-weight: 600; }
+.activite-irregulier .activite-libelle { color: var(--color-warning-text-strong); font-weight: 600; }
+.activite-inactif .activite-libelle { color: var(--color-text-muted); font-weight: 600; }
+.carte-chevron { flex-shrink: 0; font-size: var(--font-size-lg); color: var(--color-text-muted); transition: transform var(--transition-fast); }
+.athlete-carte:hover .carte-chevron { transform: translateX(2px); color: var(--color-primary); }
+
+.acwr-badge {
+  display: inline-flex; align-items: baseline; gap: 4px; flex-shrink: 0;
+  padding: 4px 10px; border-radius: var(--radius-full);
+  font-size: var(--font-size-sm); font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.acwr-badge small { font-size: 10px; font-weight: 600; letter-spacing: 0.3px; opacity: 0.75; }
+.acwr-badge.zone-optimale { background: var(--color-valid-bg); color: var(--color-valid-text-strong); }
+.acwr-badge.zone-vigilance { background: var(--color-warning-bg); color: var(--color-warning-text-strong); }
+.acwr-badge.zone-surcharge { background: var(--color-danger-bg); color: var(--color-danger-text); }
+.acwr-badge.zone-sous_charge { background: var(--color-bg-tertiary); color: var(--color-text-secondary); }
+.acwr-badge.zone-insuffisant { background: var(--color-bg-tertiary); color: var(--color-text-muted); }
+
+.carte-stats {
+  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--spacing-sm);
+  padding-top: var(--spacing-md); border-top: 1px solid var(--color-border);
+}
+.stat { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.stat-label { display: inline-flex; align-items: center; gap: 4px; font-size: var(--font-size-xs); color: var(--color-text-muted); white-space: nowrap; }
+.stat-valeur { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; font-size: var(--font-size-sm); font-weight: 600; color: var(--color-text); }
+.tendance { font-size: var(--font-size-base); color: var(--color-text-secondary); }
+.mini-badge {
+  padding: 1px 6px; border-radius: var(--radius-full);
+  font-size: 10px; font-weight: 700; white-space: nowrap;
+  background: var(--color-bg-tertiary); color: var(--color-text-secondary);
+}
+.mini-badge.wellness-bon { background: var(--color-valid-bg); color: var(--color-valid-text-strong); }
+.mini-badge.wellness-degrade { background: var(--color-danger-bg); color: var(--color-danger-text); }
+.mini-badge.sommeil-modere { background: var(--color-warning-bg); color: var(--color-warning-text); }
+.mini-badge.sommeil-eleve { background: var(--color-danger-bg); color: var(--color-danger-text); }
+
+.carte-bas { display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-sm); flex-wrap: wrap; }
+.signaux { display: flex; gap: 6px; flex-wrap: wrap; }
+.signal {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 9px; border-radius: var(--radius-full);
+  font-size: var(--font-size-xs); font-weight: 600;
+  background: var(--color-warning-bg); color: var(--color-warning-text-strong);
+}
+.signal.signal-ras { background: var(--color-valid-bg); color: var(--color-valid-text-strong); }
+.signal.signal-attente { background: var(--color-bg-tertiary); color: var(--color-text-muted); }
+.signal.signal-blessure { background: var(--color-danger-bg); color: var(--color-danger-text); }
+.groupes-badges { display: flex; gap: 4px; flex-wrap: wrap; }
+.groupe-badge { font-size: var(--font-size-xs); font-weight: 600; padding: 2px 8px; border-radius: var(--radius-full); }
+
+/* --- Aide --- */
 .modal-large { max-width: 640px; }
 .aide-indicateurs { list-style: none; margin: var(--spacing-sm) 0 0; padding: 0; display: flex; flex-direction: column; gap: var(--spacing-sm); }
 .aide-indicateurs li { display: flex; align-items: center; gap: var(--spacing-sm); font-size: var(--font-size-sm); color: var(--color-text-secondary); }
@@ -524,9 +860,9 @@ export default {
   background: var(--color-bg); text-align: center;
   font-size: var(--font-size-xs); font-weight: 700;
 }
-.aide-pastille.resume-tile-optimale { color: var(--color-valid-text-strong); }
-.aide-pastille.resume-tile-vigilance { color: var(--color-warning-text-strong); }
-.aide-pastille.resume-tile-surcharge { color: var(--color-danger-text); }
+.aide-pastille.ton-optimale { color: var(--color-valid-text-strong); }
+.aide-pastille.ton-vigilance { color: var(--color-warning-text-strong); }
+.aide-pastille.ton-surcharge { color: var(--color-danger-text); }
 .aide-section h4 { margin: 0 0 4px; font-size: var(--font-size-sm); font-weight: 700; }
 .aide-section p { margin: 0 0 var(--spacing-xs); font-size: var(--font-size-sm); color: var(--color-text-secondary); line-height: 1.5; }
 .aide-section + .aide-section { margin-top: var(--spacing-md); padding-top: var(--spacing-md); border-top: 1px solid var(--color-border); }
@@ -538,128 +874,17 @@ export default {
 .aide-dot-surcharge { background: var(--color-danger-text); }
 .aide-dot-sous_charge { background: var(--color-text-muted); }
 
-.filtres-row { display: flex; align-items: center; gap: var(--spacing-md); flex-wrap: wrap; }
-.input-recherche {
-  min-height: var(--tap-min);
-  padding: 0 var(--spacing-md);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  font-size: var(--font-size-base);
-  background: var(--color-bg);
-  min-width: 200px;
-  flex: 1;
-}
-.groupe-filtre-chips { display: flex; gap: 6px; flex-wrap: wrap; }
-.chip-filtre {
-  display: inline-flex; align-items: center; gap: 6px;
-  min-height: 36px; padding: 0 var(--spacing-md);
-  border: 1px solid var(--color-border); border-radius: var(--radius-full);
-  font-size: var(--font-size-sm); background: var(--color-bg); color: var(--color-text-secondary); cursor: pointer;
-}
-.chip-filtre.active { background: var(--color-primary-light); border-color: var(--color-primary); color: var(--color-primary-text); font-weight: 600; }
-.groupe-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
-.select-org-filtre {
-  min-height: 36px; padding: 0 var(--spacing-md);
-  border: 1px solid var(--color-border); border-radius: var(--radius-md);
-  font-size: var(--font-size-sm); background: var(--color-bg);
-}
-
-.athlete-monitoring-list { display: flex; flex-direction: column; gap: var(--spacing-sm); }
-.athlete-monitoring-card {
-  display: flex; flex-direction: column; gap: var(--spacing-sm);
-  padding: var(--spacing-md) var(--spacing-lg);
-  border: 1px solid var(--color-border); border-radius: var(--radius-lg);
-  background: var(--color-bg);
-  cursor: pointer;
-}
-.athlete-monitoring-card:hover { border-color: var(--color-primary); background: var(--color-bg-secondary); }
-.amc-clic {
-  display: flex; flex-direction: column; gap: var(--spacing-sm);
-  width: 100%;
-}
-.amc-infos-recentes {
-  display: flex; align-items: center; gap: var(--spacing-md);
-  font-size: var(--font-size-xs); color: var(--color-text-secondary);
-  flex-wrap: wrap; margin-top: 2px;
-}
-.amc-infos-recentes .ti { margin-right: 2px; }
-.amc-infos-recentes strong { color: var(--color-text); font-weight: 600; }
-.amc-head { display: flex; align-items: center; gap: var(--spacing-md); }
-.mini-av-lg {
-  width: var(--avatar-md); height: var(--avatar-md); border-radius: 50%;
-  background: var(--color-avatar-athlete-bg); color: var(--color-avatar-athlete-text);
-  display: flex; align-items: center; justify-content: center;
-  font-size: var(--font-size-xs); font-weight: 600; flex-shrink: 0;
-}
-.amc-info { flex: 1; min-width: 0; }
-.amc-nom { font-size: var(--font-size-sm); font-weight: 600; }
-.amc-nom .org-badge { margin-left: 6px; font-weight: 500; }
-.amc-meta { display: flex; align-items: center; gap: var(--spacing-sm); font-size: var(--font-size-xs); color: var(--color-text-secondary); flex-wrap: wrap; margin-top: 2px; }
-.tendance-icon { font-size: var(--font-size-base); }
-.wellness-statut { display: inline-flex; align-items: center; gap: 3px; color: var(--color-text-muted); }
-.wellness-statut.ok { color: var(--color-valid-text-strong); }
-.groupes-badges { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
-.groupe-badge { font-size: var(--font-size-xs); font-weight: 600; padding: 2px 8px; border-radius: var(--radius-full); }
-.acwr-badge {
-  font-size: var(--font-size-sm); font-weight: 700; padding: 4px 10px; border-radius: var(--radius-full); flex-shrink: 0;
-}
-.acwr-badge.zone-optimale { background: var(--color-valid-bg); color: var(--color-valid-text-strong); }
-.acwr-badge.zone-vigilance { background: var(--color-warning-bg); color: var(--color-warning-text-strong); }
-.acwr-badge.zone-surcharge { background: var(--color-danger-bg); color: var(--color-danger-text); }
-.acwr-badge.zone-sous_charge { background: var(--color-bg-tertiary); color: var(--color-text-secondary); }
-.acwr-badge.zone-insuffisant { background: var(--color-bg-tertiary); color: var(--color-text-muted); }
-.amc-signaux { display: flex; gap: 6px; flex-wrap: wrap; }
-.signal-badge {
-  display: inline-flex; align-items: center; gap: 4px;
-  font-size: var(--font-size-xs); font-weight: 600;
-  padding: 3px 9px; border-radius: var(--radius-full);
-  background: var(--color-warning-bg); color: var(--color-warning-text-strong);
-}
-.signal-badge.signal-ras { background: var(--color-valid-bg); color: var(--color-valid-text-strong); }
-.signal-badge.signal-attente { background: var(--color-bg-tertiary); color: var(--color-text-muted); }
-.signal-badge.signal-blessure { background: var(--color-danger-bg); color: var(--color-danger-text); }
-.hooper-badge {
-  margin-left: 4px; padding: 1px 6px; border-radius: var(--radius-full);
-  font-size: 10px; font-weight: 700;
-  background: var(--color-bg-tertiary); color: var(--color-text-secondary);
-}
-.hooper-badge.wellness-bon { background: var(--color-valid-bg); color: var(--color-valid-text-strong); }
-.hooper-badge.wellness-degrade { background: var(--color-danger-bg); color: var(--color-danger-text); }
-
-.sommeil-badge {
-  margin-left: 4px; padding: 1px 6px; border-radius: var(--radius-full);
-  font-size: var(--font-size-xs); font-weight: 700;
-  background: var(--color-bg-tertiary); color: var(--color-text-secondary);
-}
-.sommeil-badge.sommeil-modere { background: var(--color-warning-bg); color: var(--color-warning-text); }
-.sommeil-badge.sommeil-eleve { background: var(--color-danger-bg); color: var(--color-danger-text); }
-.amc-actions { display: flex; justify-content: flex-end; align-items: center; gap: var(--spacing-sm); }
-.btn-icon-tiny {
-  width: 28px; height: 28px; padding: 0;
-  display: inline-flex; align-items: center; justify-content: center;
-  border-radius: var(--radius-sm); border: none; cursor: pointer;
-  background: transparent; color: var(--color-text-secondary); flex-shrink: 0;
-}
-.btn-icon-tiny:hover { background: var(--color-bg-tertiary); color: var(--color-text); }
-
-.add-athlete-row { display: flex; gap: var(--spacing-sm); margin-top: var(--spacing-sm); flex-wrap: wrap; }
-.add-athlete-row input {
-  flex: 1; min-width: 180px; min-height: var(--tap-min);
-  padding: 0 var(--spacing-md); border: 1px solid var(--color-border);
-  border-radius: var(--radius-md); font-size: var(--font-size-base); background: var(--color-bg);
-}
-.athlete-row {
-  display: flex; align-items: center; gap: var(--spacing-md);
-  padding: var(--spacing-md) var(--spacing-lg);
-  border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-bg);
-}
-.athlete-row.found { border-color: var(--color-primary); background: var(--color-primary-light); }
-.athlete-info { flex: 1; min-width: 0; }
-.athlete-nom { font-size: var(--font-size-sm); font-weight: 600; }
-.athlete-email { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
-
 @media (max-width: 768px) {
   .athletes-panel { padding: var(--spacing-md) var(--spacing-lg); }
-  .resume-grid { grid-template-columns: repeat(auto-fit, minmax(105px, 1fr)); }
+  .athletes-panel.avec-fiche { padding: 0; }
+  .kpi-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .kpi { padding: var(--spacing-sm) var(--spacing-md); }
+  .kpi-valeur { font-size: var(--font-size-xl); }
+  .kpi-aide { display: none; }
+  .indicateurs-details { grid-template-columns: 1fr; }
+  .details-toggle { display: flex; }
+  .indicateurs-details:not(.ouvert) { display: none; }
+  .athlete-carte { padding: var(--spacing-md); }
+  .carte-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: var(--spacing-md); }
 }
 </style>

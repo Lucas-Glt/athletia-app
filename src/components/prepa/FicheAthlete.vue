@@ -1,23 +1,32 @@
 <template>
   <div class="fiche-athlete" @pointerdown="onSwipeStart" @pointerup="onSwipeEnd" @pointercancel="onSwipeCancel">
     <div class="fiche-topbar">
-      <button class="btn btn-sm retour-fiche" @click="$emit('fermer')">
-        <i class="ti ti-arrow-left"></i> Retour
+      <button class="btn btn-sm btn-ghost retour-fiche" @click="$emit('fermer')">
+        <i class="ti ti-arrow-left"></i> Athlètes
       </button>
       <div class="fiche-topbar-actions">
         <button class="btn btn-sm" @click="modalGroupes = true"><i class="ti ti-tags"></i> Groupes</button>
-        <button class="btn btn-sm btn-danger" @click="retirerDuCercle"><i class="ti ti-user-minus"></i> Retirer</button>
+        <button class="btn btn-sm btn-ghost btn-retirer" @click="retirerDuCercle"><i class="ti ti-user-minus"></i> Retirer</button>
       </div>
     </div>
 
-    <div class="fiche-header">
-      <div class="mini-av-lg">{{ initiales(athlete.nom) }}</div>
+    <div class="fiche-header" :class="`activite-${niveauActivite(athlete.resume)}`">
+      <span class="fiche-avatar">
+        {{ initiales(athlete.nom) }}
+        <span class="avatar-pastille" :title="LABELS_NIVEAU_ACTIVITE[niveauActivite(athlete.resume)]"></span>
+      </span>
       <div class="fiche-header-info">
         <h3>
           {{ athlete.nom }}
           <span class="badge badge-gray org-badge" v-if="estSuperPrepa">{{ athlete.organisation?.nom || 'Indépendant' }}</span>
         </h3>
         <div class="athlete-email">{{ athlete.email }}</div>
+        <div class="fiche-activite" v-if="athlete.resume">
+          <span class="activite-libelle">{{ libelleActivite(athlete.resume) }}</span>
+          <span class="activite-jours" v-if="athlete.resume.jours_actifs_28j">
+            · {{ athlete.resume.jours_actifs_28j }} j actif{{ athlete.resume.jours_actifs_28j > 1 ? 's' : '' }} sur {{ FENETRE_ACTIVITE }}
+          </span>
+        </div>
         <div class="groupes-badges" v-if="groupesDe.length > 0">
           <span
             class="groupe-badge"
@@ -26,6 +35,23 @@
             :style="{ background: (g.couleur || '#7F77DD') + '22', color: g.couleur || 'var(--color-primary-dark)' }"
           >{{ g.nom }}</span>
         </div>
+      </div>
+      <span
+        class="acwr-badge"
+        v-if="athlete.resume"
+        :class="'zone-' + (athlete.resume.acwr.zone || 'insuffisant')"
+        title="ACWR : charge des 7 derniers jours / moyenne des 28"
+      >
+        <small>ACWR</small>{{ athlete.resume.acwr.valeur !== null ? athlete.resume.acwr.valeur.toFixed(2) : '—' }}
+      </span>
+      <div class="fiche-signaux" v-if="athlete.resume && (athlete.resume.signaux.length > 0 || athlete.resume.blessures_en_cours > 0)">
+        <span class="signal signal-blessure" v-if="athlete.resume.blessures_en_cours > 0">
+          <i class="ti ti-bandage"></i>
+          {{ athlete.resume.blessures_en_cours }} blessure{{ athlete.resume.blessures_en_cours > 1 ? 's' : '' }} en cours
+        </span>
+        <span class="signal" v-for="(s, i) in athlete.resume.signaux" :key="i">
+          <i class="ti ti-alert-triangle"></i> {{ s }}
+        </span>
       </div>
     </div>
 
@@ -38,15 +64,21 @@
       @modifie="$emit('modifie')"
     />
 
-    <div class="tabs">
-      <div :ref="(el) => setTabRef('apercu', el)" class="tab" :class="{ active: sousOnglet === 'apercu' }" @click="allerA('apercu')">Aperçu</div>
-      <div :ref="(el) => setTabRef('programme', el)" class="tab" :class="{ active: sousOnglet === 'programme' }" @click="allerA('programme')">Programme</div>
-      <div :ref="(el) => setTabRef('historique', el)" class="tab" :class="{ active: sousOnglet === 'historique' }" @click="allerA('historique')">Historique</div>
-      <div :ref="(el) => setTabRef('poids', el)" class="tab" :class="{ active: sousOnglet === 'poids' }" @click="allerA('poids')">Poids</div>
-      <div :ref="(el) => setTabRef('blessures', el)" class="tab" :class="{ active: sousOnglet === 'blessures' }" @click="allerA('blessures')">
-        Blessures
-        <span class="tab-pastille" v-if="nbBlessuresEnCours > 0">{{ nbBlessuresEnCours }}</span>
-      </div>
+    <div class="tabs" role="tablist">
+      <button
+        v-for="o in ONGLETS"
+        :key="o.cle"
+        :ref="(el) => setTabRef(o.cle, el)"
+        type="button"
+        role="tab"
+        class="tab"
+        :class="{ active: sousOnglet === o.cle }"
+        :aria-selected="sousOnglet === o.cle"
+        @click="allerA(o.cle)"
+      >
+        <i class="ti" :class="o.icone"></i> {{ o.label }}
+        <span class="tab-pastille" v-if="o.cle === 'blessures' && nbBlessuresEnCours > 0">{{ nbBlessuresEnCours }}</span>
+      </button>
     </div>
 
     <!-- APERÇU : monitoring (charge, ACWR, wellness) -->
@@ -120,7 +152,7 @@
 
       <div v-for="p in programmesAssignes" :key="p.id" class="prog-block">
         <button type="button" class="prog-head" @click="basculerProgramme(p)">
-          <i class="ti prog-chevron" :class="programmesOuverts.has(p.id) ? 'ti-chevron-up' : 'ti-chevron-down'"></i>
+          <span class="type-icone type-icone-programme"><i class="ti ti-layout-grid"></i></span>
           <span class="bloc-info">
             <span class="bloc-titre">
               <span class="prog-nom">{{ p.nom }}</span>
@@ -132,6 +164,7 @@
               <span>{{ semainesDuProgramme(p.id).length }} semaine{{ semainesDuProgramme(p.id).length > 1 ? 's' : '' }}</span>
             </span>
           </span>
+          <i class="ti prog-chevron" :class="programmesOuverts.has(p.id) ? 'ti-chevron-up' : 'ti-chevron-down'"></i>
         </button>
 
         <div class="prog-actions">
@@ -148,17 +181,20 @@
 
             <div v-for="seance in semaine.seances" :key="seance.id" class="seance-prog-block">
               <button type="button" class="seance-prog-head" @click="basculerSeanceProg(seance.id)">
-                <i class="ti seance-prog-chevron" :class="seancesOuvertes.has(seance.id) ? 'ti-chevron-up' : 'ti-chevron-down'"></i>
+                <span class="type-icone" :class="`type-icone-${typeSeance(seance.type_seance)}`">
+                  <i class="ti" :class="iconeTypeSeance(seance.type_seance)"></i>
+                </span>
                 <span class="bloc-info">
                   <span class="bloc-titre">
                     <span class="seance-prog-nom">{{ seance.nom }}</span>
                     <span class="exo-count-badge">{{ seance.exercices.length }} exo{{ seance.exercices.length > 1 ? 's' : '' }}</span>
                   </span>
                   <span class="bloc-meta">
-                    <span class="type-badge" :class="`type-badge-${seance.type_seance || 'musculation'}`">{{ labelType(seance.type_seance) }}</span>
+                    <span class="type-badge" :class="`type-badge-${typeSeance(seance.type_seance)}`">{{ labelTypeSeance(seance.type_seance) }}</span>
                     <span class="meta-jour" v-if="seance.jour">{{ seance.jour }}</span>
                   </span>
                 </span>
+                <i class="ti seance-prog-chevron" :class="seancesOuvertes.has(seance.id) ? 'ti-chevron-up' : 'ti-chevron-down'"></i>
               </button>
 
               <div class="seance-prog-body" v-if="seancesOuvertes.has(seance.id)">
@@ -264,7 +300,9 @@
           <template v-else>
             <div v-for="session in sessionsFiltrees" :key="session.key" class="session-block">
               <button type="button" class="session-head" @click="basculerSession(session.key)">
-                <i class="ti session-chevron" :class="sessionsOuvertes.has(session.key) ? 'ti-chevron-up' : 'ti-chevron-down'"></i>
+                <span class="type-icone" :class="`type-icone-${typeSeance(session.typeSeance)}`">
+                  <i class="ti" :class="iconeTypeSeance(session.typeSeance)"></i>
+                </span>
                 <span class="bloc-info">
                   <span class="bloc-titre">
                     <span class="session-nom">{{ session.seanceNom }}</span>
@@ -272,10 +310,11 @@
                   </span>
                   <span class="bloc-meta">
                     <span class="session-date">{{ formatDateCourte(session.date) }}</span>
-                    <span class="type-badge" :class="`type-badge-${session.typeSeance || 'musculation'}`">{{ labelType(session.typeSeance) }}</span>
+                    <span class="type-badge" :class="`type-badge-${typeSeance(session.typeSeance)}`">{{ labelTypeSeance(session.typeSeance) }}</span>
                     <span v-if="session.semaine">Semaine {{ session.semaine }}</span>
                   </span>
                 </span>
+                <i class="ti session-chevron" :class="sessionsOuvertes.has(session.key) ? 'ti-chevron-up' : 'ti-chevron-down'"></i>
               </button>
               <div class="session-body" v-if="sessionsOuvertes.has(session.key)">
                 <div
@@ -479,6 +518,8 @@ import AssignerProgrammeModal from './AssignerProgrammeModal.vue'
 import { typeGroupe, labelTypeGroupe } from '../../data/typesGroupe'
 import { labelDureeBlessure, formatDateBlessure, labelAnciennete } from '../../data/blessures'
 import { formatHeures, labelNiveauSommeil } from '../../data/sommeil'
+import { FENETRE_ACTIVITE, LABELS_NIVEAU_ACTIVITE, niveauActivite, libelleActivite } from '../../data/activite'
+import { typeSeance, labelTypeSeance, iconeTypeSeance } from '../../data/typesSeance'
 import { parseValeurSerie } from '../../utils/valeurSerie'
 
 // Distance horizontale minimale pour valider un swipe. Volontairement haute :
@@ -495,7 +536,15 @@ const CHAMP_CHARGE = {
 }
 const champCharge = (type) => CHAMP_CHARGE[type] || CHAMP_CHARGE.musculation
 
-const LABELS_TYPE = { musculation: 'Musculation', natation: 'Natation', athletisme: 'Athlétisme', pliometrie: 'Pliométrie' }
+// Ordre des onglets = ordre du swipe gauche/droite.
+const ONGLETS = [
+  { cle: 'apercu', label: 'Aperçu', icone: 'ti-chart-line' },
+  { cle: 'programme', label: 'Programme', icone: 'ti-layout-grid' },
+  { cle: 'historique', label: 'Historique', icone: 'ti-history' },
+  { cle: 'poids', label: 'Poids', icone: 'ti-scale' },
+  { cle: 'blessures', label: 'Blessures', icone: 'ti-bandage' }
+]
+const ONGLETS_FICHE = ONGLETS.map(o => o.cle)
 
 const pad2 = (n) => String(n).padStart(2, '0')
 
@@ -520,6 +569,7 @@ export default {
     const initiales = (nom) => nom.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
 
     const retirerDuCercle = async () => {
+      if (!confirm(`Retirer ${props.athlete.nom} de votre cercle ?`)) return
       await api.del(`/users/mes-athletes/${props.athlete.id}`)
       emit('modifie')
       emit('fermer')
@@ -767,7 +817,6 @@ export default {
     })
 
     const classeTaux = (taux) => (taux >= 90 ? 'taux-done' : taux >= 60 ? 'taux-warn' : 'taux-skip')
-    const labelType = (t) => LABELS_TYPE[t] || LABELS_TYPE.musculation
 
     // Regroupe les exercices d'une session en supersets/bisets (même logique
     // que grouperExercices côté édition de programme) pour un affichage plus
@@ -930,8 +979,6 @@ export default {
     }
 
     // --- Navigation par onglet (clic ou swipe) ---
-    const ONGLETS_FICHE = ['apercu', 'programme', 'historique', 'poids', 'blessures']
-
     // Recentre l'onglet actif dans la barre (qui peut déborder sur mobile) :
     // au swipe comme au clic, l'onglet qui devient actif se replace bien en
     // vue, quitte à faire sortir son opposé de l'autre côté.
@@ -988,7 +1035,9 @@ export default {
     onMounted(fetchApercu)
 
     return {
-      estSuperPrepa, sousOnglet, modalGroupes, groupesDe, initiales, retirerDuCercle,
+      estSuperPrepa, sousOnglet, modalGroupes, groupesDe, initiales, retirerDuCercle, ONGLETS,
+      FENETRE_ACTIVITE, LABELS_NIVEAU_ACTIVITE, niveauActivite, libelleActivite,
+      typeSeance, labelTypeSeance, iconeTypeSeance,
       detail, loadingApercu, pointsAcwr, pointsAigueChronique, pointsMonotonie, pointsContrainte,
       pointsHooper, dernierWellness, barresDernierWellness, formatDateCourt,
       pointsSommeil, formatHeures, labelNiveauSommeil,
@@ -998,7 +1047,7 @@ export default {
       semainesDuProgramme, resumeSerie,
       programmesAssignes, programmeLogsId, loadingLogs, logsGroupes, ouvrirHistorique,
       vueHistorique, seanceFiltre, nomsSeances, sessionsFiltrees, resumeHistorique, courbesHistorique,
-      sessionsOuvertes, basculerSession, classeTaux, labelType,
+      sessionsOuvertes, basculerSession, classeTaux,
       grouperExosSession, letterFor, typeGroupe, labelTypeGroupe,
       formatDate, formatDateCourte, getStatutClasse, getStatutIcon,
       loadingPoids, entriesPoids, courbePoids, ouvrirPoids,
@@ -1012,51 +1061,90 @@ export default {
 </script>
 
 <style scoped>
-.fiche-athlete { display: flex; flex-direction: column; gap: var(--spacing-lg); padding: var(--spacing-xl) var(--spacing-2xl); overflow-y: auto; flex: 1; touch-action: pan-y; }
+/* Colonne centrée sur grand écran, sans déplacer la barre de défilement. */
+.fiche-athlete {
+  display: flex; flex-direction: column; gap: var(--spacing-lg);
+  padding: var(--spacing-xl) max(var(--spacing-2xl), calc((100% - 1080px) / 2));
+  overflow-y: auto; flex: 1; min-height: 0; touch-action: pan-y;
+}
 
 .fiche-topbar { display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-md); flex-wrap: wrap; }
-.retour-fiche { flex-shrink: 0; }
+.retour-fiche { flex-shrink: 0; margin-left: calc(-1 * var(--spacing-md)); }
 .fiche-topbar-actions { display: flex; gap: var(--spacing-sm); flex-shrink: 0; flex-wrap: wrap; }
+.btn-retirer { color: var(--color-danger-text); }
+.btn-retirer:hover:not(:disabled) { background: var(--color-danger-bg-soft); color: var(--color-danger-text); }
 
-.fiche-header { display: flex; align-items: center; gap: var(--spacing-md); flex-wrap: wrap; }
+.fiche-header {
+  display: flex; align-items: center; gap: var(--spacing-lg); flex-wrap: wrap;
+  padding: var(--spacing-lg) var(--spacing-xl);
+  background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-card);
+}
+.fiche-avatar {
+  position: relative; flex-shrink: 0;
+  width: 56px; height: 56px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--color-avatar-athlete-bg); color: var(--color-avatar-athlete-text);
+  font-size: var(--font-size-lg); font-weight: 700;
+}
+.activite-inactif .fiche-avatar { background: var(--color-bg-tertiary); color: var(--color-text-muted); }
+.avatar-pastille {
+  position: absolute; right: 0; bottom: 0;
+  width: 15px; height: 15px; border-radius: 50%;
+  border: 2px solid var(--color-bg); background: var(--color-border-strong);
+}
+.activite-regulier .avatar-pastille, .activite-actif .avatar-pastille { background: var(--color-valid-text); }
+.activite-irregulier .avatar-pastille { background: var(--color-warning-icon); }
 .fiche-header-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.fiche-header-info h3 { margin: 0; font-size: var(--font-size-xl); font-weight: 700; }
+.fiche-header-info h3 { margin: 0; font-size: var(--font-size-xl); font-weight: 700; letter-spacing: -0.3px; }
 .fiche-header-info h3 .org-badge { margin-left: 6px; font-weight: 500; vertical-align: middle; }
-.mini-av-lg {
-  width: var(--avatar-md);
-  height: var(--avatar-md);
-  border-radius: 50%;
-  background: var(--color-avatar-athlete-bg);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: var(--font-size-xs);
-  font-weight: 600;
-  color: var(--color-avatar-athlete-text);
-  flex-shrink: 0;
-}
-.athlete-email { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
-.groupes-badges { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 2px; }
+.athlete-email { font-size: var(--font-size-xs); color: var(--color-text-secondary); overflow-wrap: anywhere; }
+/* Les deux morceaux passent à la ligne en bloc, jamais au milieu. */
+.fiche-activite { display: flex; flex-wrap: wrap; column-gap: 4px; font-size: var(--font-size-xs); color: var(--color-text-secondary); margin-top: 2px; }
+.activite-libelle, .activite-jours { white-space: nowrap; }
+.activite-libelle { font-weight: 600; color: var(--color-text-muted); }
+.activite-regulier .activite-libelle { color: var(--color-valid-text-strong); }
+.activite-irregulier .activite-libelle { color: var(--color-warning-text-strong); }
+.groupes-badges { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
 .groupe-badge { font-size: var(--font-size-xs); font-weight: 600; padding: 2px 8px; border-radius: var(--radius-full); }
-
-.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--color-border); flex-shrink: 0; overflow-x: auto; scroll-behavior: smooth; }
-.tab {
-  padding: var(--spacing-md) var(--spacing-lg);
-  min-height: var(--tap-min);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex: 1 0 auto;
-  font-size: var(--font-size-sm);
-  font-weight: 500;
-  cursor: pointer;
-  color: var(--color-text-secondary);
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
-  user-select: none;
-  white-space: nowrap;
-  text-align: center;
+.acwr-badge {
+  display: inline-flex; align-items: baseline; gap: 4px; flex-shrink: 0; align-self: flex-start;
+  padding: 4px 10px; border-radius: var(--radius-full);
+  font-size: var(--font-size-sm); font-weight: 700; font-variant-numeric: tabular-nums;
 }
+.acwr-badge small { font-size: 10px; font-weight: 600; letter-spacing: 0.3px; opacity: 0.75; }
+.acwr-badge.zone-optimale { background: var(--color-valid-bg); color: var(--color-valid-text-strong); }
+.acwr-badge.zone-vigilance { background: var(--color-warning-bg); color: var(--color-warning-text-strong); }
+.acwr-badge.zone-surcharge { background: var(--color-danger-bg); color: var(--color-danger-text); }
+.acwr-badge.zone-sous_charge { background: var(--color-bg-tertiary); color: var(--color-text-secondary); }
+.acwr-badge.zone-insuffisant { background: var(--color-bg-tertiary); color: var(--color-text-muted); }
+.fiche-signaux {
+  flex-basis: 100%; display: flex; gap: 6px; flex-wrap: wrap;
+  padding-top: var(--spacing-md); border-top: 1px solid var(--color-border);
+}
+.signal {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 9px; border-radius: var(--radius-full);
+  font-size: var(--font-size-xs); font-weight: 600;
+  background: var(--color-warning-bg); color: var(--color-warning-text-strong);
+}
+.signal.signal-blessure { background: var(--color-danger-bg); color: var(--color-danger-text); }
+
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--color-border); flex-shrink: 0; overflow-x: auto; scroll-behavior: smooth; scrollbar-width: none; }
+.tabs::-webkit-scrollbar { display: none; }
+.tab {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  flex: 1 0 auto; min-height: var(--tap-min);
+  padding: var(--spacing-md) var(--spacing-lg);
+  margin-bottom: -1px;
+  border: none; border-bottom: 2px solid transparent; background: none;
+  font-family: inherit; font-size: var(--font-size-sm); font-weight: 500;
+  color: var(--color-text-secondary); cursor: pointer;
+  user-select: none; white-space: nowrap; text-align: center;
+  transition: color var(--transition-fast), border-color var(--transition-fast);
+}
+.tab i { font-size: var(--font-size-base); }
+.tab:hover { color: var(--color-text-body); }
 .tab.active { color: var(--color-primary-dark); border-bottom-color: var(--color-primary); font-weight: 600; }
 .tab-pastille {
   margin-left: 6px; padding: 1px 6px; border-radius: var(--radius-full);
@@ -1082,6 +1170,7 @@ export default {
 
 .stat-card {
   background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
   padding: var(--spacing-lg); display: flex; flex-direction: column; gap: var(--spacing-sm);
 }
 .stat-card-titre { font-size: var(--font-size-sm); font-weight: 700; display: flex; align-items: center; gap: var(--spacing-sm); flex-wrap: wrap; }
@@ -1102,16 +1191,17 @@ export default {
 .prog-topbar { display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-md); flex-wrap: wrap; }
 .prog-topbar-titre { font-size: var(--font-size-sm); font-weight: 600; color: var(--color-text-secondary); }
 
-.prog-block { border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-bg); overflow: hidden; }
+.prog-block { border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-bg); overflow: hidden; box-shadow: var(--shadow-card); }
 .prog-head {
   width: 100%;
   display: flex; align-items: center; gap: var(--spacing-md);
   padding: var(--spacing-md) var(--spacing-lg);
-  background: var(--color-bg-secondary);
+  background: var(--color-bg);
   border: none; font-family: inherit; color: inherit; text-align: left; cursor: pointer;
   font-size: var(--font-size-sm);
+  transition: background var(--transition-fast);
 }
-.prog-head:hover { background: var(--color-bg-tertiary); }
+.prog-head:hover { background: var(--color-bg-hover); }
 .prog-chevron { color: var(--color-text-secondary); flex-shrink: 0; }
 .prog-nom { font-weight: 700; font-size: var(--font-size-base); overflow-wrap: anywhere; }
 .prog-actions {
@@ -1133,12 +1223,13 @@ export default {
 .seance-prog-head {
   width: 100%;
   display: flex; align-items: center; gap: var(--spacing-md);
-  padding: var(--spacing-md);
-  background: var(--color-bg-secondary);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--color-bg);
   border: none; font-family: inherit; color: inherit; text-align: left; cursor: pointer;
   font-size: var(--font-size-sm);
+  transition: background var(--transition-fast);
 }
-.seance-prog-head:hover { background: var(--color-bg-tertiary); }
+.seance-prog-head:hover { background: var(--color-bg-hover); }
 .seance-prog-chevron { color: var(--color-text-secondary); flex-shrink: 0; }
 .seance-prog-nom { font-weight: 600; overflow-wrap: anywhere; }
 .exo-count-badge {
@@ -1211,23 +1302,24 @@ export default {
 .meta-sep { color: var(--color-text-muted); }
 .meta-jour { text-transform: capitalize; }
 
-.session-block { border: 1px solid var(--color-border); border-radius: var(--radius-lg); overflow: hidden; flex-shrink: 0; background: var(--color-bg); }
+.session-block { border: 1px solid var(--color-border); border-radius: var(--radius-lg); overflow: hidden; flex-shrink: 0; background: var(--color-bg); box-shadow: var(--shadow-card); }
 .session-head {
   width: 100%;
   padding: var(--spacing-md) var(--spacing-lg);
-  background: var(--color-bg-secondary);
+  background: var(--color-bg);
   display: flex;
   align-items: center;
   gap: var(--spacing-md);
   font-size: var(--font-size-sm);
   border: none;
-  border-bottom: 1px solid var(--color-border);
   font-family: inherit;
   color: inherit;
   text-align: left;
   cursor: pointer;
+  transition: background var(--transition-fast);
 }
-.session-head:hover { background: var(--color-bg-tertiary); }
+.session-head:hover { background: var(--color-bg-hover); }
+.session-body { border-top: 1px solid var(--color-border); }
 .session-nom { font-weight: 600; overflow-wrap: anywhere; }
 .session-date::first-letter { text-transform: uppercase; }
 .session-chevron { color: var(--color-text-secondary); flex-shrink: 0; }
@@ -1339,6 +1431,9 @@ export default {
 
 @media (max-width: 768px) {
   .fiche-athlete { padding: var(--spacing-md) var(--spacing-lg); }
+  .fiche-header { padding: var(--spacing-md); gap: var(--spacing-md); }
+  .fiche-avatar { width: 48px; height: 48px; font-size: var(--font-size-base); }
+  .tab { padding: var(--spacing-sm) var(--spacing-md); }
   .detail-grid { grid-template-columns: 1fr; }
   .comparatif-header, .comparatif-row { grid-template-columns: 30px 1fr 16px 1fr 20px; gap: 6px; }
   .prescrit-cell, .non-fait { font-size: var(--font-size-xs); }
