@@ -32,17 +32,21 @@
 
     <div class="diete-total">
       <div class="diete-total-kcal">
-        {{ fr(totalJour.kcal) }}<span v-if="bilan" class="diete-total-cible">/ {{ fr(bilan.kcal_cible) }}</span
+        {{ fr(totalJour.kcal) }}<span v-if="bilan && cibleAffichee" class="diete-total-cible">/ {{ fr(cibleAffichee) }}</span
         ><span class="diete-total-unite">kcal</span>
       </div>
 
       <!-- Sans objectif défini, le total reste une information brute : c'est
            la cible qui lui donne un sens, pas l'inverse. -->
-      <template v-if="bilan">
+      <!-- Rouge loin de la cible, orange en approche, vert dedans (un peu
+           au-dessus aussi) ; si on dépasse franchement, repasse à l'orange
+           puis au rouge. Mêmes seuils que le calendrier. Rien de saisi :
+           pas de couleur. -->
+      <template v-if="reste">
         <div class="jauge">
-          <div class="jauge-barre" :class="{ depasse: reste.depasse }" :style="{ width: reste.pct + '%' }"></div>
+          <div class="jauge-barre" :class="`statut-${reste.statut}`" :style="{ width: reste.pct + '%' }"></div>
         </div>
-        <div class="diete-reste" :class="{ depasse: reste.depasse }">{{ reste.texte }}</div>
+        <div class="diete-reste" :class="`statut-${reste.statut}`">{{ reste.texte }}</div>
       </template>
 
       <div class="diete-macros">
@@ -624,16 +628,49 @@ export default {
 
     /* --- Objectif --- */
 
-    const reste = computed(() => {
-      if (!bilan.value) return null
-      const ecart = bilan.value.kcal_cible - totalJour.value.kcal
-      return {
-        pct: Math.min(100, Math.round((totalJour.value.kcal / bilan.value.kcal_cible) * 100)),
-        depasse: ecart < 0,
-        texte: ecart >= 0
-          ? `Il reste ${fr(ecart)} kcal`
-          : `Dépassement de ${fr(Math.abs(ecart))} kcal`
+    // Cible du jour affiché : aujourd'hui, celle de l'objectif ; un jour passé,
+    // celle demandée ce jour-là (figée côté serveur), comme le calendrier.
+    const cibleJourPasse = ref(null)
+    const cibleAffichee = computed(() =>
+      (estAujourdhui.value ? null : cibleJourPasse.value) ?? bilan.value?.kcal_cible ?? null
+    )
+    const chargerCibleJour = async () => {
+      cibleJourPasse.value = null
+      if (estAujourdhui.value) return
+      const demande = jour.value
+      try {
+        const r = await api.get(`/diete/cible-du-jour?date=${demande}`)
+        if (jour.value === demande) cibleJourPasse.value = r.kcal_cible
+      } catch {
+        // API pas encore à jour : la cible actuelle fait foi
       }
+    }
+
+    // Mêmes seuils que le calendrier (app/diete_calc.py, statut_calorique) :
+    // à 10 % de la cible c'est vert, un peu au-dessus compris ; à 20 %
+    // orange ; au-delà rouge, en dessous comme au-dessus. La couleur de la
+    // jauge en fin de journée est donc celle du jour dans le calendrier.
+    const SEUIL_REUSSI = 0.10
+    const SEUIL_PROCHE = 0.20
+    const reste = computed(() => {
+      const cible = cibleAffichee.value
+      if (!bilan.value || !cible) return null
+      const kcal = totalJour.value.kcal
+      const ecart = Math.round(cible - kcal)
+      // Rien de saisi ce jour-là : la journée n'a pas commencé, pas de couleur
+      // (le calendrier ne colore pas non plus un jour sans repas).
+      if (kcal <= 0) return { pct: 0, statut: 'vide', texte: `Il reste ${fr(ecart)} kcal` }
+      const relatif = Math.abs(cible - kcal) / cible
+      const statut = relatif <= SEUIL_REUSSI ? 'reussi' : relatif <= SEUIL_PROCHE ? 'proche' : 'loin'
+      let texte
+      if (statut === 'reussi') {
+        texte = ecart > 0 ? `Dans la cible · il reste ${fr(ecart)} kcal`
+          : ecart < 0 ? `Dans la cible · ${fr(-ecart)} kcal au-dessus`
+            : 'Pile dans la cible'
+      } else {
+        texte = ecart > 0 ? `Il reste ${fr(ecart)} kcal` : `Dépassement de ${fr(-ecart)} kcal`
+      }
+      return { pct: Math.min(100, Math.round((kcal / cible) * 100)), statut, texte }
     })
 
     const rythmesProposes = computed(() =>
@@ -731,6 +768,7 @@ export default {
     }
 
     const charger = async () => {
+      chargerCibleJour()
       chargement.value = true
       erreurListe.value = ''
       try {
@@ -1000,7 +1038,7 @@ export default {
     return {
       REPAS_COURANTS, RACCOURCIS_G, OBJECTIFS, LABELS_OBJECTIF,
       NIVEAUX_ACTIVITE, LABELS_ACTIVITE_COURT,
-      vue, bilan, chargementBilan, reste, aujourdhuiISO, formatDateLongue,
+      vue, bilan, chargementBilan, reste, cibleAffichee, aujourdhuiISO, formatDateLongue,
       modaleObjectif, formObjectif, objectifValide, rythmesProposes,
       ouvrirObjectif, fermerObjectif, choisirObjectif, enregistrerObjectif, supprimerObjectif,
       jour, repas, chargement, envoiEnCours, erreurListe, erreurModale,
@@ -1105,7 +1143,9 @@ export default {
 .diete-total-unite { font-size: var(--font-size-base); font-weight: 600; margin-left: 6px; }
 .diete-total-cible { font-size: var(--font-size-lg); font-weight: 600; opacity: 0.65; margin-left: 6px; }
 .diete-reste { margin-top: 6px; font-size: var(--font-size-xs); font-weight: 600; color: var(--color-primary-text); }
-.diete-reste.depasse { color: var(--color-warning-text-strong); }
+.diete-reste.statut-reussi { color: var(--color-valid-text-strong); }
+.diete-reste.statut-proche { color: var(--color-warning-text-strong); }
+.diete-reste.statut-loin { color: var(--color-danger-text); }
 .diete-macros {
   display: flex;
   justify-content: center;
@@ -1344,9 +1384,11 @@ export default {
   height: 100%;
   border-radius: var(--radius-full);
   background: var(--color-primary);
-  transition: width 0.25s;
+  transition: width 0.25s, background-color 0.4s;
 }
-.jauge-barre.depasse { background: var(--color-warning-icon); }
+.jauge-barre.statut-reussi { background: var(--color-valid-text); }
+.jauge-barre.statut-proche { background: var(--color-warning-icon); }
+.jauge-barre.statut-loin { background: var(--color-danger-text); }
 
 /* --- Vue Objectif --- */
 .objectif-cta { margin-top: var(--spacing-md); }
