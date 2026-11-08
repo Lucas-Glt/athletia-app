@@ -4,7 +4,7 @@
       <header class="tel-entete">
         <div class="tel-programme">{{ brouillon.nom || 'Programme sans nom' }}</div>
         <div class="tel-semaine">Semaine {{ detail.numero }} <span>sur {{ brouillon.nbSemaines }}</span></div>
-        <div class="tel-dates">du {{ formatCourt(detail.debut) }} au {{ formatCourt(detail.fin) }}</div>
+        <div class="tel-sous-titre">{{ sousTitre }}</div>
         <div class="tel-frise" aria-hidden="true">
           <span
             v-for="w in brouillon.nbSemaines"
@@ -16,33 +16,37 @@
       </header>
 
       <div class="tel-corps">
-        <div v-if="detail.tests" class="tel-tests">
+        <!-- Tests d'entrée en tête de semaine, tests de fin après les séances
+             (cf. order en CSS). L'athlète y note lui-même ses résultats :
+             les champs sont factices ici, pour montrer où il les saisira. -->
+        <div v-if="detail.tests" class="tel-tests" :class="`tel-tests-${detail.tests.moment}`">
           <span class="tel-tests-icone"><i class="ti ti-flag-3"></i></span>
           <div class="tel-tests-info">
             <div class="tel-tests-titre">{{ detail.tests.moment === 'debut' ? "Tests d'entrée" : 'Tests de fin de cycle' }}</div>
-            <div class="tel-tests-date">{{ formatJour(detail.tests.date) }}</div>
             <ul v-if="detail.tests.liste.length" class="tel-tests-liste">
-              <li v-for="t in detail.tests.liste" :key="t.cle">{{ t.nom }}<span v-if="t.unite"> · {{ t.unite }}</span></li>
+              <li v-for="t in detail.tests.liste" :key="t.cle">
+                <span class="tel-test-nom">{{ t.nom }}</span>
+                <span class="tel-test-champ"><span class="tel-test-saisie">résultat</span>{{ t.unite }}</span>
+              </li>
             </ul>
+            <p v-else class="tel-tests-note">Aucun test choisi.</p>
             <p class="tel-tests-note">
               {{ detail.tests.moment === 'debut'
-                ? 'Ton point de départ : les charges du programme en découlent.'
-                : "Compare avec tes tests d'entrée pour voir tes progrès." }}
+                ? 'Note tes résultats : ils partent chez ton prépa et servent de point de départ.'
+                : "Note tes résultats pour les comparer à tes tests d'entrée." }}
             </p>
           </div>
         </div>
 
-        <div v-for="s in detail.seances" :key="s.cle" class="tel-seance" :class="{ ouverte: ouvertes.has(s.cle) }">
+        <div v-for="(s, i) in detail.seances" :key="s.cle" class="tel-seance">
           <button type="button" class="tel-seance-tete" @click="basculer(s.cle)">
             <span class="type-icone" :class="`type-icone-${typeSeance(s.type)}`">
               <i class="ti" :class="iconeTypeSeance(s.type)"></i>
             </span>
             <span class="tel-seance-info">
-              <span class="tel-seance-nom">
-                {{ s.nom || 'Séance sans nom' }}
-                <span class="badge badge-today" v-if="estAujourdhui(s.date)">Aujourd'hui</span>
-              </span>
-              <span class="tel-seance-meta">{{ formatJour(s.date) }} · {{ s.exercices.length }} exercice{{ s.exercices.length > 1 ? 's' : '' }}</span>
+              <span class="tel-seance-num">Séance {{ i + 1 }}</span>
+              <span class="tel-seance-nom">{{ s.nom || 'Séance sans nom' }}</span>
+              <span class="tel-seance-meta">{{ s.exercices.length }} exercice{{ s.exercices.length > 1 ? 's' : '' }} · {{ libelleJour(s.jour) }}</span>
             </span>
             <i class="ti tel-chevron" :class="ouvertes.has(s.cle) ? 'ti-chevron-up' : 'ti-chevron-down'"></i>
           </button>
@@ -59,6 +63,13 @@
           <i class="ti ti-calendar-event"></i>
           Pas de séance prévue cette semaine.
         </div>
+
+        <p class="tel-suite">
+          <i class="ti" :class="estDerniere ? 'ti-trophy' : 'ti-lock-open'"></i>
+          {{ estDerniere
+            ? 'Dernière semaine du programme.'
+            : `La semaine ${detail.numero + 1} se débloque quand tu as fait ${nbEtapes > 1 ? `tes ${nbEtapes} séances` : 'ta séance'}.` }}
+        </p>
       </div>
     </div>
   </div>
@@ -67,7 +78,7 @@
 <script>
 import { ref, computed, watch } from 'vue'
 import { typeSeance, iconeTypeSeance } from '../../data/typesSeance'
-import { detailSemaine, semainesTest, resumePrescription } from '../../utils/programmeAtelier'
+import { detailSemaine, semainesTest, resumePrescription, libelleJour } from '../../utils/programmeAtelier'
 
 export default {
   props: {
@@ -78,9 +89,20 @@ export default {
     const numero = computed(() => Math.min(Math.max(1, props.semaine), props.brouillon.nbSemaines))
     const detail = computed(() => detailSemaine(props.brouillon, numero.value))
     const semainesDeTests = computed(() => semainesTest(props.brouillon))
+    const estDerniere = computed(() => numero.value >= props.brouillon.nbSemaines)
 
-    // Première séance de la semaine dépliée d'office : l'athlète voit tout
-    // de suite à quoi ressemble une séance, sans chercher où cliquer.
+    // Ce que l'athlète doit faire pour finir sa semaine : ses séances, plus
+    // la séance de tests quand il y en a une.
+    const nbEtapes = computed(() => detail.value.seances.length + (detail.value.tests ? 1 : 0))
+    const sousTitre = computed(() => {
+      const n = detail.value.seances.length
+      const tests = detail.value.tests ? (n ? ' + tes tests' : 'Ta séance de tests') : ''
+      if (!n) return tests || 'Semaine de repos'
+      return `${n} séance${n > 1 ? 's' : ''}${tests}, à ton rythme`
+    })
+
+    // Première séance dépliée d'office : l'athlète voit tout de suite à quoi
+    // ressemble une séance, sans chercher où cliquer.
     const ouvertes = ref(new Set())
     watch(() => detail.value.seances[0]?.cle, (cle) => { ouvertes.value = new Set(cle ? [cle] : []) }, { immediate: true })
     const basculer = (cle) => {
@@ -90,13 +112,9 @@ export default {
       ouvertes.value = s
     }
 
-    const formatCourt = (d) => d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
-    const formatJour = (d) => d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
-    const estAujourdhui = (d) => d.toDateString() === new Date().toDateString()
-
     return {
-      detail, semainesDeTests, ouvertes, basculer,
-      formatCourt, formatJour, estAujourdhui, typeSeance, iconeTypeSeance, resumePrescription
+      detail, semainesDeTests, estDerniere, nbEtapes, sousTitre, ouvertes, basculer,
+      typeSeance, iconeTypeSeance, resumePrescription, libelleJour
     }
   }
 }
@@ -134,7 +152,7 @@ export default {
 .tel-programme { font-size: var(--font-size-xs); font-weight: 600; opacity: 0.85; text-transform: uppercase; letter-spacing: 0.4px; }
 .tel-semaine { font-size: var(--font-size-xl); font-weight: 700; letter-spacing: -0.3px; }
 .tel-semaine span { font-size: var(--font-size-base); font-weight: 500; opacity: 0.85; }
-.tel-dates { font-size: var(--font-size-sm); opacity: 0.85; }
+.tel-sous-titre { font-size: var(--font-size-sm); opacity: 0.85; }
 /* Marge haute pour loger les drapeaux des semaines de tests au-dessus de la frise. */
 .tel-frise { display: flex; gap: 4px; margin-top: 26px; }
 .frise-pas {
@@ -160,6 +178,8 @@ export default {
   background: var(--color-warning-bg-soft);
   border: 1px solid var(--color-warning-border);
 }
+/* Tests de fin : après les séances de la semaine */
+.tel-tests-fin { order: 1; }
 .tel-tests-icone {
   flex-shrink: 0;
   width: 36px; height: 36px; border-radius: var(--radius-md);
@@ -167,12 +187,17 @@ export default {
   background: var(--color-warning-bg); color: var(--color-warning-text-strong);
   font-size: 18px;
 }
-.tel-tests-info { min-width: 0; }
+.tel-tests-info { flex: 1; min-width: 0; }
 .tel-tests-titre { font-size: var(--font-size-base); font-weight: 700; color: var(--color-text); }
-.tel-tests-date { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
-.tel-tests-date::first-letter { text-transform: uppercase; }
-.tel-tests-liste { margin: var(--spacing-sm) 0 0; padding-left: 18px; font-size: var(--font-size-sm); color: var(--color-text-body); }
-.tel-tests-liste span { color: var(--color-text-muted); }
+.tel-tests-liste { list-style: none; margin: var(--spacing-sm) 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.tel-tests-liste li { display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-sm); font-size: var(--font-size-sm); color: var(--color-text-body); }
+.tel-test-nom { font-weight: 600; }
+.tel-test-champ { display: inline-flex; align-items: center; gap: 4px; font-size: var(--font-size-xs); color: var(--color-text-muted); }
+.tel-test-saisie {
+  min-width: 72px; padding: 4px 8px; border-radius: var(--radius-sm);
+  border: 1px dashed var(--color-warning-border); background: var(--color-bg);
+  color: var(--color-text-muted); font-size: var(--font-size-xs); text-align: center;
+}
 .tel-tests-note { margin: var(--spacing-sm) 0 0; font-size: var(--font-size-xs); color: var(--color-warning-text-strong); }
 
 .tel-seance {
@@ -188,11 +213,10 @@ export default {
   padding: var(--spacing-md);
   border: none; background: none; font-family: inherit; color: inherit; text-align: left; cursor: pointer;
 }
-.tel-seance-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.tel-seance-nom { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: var(--font-size-base); font-weight: 600; color: var(--color-text); }
+.tel-seance-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.tel-seance-num { font-size: 11px; font-weight: 700; letter-spacing: 0.4px; text-transform: uppercase; color: var(--color-text-muted); }
+.tel-seance-nom { font-size: var(--font-size-base); font-weight: 600; color: var(--color-text); }
 .tel-seance-meta { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
-.tel-seance-meta::first-letter { text-transform: uppercase; }
-.badge-today { background: var(--color-primary); color: var(--color-on-primary); font-weight: 600; }
 .tel-chevron { color: var(--color-text-muted); flex-shrink: 0; }
 .tel-exos {
   list-style: none; margin: 0; padding: 0 var(--spacing-md) var(--spacing-md);
@@ -215,4 +239,13 @@ export default {
   color: var(--color-text-muted); font-size: var(--font-size-sm); text-align: center;
 }
 .tel-vide i { font-size: 28px; }
+
+.tel-suite {
+  order: 2;
+  margin: auto 0 0;
+  display: flex; align-items: center; gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-size: var(--font-size-xs); color: var(--color-text-secondary);
+}
+.tel-suite .ti { font-size: var(--font-size-base); color: var(--color-primary); }
 </style>

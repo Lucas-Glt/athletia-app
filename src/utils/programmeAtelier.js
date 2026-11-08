@@ -1,11 +1,15 @@
 // Atelier de programme (prototype côté prépa) : un programme pensé comme une
-// frise de semaines. Une séance = un modèle + les semaines où elle a lieu +
-// une progression automatique d'une semaine à l'autre ; des tests en début
-// et/ou en fin de cycle. Tout se calcule ici à partir du brouillon : rien
-// n'est envoyé à l'API.
+// suite de semaines. L'athlète avance à son rythme — il passe à la semaine
+// suivante quand il a fait les séances de la sienne — et aucun jour n'est
+// imposé : chaque semaine est une suite ordonnée de séances, avec au plus un
+// jour conseillé. Une séance = un modèle + les semaines où elle a lieu + une
+// progression automatique d'une semaine à l'autre ; des tests en début et/ou
+// en fin de cycle, dont l'athlète saisit lui-même les résultats.
+// Tout se calcule ici à partir du brouillon : rien n'est envoyé à l'API.
 
 export const JOURS = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche']
 export const NB_SEMAINES_MAX = 16
+const VERSION_BROUILLON = 2
 
 // Mêmes trois grandeurs que les séries du modèle actuel (séries × volume @
 // intensité : nb_reps/metres/bonds, poids_cible/intensite), libellées selon
@@ -29,37 +33,8 @@ export const labelProgression = (valeur, type) => {
 export const nouvelleCle = () =>
   globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`
 
-// --- Dates : 'YYYY-MM-DD' lu comme un jour local, jamais en UTC ---
-const pad2 = (n) => String(n).padStart(2, '0')
-export const versIso = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
-const depuisIso = (iso) => {
-  const [a, m, j] = String(iso).split('-').map(Number)
-  return new Date(a, m - 1, j)
-}
-const ajouterJours = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n)
-
-// Lundi de la semaine qui contient `d` (getDay : dimanche = 0).
-const lundiDe = (d) => ajouterJours(d, -((d.getDay() + 6) % 7))
-
-// Aujourd'hui si on est lundi, sinon le lundi qui vient.
-export const prochainLundi = (depuis = new Date()) => {
-  const d = new Date(depuis.getFullYear(), depuis.getMonth(), depuis.getDate())
-  return versIso(ajouterJours(d, (8 - d.getDay()) % 7))
-}
-
-// Les semaines se calent toujours du lundi au dimanche : une date de début
-// en milieu de semaine fait commencer la semaine 1 le lundi précédent.
-export const lundiSemaine = (b, semaine) => ajouterJours(lundiDe(depuisIso(b.dateDebut)), (semaine - 1) * 7)
-export const dateDuJour = (b, semaine, jour) => ajouterJours(lundiSemaine(b, semaine), Math.max(0, JOURS.indexOf(jour)))
-
-// Semaine du programme qui contient `aujourdhui` ; 0 avant le début,
-// nbSemaines + 1 après la fin.
-export const semaineDuJour = (b, aujourdhui = new Date()) => {
-  const jour = new Date(aujourdhui.getFullYear(), aujourdhui.getMonth(), aujourdhui.getDate())
-  const ecart = Math.round((jour - lundiSemaine(b, 1)) / 86400000)
-  if (ecart < 0) return 0
-  return Math.min(Math.floor(ecart / 7) + 1, b.nbSemaines + 1)
-}
+// Le jour n'est qu'un conseil : sans lui, la séance se fait quand l'athlète veut.
+export const libelleJour = (jour) => (jour ? `conseillée le ${jour}` : 'jour libre')
 
 // --- Semaines ---
 const plage = (n) => Array.from({ length: n }, (_, i) => i + 1)
@@ -124,29 +99,19 @@ export const resumePrescription = (p) => {
   return [volume, p.intensite, p.repos && `repos ${p.repos}`].filter(Boolean).join(' · ')
 }
 
-// --- Contenu d'une semaine ---
+// --- Contenu d'une semaine : la suite de séances, dans l'ordre du prépa ---
 export const detailSemaine = (b, w) => {
   const tests = semainesTest(b)
   const seances = b.seances
-    .map((s, ordre) => {
+    .map(s => {
       const rang = semainesDeSeance(b, s).indexOf(w)
       if (rang === -1) return null
-      return {
-        ...s,
-        ordre,
-        date: dateDuJour(b, w, s.jour),
-        exercices: s.exercices.map(e => ({ ...e, prescrit: prescriptionSemaine(e, rang) }))
-      }
+      return { ...s, exercices: s.exercices.map(e => ({ ...e, prescrit: prescriptionSemaine(e, rang) })) }
     })
     .filter(Boolean)
-    .sort((x, y) => JOURS.indexOf(x.jour) - JOURS.indexOf(y.jour) || x.ordre - y.ordre)
   return {
     numero: w,
-    debut: lundiSemaine(b, w),
-    fin: ajouterJours(lundiSemaine(b, w), 6),
-    tests: tests.has(w)
-      ? { moment: w === 1 && b.testsDebut ? 'debut' : 'fin', jour: b.jourTests, date: dateDuJour(b, w, b.jourTests), liste: b.tests }
-      : null,
+    tests: tests.has(w) ? { moment: w === 1 && b.testsDebut ? 'debut' : 'fin', liste: b.tests } : null,
     seances
   }
 }
@@ -173,36 +138,44 @@ export const nouvelExercice = (type) => ({
   progression: 'aucune', pas: 0
 })
 
-export const nouvelleSeance = (b) => {
-  const pris = new Set(b.seances.map(s => s.jour))
-  return {
-    cle: nouvelleCle(),
-    nom: `Séance ${b.seances.length + 1}`,
-    type: 'musculation',
-    jour: JOURS.find(j => !pris.has(j)) || 'lundi',
-    toutesSemaines: true,
-    semaines: semainesNormales(b),
-    exercices: []
-  }
-}
+export const nouvelleSeance = (b) => ({
+  cle: nouvelleCle(),
+  nom: `Séance ${b.seances.length + 1}`,
+  type: 'musculation',
+  jour: null,
+  toutesSemaines: true,
+  semaines: semainesNormales(b),
+  exercices: []
+})
 
 export const nouveauBrouillon = () => ({
-  version: 1,
+  version: VERSION_BROUILLON,
   nom: '',
   nbSemaines: 6,
-  dateDebut: prochainLundi(),
   testsDebut: true,
   testsFin: true,
-  jourTests: 'lundi',
   tests: [],
   seances: []
 })
+
+// Brouillon relu depuis l'appareil. La v1 calait les semaines sur des dates :
+// on retire la date de début et le jour des tests, et les jours fixés
+// deviennent des jours conseillés. Toute autre forme est ignorée.
+export const migrerBrouillon = (brouillon) => {
+  if (brouillon?.version === VERSION_BROUILLON) return brouillon
+  if (brouillon?.version !== 1) return null
+  const migre = { ...brouillon, version: VERSION_BROUILLON }
+  delete migre.dateDebut
+  delete migre.jourTests
+  return migre
+}
 
 const exo = (nom, series, volume, intensite, repos, progression = 'aucune', pas = 0) =>
   ({ cle: nouvelleCle(), nom, series, volume, intensite, repos, progression, pas })
 
 // Exemple de départ : 6 semaines, tests en S1 et S6, trois séances
 // équivalentes avec progression et une séance de vitesse qui change en S4.
+// Aucun jour fixé : l'athlète place ses séances comme il veut.
 export const exempleBrouillon = () => ({
   ...nouveauBrouillon(),
   nom: 'Cycle force & vitesse',
@@ -213,7 +186,7 @@ export const exempleBrouillon = () => ({
   ],
   seances: [
     {
-      cle: nouvelleCle(), nom: 'Force bas du corps', type: 'musculation', jour: 'lundi', toutesSemaines: true, semaines: [],
+      cle: nouvelleCle(), nom: 'Force bas du corps', type: 'musculation', jour: null, toutesSemaines: true, semaines: [],
       exercices: [
         exo('Squat', 4, '5', '75 %', '3 min', 'intensite', '2,5'),
         exo('Fentes bulgares', 3, '8', '20 kg', '90 s', 'intensite', '2'),
@@ -221,22 +194,22 @@ export const exempleBrouillon = () => ({
       ]
     },
     {
-      cle: nouvelleCle(), nom: 'Force haut du corps', type: 'musculation', jour: 'mercredi', toutesSemaines: true, semaines: [],
+      cle: nouvelleCle(), nom: 'Force haut du corps', type: 'musculation', jour: null, toutesSemaines: true, semaines: [],
       exercices: [
         exo('Développé couché', 4, '6', '60 kg', '2 min', 'intensite', '2,5'),
         exo('Tractions', 4, '5', '', '2 min', 'volume', '1')
       ]
     },
     {
-      cle: nouvelleCle(), nom: 'Vitesse — accélérations', type: 'athletisme', jour: 'vendredi', toutesSemaines: false, semaines: [2, 3],
+      cle: nouvelleCle(), nom: 'Vitesse — accélérations', type: 'athletisme', jour: null, toutesSemaines: false, semaines: [2, 3],
       exercices: [exo('Sprint départ arrêté', 6, '30 m', 'max', '3 min', 'series', '1')]
     },
     {
-      cle: nouvelleCle(), nom: 'Vitesse — lancés', type: 'athletisme', jour: 'vendredi', toutesSemaines: false, semaines: [4, 5],
+      cle: nouvelleCle(), nom: 'Vitesse — lancés', type: 'athletisme', jour: null, toutesSemaines: false, semaines: [4, 5],
       exercices: [exo('Sprint lancé', 5, '40 m', '95 %', '4 min')]
     },
     {
-      cle: nouvelleCle(), nom: 'Pliométrie', type: 'pliometrie', jour: 'samedi', toutesSemaines: true, semaines: [],
+      cle: nouvelleCle(), nom: 'Pliométrie', type: 'pliometrie', jour: null, toutesSemaines: true, semaines: [],
       exercices: [
         exo('Box jump', 4, '6', 'max', '90 s', 'volume', '1'),
         exo('Bonds horizontaux', 3, '5', 'max', '2 min')

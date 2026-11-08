@@ -1,6 +1,7 @@
 <template>
-  <!-- Le swipe d'onglets du dashboard est coupé ici : la grille de la vue
-       d'ensemble défile horizontalement sur mobile. -->
+  <!-- Le swipe d'onglets du dashboard est coupé ici : c'est un formulaire, et
+       glisser le doigt pour sélectionner du texte dans un champ ne doit pas
+       faire changer d'onglet. -->
   <div class="atelier" @pointerdown.stop @pointerup.stop @pointercancel.stop>
     <div class="atelier-entete">
       <div>
@@ -46,43 +47,38 @@
           <label for="atelier-nom">Nom du programme</label>
           <input id="atelier-nom" v-model="b.nom" placeholder="ex : Cycle force & vitesse" />
         </div>
-        <div class="cadre-ligne">
-          <div class="field">
-            <label>Durée</label>
-            <div class="compteur">
-              <button type="button" class="btn btn-icon" :disabled="b.nbSemaines <= 1" @click="changerNbSemaines(-1)" aria-label="Une semaine de moins">
-                <i class="ti ti-minus"></i>
-              </button>
-              <span class="compteur-valeur"><strong>{{ b.nbSemaines }}</strong> semaine{{ b.nbSemaines > 1 ? 's' : '' }}</span>
-              <button type="button" class="btn btn-icon" :disabled="b.nbSemaines >= NB_SEMAINES_MAX" @click="changerNbSemaines(1)" aria-label="Une semaine de plus">
-                <i class="ti ti-plus"></i>
-              </button>
-            </div>
-          </div>
-          <div class="field">
-            <label for="atelier-debut">Début</label>
-            <input id="atelier-debut" type="date" v-model="b.dateDebut" />
+        <div class="field">
+          <label>Durée</label>
+          <div class="compteur">
+            <button type="button" class="btn btn-icon" :disabled="b.nbSemaines <= 1" @click="changerNbSemaines(-1)" aria-label="Une semaine de moins">
+              <i class="ti ti-minus"></i>
+            </button>
+            <span class="compteur-valeur"><strong>{{ b.nbSemaines }}</strong> semaine{{ b.nbSemaines > 1 ? 's' : '' }}</span>
+            <button type="button" class="btn btn-icon" :disabled="b.nbSemaines >= NB_SEMAINES_MAX" @click="changerNbSemaines(1)" aria-label="Une semaine de plus">
+              <i class="ti ti-plus"></i>
+            </button>
           </div>
         </div>
+        <p class="rythme">
+          <i class="ti ti-player-play"></i>
+          <span>
+            <strong>L'athlète avance à son rythme</strong> : pas de date ni de jour imposés. Il passe à la semaine
+            suivante quand il a fait les séances de la sienne.
+          </span>
+        </p>
       </div>
 
       <div class="bloc">
         <h3 class="bloc-titre"><i class="ti ti-flag-3"></i> Tests</h3>
         <label class="interrupteur">
           <input type="checkbox" v-model="b.testsDebut" />
-          <span><strong>En début de programme</strong> : la semaine 1 sert de point de départ.</span>
+          <span><strong>En début de programme</strong> : la semaine 1, point de départ du cycle.</span>
         </label>
         <label class="interrupteur">
           <input type="checkbox" v-model="b.testsFin" />
-          <span><strong>En fin de programme</strong> : la dernière semaine mesure la progression.</span>
+          <span><strong>En fin de programme</strong> : la dernière semaine, pour mesurer la progression.</span>
         </label>
         <template v-if="b.testsDebut || b.testsFin">
-          <div class="field field-court">
-            <label for="atelier-jour-tests">Jour des tests</label>
-            <select id="atelier-jour-tests" v-model="b.jourTests">
-              <option v-for="j in JOURS" :key="j" :value="j">{{ j }}</option>
-            </select>
-          </div>
           <div class="field">
             <label>Tests à passer</label>
             <div class="chips">
@@ -104,7 +100,7 @@
             </div>
             <p class="aide">
               {{ testsCatalogue.length ? 'Tes tests de l\'onglet « Tests » sont proposés ci-dessus.' : 'Tes tests de l\'onglet « Tests » apparaîtront ici.' }}
-              Tu peux aussi en saisir un autre :
+              L'athlète saisira lui-même ses résultats. Tu peux aussi ajouter un autre test :
             </p>
             <form class="test-libre" @submit.prevent="ajouterTestLibre">
               <input v-model="nouveauTest.nom" placeholder="ex : VMA" aria-label="Nom du test" />
@@ -120,7 +116,6 @@
         <div class="frise">
           <div v-for="s in semaines" :key="s.numero" class="frise-semaine" :class="{ test: s.tests }">
             <span class="frise-num">S{{ s.numero }}</span>
-            <span class="frise-date">{{ formatCourt(s.debut) }}</span>
             <span class="frise-contenu">
               <template v-if="s.tests"><i class="ti ti-flag-3"></i> Tests{{ s.seances.length ? ` + ${s.seances.length}` : '' }}</template>
               <template v-else>{{ s.seances.length }} séance{{ s.seances.length > 1 ? 's' : '' }}</template>
@@ -139,20 +134,27 @@
     <section v-if="etape === 'seances'" class="etape-contenu">
       <div class="seances-disposition">
         <aside class="seances-liste">
-          <button
-            v-for="s in b.seances"
+          <p class="aide" v-if="b.seances.length > 1">
+            <i class="ti ti-arrows-sort"></i> L'ordre de la liste est l'ordre des séances dans la semaine.
+          </p>
+          <div
+            v-for="(s, i) in b.seances"
             :key="s.cle"
-            type="button"
             class="seance-item"
             :class="{ active: s.cle === seanceCle }"
-            @click="seanceCle = s.cle"
           >
-            <span class="type-icone" :class="`type-icone-${typeSeance(s.type)}`"><i class="ti" :class="iconeTypeSeance(s.type)"></i></span>
-            <span class="seance-item-info">
-              <span class="seance-item-nom">{{ s.nom || 'Séance sans nom' }}</span>
-              <span class="seance-item-meta"><span class="capitale">{{ s.jour }}</span> · {{ libelleSemaines(semainesSeance(s)) }}</span>
+            <button type="button" class="seance-item-choisir" @click="seanceCle = s.cle">
+              <span class="type-icone" :class="`type-icone-${typeSeance(s.type)}`"><i class="ti" :class="iconeTypeSeance(s.type)"></i></span>
+              <span class="seance-item-info">
+                <span class="seance-item-nom">{{ s.nom || 'Séance sans nom' }}</span>
+                <span class="seance-item-meta">{{ libelleSemaines(semainesSeance(s)) }}<template v-if="s.jour"> · {{ s.jour }}</template></span>
+              </span>
+            </button>
+            <span v-if="s.cle === seanceCle && b.seances.length > 1" class="seance-item-ordre">
+              <button type="button" class="btn-outil" :disabled="i === 0" @click="deplacerSeance(i, -1)" aria-label="Plus tôt dans la semaine"><i class="ti ti-arrow-up"></i></button>
+              <button type="button" class="btn-outil" :disabled="i === b.seances.length - 1" @click="deplacerSeance(i, 1)" aria-label="Plus tard dans la semaine"><i class="ti ti-arrow-down"></i></button>
             </span>
-          </button>
+          </div>
           <button class="btn btn-dashed" @click="ajouterSeance"><i class="ti ti-plus"></i> Ajouter une séance</button>
         </aside>
 
@@ -179,8 +181,9 @@
           </div>
 
           <div class="field">
-            <label>Jour</label>
+            <label>Jour conseillé <span class="facultatif">facultatif</span></label>
             <div class="jours">
+              <button type="button" class="jour" :class="{ active: !seanceSel.jour }" @click="seanceSel.jour = null">Libre</button>
               <button
                 v-for="j in JOURS"
                 :key="j"
@@ -188,7 +191,7 @@
                 class="jour"
                 :class="{ active: seanceSel.jour === j }"
                 :title="j"
-                @click="seanceSel.jour = j"
+                @click="seanceSel.jour = seanceSel.jour === j ? null : j"
               >{{ j.slice(0, 3) }}</button>
             </div>
           </div>
@@ -267,34 +270,36 @@
       </div>
     </section>
 
-    <!-- 3. VUE D'ENSEMBLE : semaines × jours -->
+    <!-- 3. VUE D'ENSEMBLE : la suite de séances de chaque semaine -->
     <section v-if="etape === 'ensemble'" class="etape-contenu">
       <div class="bloc">
-        <div class="grille-defile">
-          <div class="grille">
-            <div class="grille-coin"></div>
-            <div v-for="j in JOURS" :key="j" class="grille-jour">{{ j.slice(0, 3) }}</div>
-            <template v-for="s in semaines" :key="s.numero">
-              <div class="grille-semaine" :class="{ test: s.tests }">
-                <strong>S{{ s.numero }}</strong>
-                <small>{{ formatCourt(s.debut) }}</small>
-              </div>
-              <div v-for="j in JOURS" :key="j" class="grille-case" :class="{ 'case-test': s.tests }">
-                <span v-if="s.tests && s.tests.jour === j" class="puce puce-test"><i class="ti ti-flag-3"></i><span>Tests</span></span>
-                <button
-                  v-for="se in seancesDuJour(s, j)"
-                  :key="se.cle"
-                  type="button"
-                  class="puce"
-                  :class="`puce-${typeSeance(se.type)}`"
-                  :title="se.nom"
-                  @click="ouvrirSeance(se.cle)"
-                ><i class="ti" :class="iconeTypeSeance(se.type)"></i><span>{{ se.nom || 'Séance' }}</span></button>
-              </div>
-            </template>
+        <div class="suites">
+          <div v-for="s in semaines" :key="s.numero" class="suite-semaine" :class="{ test: s.tests }">
+            <div class="suite-label">
+              <strong>S{{ s.numero }}</strong>
+              <small>{{ s.seances.length + (s.tests ? 1 : 0) }} étape{{ s.seances.length + (s.tests ? 1 : 0) > 1 ? 's' : '' }}</small>
+            </div>
+            <div class="suite-contenu">
+              <span v-if="s.tests && s.tests.moment === 'debut'" class="puce puce-test"><i class="ti ti-flag-3"></i><span>Tests d'entrée</span></span>
+              <button
+                v-for="se in s.seances"
+                :key="se.cle"
+                type="button"
+                class="puce"
+                :class="`puce-${typeSeance(se.type)}`"
+                :title="se.nom"
+                @click="ouvrirSeance(se.cle)"
+              >
+                <i class="ti" :class="iconeTypeSeance(se.type)"></i>
+                <span>{{ se.nom || 'Séance' }}</span>
+                <small v-if="se.jour" class="puce-jour">{{ se.jour.slice(0, 3) }}</small>
+              </button>
+              <span v-if="s.tests && s.tests.moment === 'fin'" class="puce puce-test"><i class="ti ti-flag-3"></i><span>Tests de fin</span></span>
+              <span v-if="!s.tests && s.seances.length === 0" class="suite-vide">Aucune séance</span>
+            </div>
           </div>
         </div>
-        <p class="aide">Clique sur une séance pour la modifier.</p>
+        <p class="aide">Chaque ligne est la suite de séances d'une semaine, dans l'ordre. Clique sur une séance pour la modifier.</p>
       </div>
 
       <div class="bloc">
@@ -317,8 +322,9 @@
         <div class="bloc apercu-controles">
           <h3 class="bloc-titre"><i class="ti ti-device-mobile"></i> Ce que voit l'athlète</h3>
           <p class="aide-texte">
-            Chaque semaine, l'athlète ne voit que les séances de sa semaine, avec les charges déjà calculées par la
-            progression. Les semaines de tests sont mises en avant.
+            L'athlète voit sa semaine en cours : ses séances dans l'ordre, avec les charges déjà calculées par la
+            progression, à faire quand il veut. La semaine suivante se débloque quand il les a toutes faites. Aux
+            semaines de tests, il note lui-même ses résultats.
           </p>
           <div class="semaine-nav">
             <button class="btn btn-icon" :disabled="semaineApercu <= 1" @click="semaineApercu--" aria-label="Semaine précédente"><i class="ti ti-chevron-left"></i></button>
@@ -335,17 +341,11 @@
               @click="semaineApercu = w"
             ><i v-if="semainesTestSet.has(w)" class="ti ti-flag-3"></i>S{{ w }}</button>
           </div>
-          <p class="aide" v-if="semaineDuJourCourante >= 1 && semaineDuJourCourante <= b.nbSemaines">
-            Aujourd'hui, l'athlète serait en semaine {{ semaineDuJourCourante }}.
-          </p>
-          <p class="aide" v-else-if="semaineDuJourCourante === 0">
-            Le programme n'a pas commencé : l'athlète verra la semaine 1 à partir du {{ formatLong(lundiDebut) }}.
-          </p>
           <div class="suite">
             <i class="ti ti-bulb"></i>
             <span>
               Si cette façon de construire te convient, l'étape suivante sera d'enregistrer le programme, de l'assigner à
-              des athlètes et d'adapter leur appli pour qu'elle suive les semaines.
+              des athlètes et d'adapter leur appli pour qu'elle suive les semaines à leur rythme.
             </span>
           </div>
         </div>
@@ -368,9 +368,9 @@ import AtelierApercuAthlete from './AtelierApercuAthlete.vue'
 import { CLES_TYPES_SEANCE, typeSeance, labelTypeSeance, iconeTypeSeance } from '../../data/typesSeance'
 import {
   JOURS, NB_SEMAINES_MAX, PROGRESSIONS, champsType, labelProgression, nouvelleCle,
-  lundiSemaine, semaineDuJour, semainesTest, semainesDeSeance, libelleSemaines,
+  semainesTest, semainesDeSeance, libelleSemaines,
   prescriptionSemaine, toutesLesSemaines, pointsAttention,
-  nouvelExercice, nouvelleSeance, nouveauBrouillon, exempleBrouillon
+  nouvelExercice, nouvelleSeance, nouveauBrouillon, migrerBrouillon, exempleBrouillon
 } from '../../utils/programmeAtelier'
 
 const ETAPES = [
@@ -385,8 +385,7 @@ const ETAPES = [
 const CLE_STOCKAGE = 'athletia.atelier.brouillon'
 const lireBrouillon = () => {
   try {
-    const brouillon = JSON.parse(localStorage.getItem(CLE_STOCKAGE))
-    return brouillon?.version === 1 ? brouillon : null
+    return migrerBrouillon(JSON.parse(localStorage.getItem(CLE_STOCKAGE)))
   } catch {
     return null
   }
@@ -511,20 +510,24 @@ export default {
       return debut === fin || !debut ? '' : `S${sem[0]} : ${debut} → S${sem[sem.length - 1]} : ${fin}`
     }
 
+    // L'ordre de la liste est l'ordre des séances dans chaque semaine.
+    const deplacerSeance = (i, sens) => {
+      const j = i + sens
+      if (j < 0 || j >= b.value.seances.length) return
+      const [seance] = b.value.seances.splice(i, 1)
+      b.value.seances.splice(j, 0, seance)
+    }
+
     // --- Vue d'ensemble ---
-    const seancesDuJour = (semaine, jour) => semaine.seances.filter(s => s.jour === jour)
     const ouvrirSeance = (cle) => {
       seanceCle.value = cle
       etape.value = 'seances'
     }
     const points = computed(() => pointsAttention(b.value))
 
-    // --- Aperçu athlète ---
-    const semaineDuJourCourante = computed(() => semaineDuJour(b.value))
-    const borner = (w) => Math.min(Math.max(1, w), b.value.nbSemaines)
-    const semaineApercu = ref(borner(semaineDuJourCourante.value))
-    watch(() => b.value.nbSemaines, () => { semaineApercu.value = borner(semaineApercu.value) })
-    const lundiDebut = computed(() => lundiSemaine(b.value, 1))
+    // --- Aperçu athlète : la semaine où il en serait ---
+    const semaineApercu = ref(1)
+    watch(() => b.value.nbSemaines, (n) => { semaineApercu.value = Math.min(semaineApercu.value, n) })
 
     // --- Exemple / page blanche ---
     const brouillonEntame = () => b.value.seances.length > 0 || b.value.nom.trim() !== ''
@@ -543,8 +546,6 @@ export default {
       etape.value = 'cadre'
     }
 
-    const formatCourt = (d) => d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
-    const formatLong = (d) => d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
 
     return {
       ETAPES, JOURS, NB_SEMAINES_MAX, PROGRESSIONS, CLES_TYPES_SEANCE,
@@ -553,10 +554,9 @@ export default {
       nouveauTest, ajouterTestLibre, semaines, semainesTestSet,
       seanceCle, seanceSel, champs, semainesSeance, ajouterSeance, dupliquerSeance, supprimerSeance,
       basculerSemaine, ajouterExercice, deplacerExercice, changerProgression, apercuProgression,
-      seancesDuJour, ouvrirSeance, points,
-      semaineDuJourCourante, semaineApercu, lundiDebut,
+      deplacerSeance, ouvrirSeance, points, semaineApercu,
       chargerExemple, repartirDeZero,
-      formatCourt, formatLong, libelleSemaines, labelProgression,
+      libelleSemaines, labelProgression,
       typeSeance, labelTypeSeance, iconeTypeSeance
     }
   }
@@ -631,10 +631,16 @@ export default {
 .aide-texte { margin: 0; font-size: var(--font-size-sm); color: var(--color-text-secondary); line-height: 1.5; }
 .capitale { text-transform: capitalize; }
 
-.cadre-ligne { display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-md); }
-.field-court { max-width: 220px; }
-.field select { text-transform: capitalize; }
 .compteur { display: flex; align-items: center; gap: var(--spacing-sm); }
+.rythme {
+  margin: 0;
+  display: flex; align-items: flex-start; gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md); border-radius: var(--radius-md);
+  background: var(--color-primary-light); color: var(--color-primary-text);
+  font-size: var(--font-size-sm); line-height: 1.5;
+}
+.rythme .ti { font-size: var(--font-size-lg); margin-top: 1px; }
+.facultatif { font-size: var(--font-size-xs); font-weight: 400; color: var(--color-text-muted); }
 .compteur-valeur { min-width: 110px; text-align: center; font-size: var(--font-size-base); }
 
 .interrupteur {
@@ -688,22 +694,28 @@ input:focus, select:focus { outline: none; border-color: var(--color-primary); b
 }
 .frise-semaine.test { background: var(--color-warning-bg-soft); border-color: var(--color-warning-border); }
 .frise-num { font-size: var(--font-size-base); font-weight: 700; }
-.frise-date { font-size: var(--font-size-xs); color: var(--color-text-muted); }
 .frise-contenu { display: inline-flex; align-items: center; gap: 4px; font-size: var(--font-size-xs); font-weight: 600; color: var(--color-text-secondary); }
 .frise-semaine.test .frise-contenu { color: var(--color-warning-text-strong); }
 
 /* --- Séances --- */
 .seances-disposition { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: var(--spacing-md); align-items: start; }
 .seances-liste { display: flex; flex-direction: column; gap: var(--spacing-sm); }
+.seances-liste .aide { display: flex; align-items: center; gap: 4px; }
 .seance-item {
-  display: flex; align-items: center; gap: var(--spacing-md); width: 100%;
-  padding: var(--spacing-sm) var(--spacing-md);
+  display: flex; align-items: center; gap: 2px;
   border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-bg);
-  font-family: inherit; color: inherit; text-align: left; cursor: pointer;
   transition: border-color var(--transition-fast), background var(--transition-fast), box-shadow var(--transition-fast);
 }
 .seance-item:hover { border-color: var(--color-border-strong); background: var(--color-bg-hover); }
 .seance-item.active { border-color: var(--color-primary); background: var(--color-primary-light); box-shadow: inset 3px 0 0 var(--color-primary); }
+.seance-item-choisir {
+  flex: 1; min-width: 0;
+  display: flex; align-items: center; gap: var(--spacing-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: none; background: transparent; font-family: inherit; color: inherit; text-align: left; cursor: pointer;
+}
+.seance-item-ordre { display: flex; flex-direction: column; padding-right: 4px; }
+.seance-item-ordre .btn-outil { width: 32px; height: 28px; }
 .seance-item-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .seance-item-nom { font-size: var(--font-size-sm); font-weight: 600; overflow-wrap: anywhere; }
 .seance-item-meta { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
@@ -716,7 +728,7 @@ input:focus, select:focus { outline: none; border-color: var(--color-primary); b
   font-family: inherit; font-size: var(--font-size-sm); font-weight: 500; color: var(--color-text-secondary); cursor: pointer;
 }
 .segment.active { border-color: var(--color-primary); background: var(--color-primary-light); color: var(--color-primary-text); font-weight: 600; }
-.jours { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+.jours { display: grid; grid-template-columns: minmax(0, 1.4fr) repeat(7, minmax(0, 1fr)); gap: 6px; }
 .jour {
   min-height: var(--tap-min); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-bg);
   font-family: inherit; font-size: var(--font-size-sm); font-weight: 600; color: var(--color-text-secondary);
@@ -768,25 +780,25 @@ input:focus, select:focus { outline: none; border-color: var(--color-primary); b
 .btn-supprimer { color: var(--color-danger-text); }
 .btn-supprimer:hover:not(:disabled) { background: var(--color-danger-bg-soft); color: var(--color-danger-text); }
 
-/* --- Vue d'ensemble --- */
-.grille-defile { overflow-x: auto; margin: 0 calc(-1 * var(--spacing-lg)); padding: 0 var(--spacing-lg); }
-.grille { display: grid; grid-template-columns: 72px repeat(7, minmax(96px, 1fr)); gap: 4px; min-width: 760px; }
-.grille-jour { padding: 4px; text-align: center; font-size: var(--font-size-xs); font-weight: 700; color: var(--color-text-muted); text-transform: uppercase; letter-spacing: 0.4px; }
-.grille-semaine {
-  display: flex; flex-direction: column; justify-content: center; gap: 1px;
-  padding: var(--spacing-sm); border-radius: var(--radius-md); background: var(--color-bg-secondary);
+/* --- Vue d'ensemble : une ligne par semaine, ses séances dans l'ordre --- */
+.suites { display: flex; flex-direction: column; gap: 6px; }
+.suite-semaine {
+  display: flex; align-items: stretch; gap: var(--spacing-sm);
+  padding: 6px; border-radius: var(--radius-md); background: var(--color-bg-secondary);
 }
-.grille-semaine strong { font-size: var(--font-size-sm); }
-.grille-semaine small { font-size: 11px; color: var(--color-text-muted); }
-.grille-semaine.test { background: var(--color-warning-bg-soft); }
-.grille-case {
-  min-height: 56px; padding: 4px; border-radius: var(--radius-md);
-  border: 1px dashed var(--color-border); display: flex; flex-direction: column; gap: 4px;
+.suite-semaine.test { background: var(--color-warning-bg-soft); }
+.suite-label {
+  flex: 0 0 64px; display: flex; flex-direction: column; justify-content: center; gap: 1px;
+  padding: 0 var(--spacing-sm);
 }
-.grille-case.case-test { background: var(--color-warning-bg-soft); border-color: transparent; }
+.suite-label strong { font-size: var(--font-size-sm); }
+.suite-label small { font-size: 11px; color: var(--color-text-muted); }
+.suite-contenu { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.suite-vide { font-size: var(--font-size-xs); color: var(--color-text-muted); font-style: italic; }
+.puce-jour { font-size: 10px; font-weight: 700; text-transform: uppercase; opacity: 0.7; }
 .puce {
-  display: flex; align-items: center; gap: 4px; width: 100%;
-  min-height: 30px; padding: 2px 8px; border: none; border-radius: var(--radius-sm);
+  display: flex; align-items: center; gap: 4px; max-width: 220px;
+  min-height: 32px; padding: 2px 10px; border: none; border-radius: var(--radius-sm);
   font-family: inherit; font-size: var(--font-size-xs); font-weight: 600; text-align: left; cursor: pointer;
   background: var(--color-bg-tertiary); color: var(--color-text-body);
   transition: transform var(--transition-fast), box-shadow var(--transition-fast);
@@ -823,7 +835,6 @@ button.puce:hover { box-shadow: var(--shadow-sm); transform: translateY(-1px); }
   .atelier { padding: var(--spacing-md) var(--spacing-lg); }
   .etapes { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .etape-onglet { flex-direction: column; gap: 2px; padding: 4px 2px; font-size: 11px; line-height: 1.15; text-align: center; }
-  .cadre-ligne { grid-template-columns: 1fr; }
   .seances-disposition { grid-template-columns: 1fr; }
   .segments { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .jour { font-size: var(--font-size-xs); }
