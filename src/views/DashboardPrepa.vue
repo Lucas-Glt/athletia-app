@@ -10,6 +10,9 @@
       <div class="nav-item" :class="{ active: onglet === 'tests' }" @click="onglet = 'tests'">
         <i class="ti ti-clipboard-list"></i> Tests
       </div>
+      <div class="nav-item" :class="{ active: onglet === 'atelier' }" @click="onglet = 'atelier'">
+        <i class="ti ti-flask"></i> Atelier
+      </div>
     </template>
 
     <template #actions>
@@ -460,6 +463,9 @@
         :actif="onglet === 'tests'"
       />
 
+      <!-- ONGLET ATELIER (prototype de construction de programme) -->
+      <AtelierProgramme v-if="onglet === 'atelier'" />
+
     </div>
   </AppLayout>
 </template>
@@ -474,6 +480,7 @@ import ProgrammeForm from '../components/prepa/ProgrammeForm.vue'
 import AssignerAthleteModal from '../components/prepa/AssignerAthleteModal.vue'
 import AthletesPanel from '../components/prepa/AthletesPanel.vue'
 import TestsPanel from '../components/prepa/TestsPanel.vue'
+import AtelierProgramme from '../components/prepa/AtelierProgramme.vue'
 import ExerciceAutocomplete from '../components/prepa/ExerciceAutocomplete.vue'
 import ExerciceImage from '../components/ExerciceImage.vue'
 import { TYPES_GROUPE, TYPE_GROUPE_DEFAUT, typeGroupe, labelTypeGroupe } from '../data/typesGroupe'
@@ -484,7 +491,7 @@ import { typeSeance, labelTypeSeance, iconeTypeSeance } from '../data/typesSeanc
 const SEUIL_SWIPE = 80
 
 export default {
-  components: { AppLayout, ProgrammeForm, AssignerAthleteModal, AthletesPanel, TestsPanel, ExerciceAutocomplete, ExerciceImage },
+  components: { AppLayout, ProgrammeForm, AssignerAthleteModal, AthletesPanel, TestsPanel, AtelierProgramme, ExerciceAutocomplete, ExerciceImage },
   setup() {
     const programmes = ref([])
     const programmeActif = ref(null)
@@ -510,14 +517,16 @@ export default {
     const api = useApi()
 
     const jours = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche']
-    const vueLabel = computed(() => onglet.value === 'athletes' ? 'Athlètes' : onglet.value === 'tests' ? 'Tests' : 'Programmes')
+    const LABELS_ONGLETS = { athletes: 'Athlètes', programmes: 'Programmes', tests: 'Tests', atelier: 'Atelier' }
+    const vueLabel = computed(() => LABELS_ONGLETS[onglet.value] || 'Programmes')
 
-    // Swipe entre les onglets Athlètes/Programmes/Tests, même logique que
-    // le swipe de tabs du dashboard athlète. Sans effet quand la fiche
+    // Swipe entre les onglets Athlètes/Programmes/Tests/Atelier, même logique
+    // que le swipe de tabs du dashboard athlète. Sans effet quand la fiche
     // d'un athlète est ouverte : FicheAthlete.vue stoppe la propagation de
     // ses propres pointerdown/pointerup, son swipe interne (Aperçu/
-    // Programme/Séances/Poids) est alors prioritaire.
-    const ONGLETS_PREPA = ['athletes', 'programmes', 'tests']
+    // Programme/Séances/Poids) est alors prioritaire. L'Atelier la stoppe
+    // aussi : sa grille semaines × jours défile horizontalement sur mobile.
+    const ONGLETS_PREPA = ['athletes', 'programmes', 'tests', 'atelier']
     const tabSwipeState = { startX: 0, startY: 0, pointerId: null }
     const onTabSwipeStart = (e) => {
       if (e.pointerType === 'mouse' && e.button !== 0) return

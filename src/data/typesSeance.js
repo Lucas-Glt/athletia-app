@@ -7,6 +7,7 @@ const TYPES_SEANCE = {
   pliometrie: { label: 'Pliométrie', icone: 'ti-bolt' }
 }
 
+export const CLES_TYPES_SEANCE = Object.keys(TYPES_SEANCE)
 export const typeSeance = (t) => (TYPES_SEANCE[t] ? t : 'musculation')
 export const labelTypeSeance = (t) => TYPES_SEANCE[typeSeance(t)].label
 export const iconeTypeSeance = (t) => TYPES_SEANCE[typeSeance(t)].icone
