@@ -41,6 +41,16 @@
       @non="popupRessenti = null"
     />
     <PopupBanniere
+      v-else-if="banniereReaction"
+      icone="ti-message-heart"
+      :titre="banniereReaction.titre"
+      :sous-titre="banniereReaction.sousTitre"
+      texte-oui="Voir"
+      texte-non="OK"
+      @oui="voirReaction"
+      @non="marquerReactionsVues"
+    />
+    <PopupBanniere
       v-else-if="popupWellness"
       icone="ti-heart-rate-monitor"
       titre="Remplir mon wellness du jour ?"
@@ -50,6 +60,20 @@
       @oui="repondreWellness"
       @non="popupWellness = false"
     />
+    <PopupBanniere
+      v-else-if="recapPropose"
+      icone="ti-confetti"
+      titre="Ton récap de la semaine est prêt"
+      sous-titre="Séances, XP, régularité : ta semaine en un coup d'œil"
+      texte-oui="Voir"
+      texte-non="Plus tard"
+      @oui="ouvrirRecap"
+      @non="marquerRecapVu"
+    />
+
+    <!-- XP gagnée, confettis, passage de niveau -->
+    <CelebrationXp />
+    <RecapSemaineModal v-if="recapOuvert" @fermer="recapOuvert = false" />
 
     <!-- Feuille "Suivi" : regroupe Poids / Diète / Blessures, trois usages
          occasionnels qui ne méritent pas chacun leur propre onglet à l'égal
@@ -181,7 +205,7 @@
                       {{ labelType(seance.type_seance) }}
                     </span>
                     <span class="badge badge-purple" v-if="seance.jour">{{ seance.jour }}</span>
-                    <span class="seance-card-count">{{ seance.exercices?.length || 0 }} exercices</span>
+                    <span class="seance-card-count">{{ seance.exercices?.length || 0 }} exercice{{ seance.exercices?.length > 1 ? 's' : '' }}</span>
                   </div>
                 </div>
                 <i class="ti ti-chevron-right seance-card-chevron"></i>
@@ -502,6 +526,9 @@
                       <span v-if="v.diff" class="histo-diff" :class="v.diff.classe">{{ v.diff.texte }}</span>
                     </span>
                   </template>
+                  <span v-if="log.reaction_prepa" class="histo-reaction" title="Réaction de ton prépa">
+                    {{ log.reaction_prepa }}<small>prépa</small>
+                  </span>
                 </div>
               </div>
             </template>
@@ -880,6 +907,7 @@
 
       <!-- ONGLET PERFORMANCES -->
       <div v-if="onglet === 'performances'" class="performances-page">
+        <ProgressionExercice :performances="performances" />
         <div class="section-title">Meilleures performances</div>
         <div v-if="performances.length === 0" class="empty">
           Aucun exercice suivi pour l'instant. Touche l'étoile à côté d'un exercice dans le panneau de saisie pour le faire apparaître ici.
@@ -1018,13 +1046,14 @@
         @ressenti-envoye="popupRessenti = null"
         @wellness-envoye="popupWellness = false"
         @voir-seance="ouvrirDepuisRegularite"
+        @voir-poids="onglet = 'poids'"
       />
     </div>
   </AppLayout>
 </template>
 
 <script>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useApi } from '../services/api'
 // utilisé uniquement pour cloisonner le brouillon de saisie par athlète
 // (téléphone partagé, changement de compte)
@@ -1032,6 +1061,10 @@ import { useAuthStore } from '../stores/auth'
 import AppLayout from '../components/AppLayout.vue'
 import CourbeProgression from '../components/athlete/CourbeProgression.vue'
 import MesStats from '../components/athlete/MesStats.vue'
+import ProgressionExercice from '../components/athlete/ProgressionExercice.vue'
+import CelebrationXp from '../components/athlete/CelebrationXp.vue'
+import RecapSemaineModal from '../components/athlete/RecapSemaineModal.vue'
+import { useProgressionStore } from '../stores/progression'
 import BlessuresPanel from '../components/athlete/BlessuresPanel.vue'
 import DietePanel from '../components/athlete/DietePanel.vue'
 import PopupBanniere from '../components/athlete/PopupBanniere.vue'
@@ -1041,6 +1074,7 @@ import ExerciceImage from '../components/ExerciceImage.vue'
 import { typeGroupe, labelTypeGroupe, estComplexe } from '../data/typesGroupe'
 import { cleOccurrence, jourDeLaDate } from '../data/joursSemaine'
 import { parseValeurSerie, inputmodeSaisie } from '../utils/valeurSerie'
+import { formatJourRelatif } from '../data/activite'
 
 // Distance horizontale minimale pour valider un swipe. Volontairement haute :
 // un doigt qui ripe sur un simple appui ne doit jamais changer d'écran.
@@ -1159,6 +1193,8 @@ const CLE_EPINGLE = 'athletia:programme-epingle'
 // enregistrées telles quelles). Détaillée par défaut : rien ne change pour
 // qui saisit déjà ses séries.
 const CLE_MODE_SEANCE = 'athletia:mode-seance'
+// Récap de la semaine déjà vu : lundi (ISO) de la semaine où il l'a été.
+const CLE_RECAP_VU = 'athletia:recap-vu'
 const lireModeSeance = () => {
   try {
     return localStorage.getItem(CLE_MODE_SEANCE) === 'simple' ? 'simple' : 'detaillee'
@@ -1172,7 +1208,7 @@ const DUREE_BROUILLON_MS = 48 * 60 * 60 * 1000
 
 export default {
   components: {
-    AppLayout, CourbeProgression, MesStats, BlessuresPanel, DietePanel, PopupBanniere,
+    AppLayout, CourbeProgression, MesStats, ProgressionExercice, CelebrationXp, RecapSemaineModal, BlessuresPanel, DietePanel, PopupBanniere,
     PlanningCalendrier, PlanningHebdoModal, ExerciceImage
   },
   setup() {
@@ -2355,6 +2391,9 @@ export default {
       effacerBrouillon()
       debutSaisie.value = null
       seanceActive.value = null
+      // Séance faite : confettis et XP gagnée
+      progression.feter()
+      progression.actualiser('Séance validée')
       // Le calendrier de la semaine type colore les séances faites à partir de
       // l'historique : sans ce rafraîchissement, celle qu'on vient de valider
       // y resterait « à faire » jusqu'au prochain chargement de l'écran.
@@ -2365,6 +2404,95 @@ export default {
       // seancesAffichees recalcule alors automatiquement : ce créneau montrera
       // la semaine suivante programmée par le prépa (ou reboucle sur la
       // dernière si la programmation s'arrête là).
+    }
+
+    // --- Progression ludique (XP, niveau) et récap de la semaine ---
+    const progression = useProgressionStore()
+    const recapPropose = ref(false)
+    const recapOuvert = ref(false)
+    const lundiCourantIso = () => {
+      const d = new Date()
+      d.setDate(d.getDate() - ((d.getDay() + 6) % 7))
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    }
+    // Proposé à partir du lundi, jusqu'à ce qu'il soit vu ou écarté : un
+    // athlète qui n'ouvre l'appli que le mardi l'a quand même. Pas à un
+    // athlète qui n'a encore rien fait (récap vide).
+    const verifierRecap = () => {
+      try {
+        recapPropose.value = (progression.progression?.xp_total || 0) > 0 && localStorage.getItem(CLE_RECAP_VU) !== lundiCourantIso()
+      } catch {
+        recapPropose.value = false
+      }
+    }
+    const marquerRecapVu = () => {
+      recapPropose.value = false
+      try {
+        localStorage.setItem(CLE_RECAP_VU, lundiCourantIso())
+      } catch {
+        // stockage indisponible : la bannière reviendra au prochain lancement
+      }
+    }
+    const ouvrirRecap = () => {
+      marquerRecapVu()
+      recapOuvert.value = true
+    }
+    onMounted(async () => {
+      await progression.charger()
+      verifierRecap()
+    })
+
+    // --- Réactions du prépa : notification dans l'appli ---
+    // Vérifiées à l'ouverture, puis à chaque retour dans l'appli (PWA restée
+    // ouverte en arrière-plan), au plus une fois par minute.
+    const reactionsNouvelles = ref([])
+    let derniereVerifReactions = 0
+    const chargerReactions = async () => {
+      derniereVerifReactions = Date.now()
+      try {
+        reactionsNouvelles.value = await api.get('/logs/reactions/nouvelles')
+      } catch {
+        // API pas encore à jour ou hors ligne : pas de bannière, rien à signaler
+      }
+    }
+    const surRetourDansLAppli = () => {
+      if (document.visibilityState === 'visible' && Date.now() - derniereVerifReactions > 60000) chargerReactions()
+    }
+    onMounted(() => {
+      chargerReactions()
+      document.addEventListener('visibilitychange', surRetourDansLAppli)
+    })
+    onBeforeUnmount(() => document.removeEventListener('visibilitychange', surRetourDansLAppli))
+
+    const banniereReaction = computed(() => {
+      const liste = reactionsNouvelles.value
+      if (!liste.length) return null
+      const derniere = liste[0]
+      const ou = `${derniere.exercice} · ${derniere.seance}`
+      if (liste.length === 1) {
+        return { titre: `Ton prépa a réagi ${derniere.reaction} à ta série`, sousTitre: `${ou}, ${formatJourRelatif(derniere.date)}` }
+      }
+      const emojis = [...new Set(liste.map(r => r.reaction))].slice(0, 3).join(' ')
+      return { titre: `Ton prépa a réagi à ${liste.length} de tes séries ${emojis}`, sousTitre: `Dernière : ${ou}` }
+    })
+    // Seules les réactions montrées passent en vues (cf. POST /logs/reactions/vues)
+    const marquerReactionsVues = async () => {
+      const ids = reactionsNouvelles.value.map(r => r.id)
+      reactionsNouvelles.value = []
+      if (!ids.length) return
+      try {
+        await api.post('/logs/reactions/vues', { ids })
+      } catch (e) {
+        console.error('Erreur réactions vues:', e)
+      }
+    }
+    // Ouvre la séance de la réaction la plus récente, sur la date de la série
+    const voirReaction = async () => {
+      const derniere = reactionsNouvelles.value[0]
+      await marquerReactionsVues()
+      if (derniere) {
+        await ouvrirDepuisRegularite({ seanceId: derniere.seance_id, programmeId: derniere.programme_id, date: derniere.date })
+      }
     }
 
     // --- Vue simple de la séance ---
@@ -2583,6 +2711,7 @@ export default {
         const entree = await api.post('/poids/', { date, poids: valeur })
         entriesPoids.value = [...entriesPoids.value.filter(e => e.date !== date), entree]
         fermerSaisiePoids()
+        progression.actualiser('Pesée')
 
         if (date === aujourdhuiISO()) {
           const wellnessJour = await api.get('/wellness/aujourdhui')
@@ -2677,6 +2806,8 @@ export default {
       etatBoutonSerie, toggleSerie, historiqueGroupeExiste, supprimerSeanceHistorique,
       selectProgramme, demarrerSeance, validerSeance,
       modeSeance, choisirModeSeance, estExoCoche, basculerExoSimple, nbExosCoches, validerSeanceSimple,
+      recapPropose, recapOuvert, ouvrirRecap, marquerRecapVu,
+      banniereReaction, voirReaction, marquerReactionsVues,
       programmesAffiches, programmeEpingleId, estEpingle, basculerEpingleProgramme,
       isGroupeComplete,
       progressionSeance,
@@ -3246,6 +3377,20 @@ export default {
 }
 .serie-card.done { background: var(--color-valid-bg-soft); border-color: var(--color-valid-border); }
 
+/* --- Réaction du prépa sur une série, dans l'historique --- */
+.histo-reaction {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: auto;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  background: var(--color-primary-light);
+  font-size: var(--font-size-sm);
+}
+.histo-reaction small { font-size: 10px; font-weight: 700; color: var(--color-primary-text); text-transform: uppercase; letter-spacing: 0.3px; }
+
+
 .serie-head { display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-sm); }
 .serie-label { font-size: var(--font-size-base); font-weight: 700; color: var(--color-superset-text); }
 .serie-repos {
@@ -3727,6 +3872,8 @@ export default {
 .btn-suivi.active { color: var(--color-warning-icon); }
 
 /* --- Performances --- */
+/* La courbe de progression (si un exercice est suivi) précède la liste */
+.performances-page > .section-title { margin-top: var(--spacing-sm); }
 .performances-page {
   flex: 1;
   padding: var(--spacing-lg);

@@ -1,5 +1,8 @@
 <template>
   <div class="mes-stats">
+    <!-- Niveau, XP et série en cours -->
+    <CarteNiveau />
+
     <!-- Ressenti de séance à compléter -->
     <div class="stat-card" v-if="ressenti" ref="ressentiEl">
       <div class="stat-card-titre"><i class="ti ti-mood-smile"></i> Ressenti — {{ ressenti.seance_nom }}</div>
@@ -94,15 +97,48 @@
       </template>
     </div>
 
-    <!-- Stats descriptives, aucune interprétation -->
-    <div class="stat-card" v-if="courbePoids.length > 0">
-      <div class="stat-card-titre"><i class="ti ti-scale"></i> Poids</div>
-      <CourbeProgression :points="courbePoids" label="Poids" unite="kg" axe-x="dates" />
+    <!-- En bref : trois chiffres, aucune interprétation. Le détail vit dans
+         les onglets dédiés (courbe de poids dans Suivi, progression dans Perfs). -->
+    <div class="en-bref" v-if="stats">
+      <div class="bref-tuile">
+        <span class="bref-valeur">{{ seancesSemaine }}</span>
+        <span class="bref-label">séance{{ seancesSemaine > 1 ? 's' : '' }} cette semaine</span>
+      </div>
+      <div class="bref-tuile">
+        <span class="bref-valeur">{{ stats.nb_seances_completees }}</span>
+        <span class="bref-label">au total</span>
+      </div>
+      <button v-if="dernierPoids" type="button" class="bref-tuile bref-cliquable" @click="$emit('voir-poids')">
+        <span class="bref-valeur">
+          {{ dernierPoids }}<small> kg</small>
+          <i v-if="tendancePoids" class="ti bref-tendance" :class="tendancePoids"></i>
+        </span>
+        <span class="bref-label">poids <i class="ti ti-chevron-right"></i></span>
+      </button>
     </div>
 
     <div class="stat-card" v-if="stats">
-      <div class="stat-card-titre"><i class="ti ti-calendar-stats"></i> Régularité</div>
-      <p class="stat-card-sub">{{ stats.nb_seances_completees }} séance{{ stats.nb_seances_completees > 1 ? 's' : '' }} complétée{{ stats.nb_seances_completees > 1 ? 's' : '' }} au total</p>
+      <div class="stat-card-titre">
+        <i class="ti ti-calendar-stats"></i> Régularité
+        <div class="bascule" role="group" aria-label="Régularité affichée">
+          <button
+            type="button"
+            :class="{ active: vueRegularite === 'seances' }"
+            :aria-pressed="vueRegularite === 'seances'"
+            @click="choisirVueRegularite('seances')"
+          >Séances</button>
+          <button
+            type="button"
+            :class="{ active: vueRegularite === 'diete' }"
+            :aria-pressed="vueRegularite === 'diete'"
+            @click="choisirVueRegularite('diete')"
+          >Diète</button>
+        </div>
+      </div>
+      <!-- DIÈTE : calendrier de la réussite calorique, mois par mois -->
+      <CalendrierDiete v-if="vueRegularite === 'diete'" />
+
+      <template v-else>
       <div class="regularite-grille">
         <button
           v-for="j in derniersJours"
@@ -136,27 +172,15 @@
         </div>
       </div>
 
-      <p class="stat-card-note">Les 35 derniers jours — couleur = type de séance complétée (rouge musculation, bleu natation, vert athlétisme, orange pliométrie). Touche un carré coloré pour voir la séance faite ce jour-là.</p>
-    </div>
-
-    <div class="stat-card" v-if="stats && stats.repartition_types.length > 0">
-      <GraphiqueBarres
-        label="Répartition par type de séance"
-        :barres="repartitionBarres"
-      />
-    </div>
-
-    <div class="stat-card" v-if="performances.length > 0">
-      <div class="stat-card-titre"><i class="ti ti-trending-up"></i> Progression</div>
-      <select v-model="exerciceChoisiId" class="select-exercice">
-        <option v-for="p in performances" :key="p.exercice_id" :value="p.exercice_id">{{ p.exercice_nom }}</option>
-      </select>
-      <CourbeProgression
-        v-if="exerciceChoisi"
-        :points="courbeExerciceChoisi"
-        :label="exerciceChoisi.exercice_nom"
-        :unite="exerciceChoisi.unite"
-      />
+      <!-- Légende = répartition : une pastille par type, avec son total -->
+      <div class="regularite-legende" v-if="stats.repartition_types.length > 0">
+        <span v-for="r in stats.repartition_types" :key="r.type_seance" class="legende-item">
+          <span class="legende-puce" :style="{ background: couleurType(r.type_seance) }"></span>
+          {{ labelType(r.type_seance) }} <strong>{{ r.nb_seances }}</strong>
+        </span>
+      </div>
+      <p class="stat-card-note">35 derniers jours. Touche un jour coloré pour revoir ta séance.</p>
+      </template>
     </div>
 
     <div class="empty" v-if="stats && stats.nb_seances_completees === 0">
@@ -168,10 +192,10 @@
 <script>
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useApi } from '../../services/api'
-import CourbeProgression from './CourbeProgression.vue'
-import GraphiqueBarres from '../monitoring/GraphiqueBarres.vue'
+import { useProgressionStore } from '../../stores/progression'
+import CarteNiveau from './CarteNiveau.vue'
+import CalendrierDiete from './CalendrierDiete.vue'
 import { SOMMEIL_MIN, SOMMEIL_MAX, SOMMEIL_PAS, SOMMEIL_DEFAUT, formatHeures } from '../../data/sommeil'
-import { parseValeurSerie } from '../../utils/valeurSerie'
 
 const LABELS_TYPE = { musculation: 'Musculation', natation: 'Natation', athletisme: 'Athlétisme', pliometrie: 'Pliométrie' }
 
@@ -188,19 +212,21 @@ const LABELS_RPE = {
 }
 
 export default {
-  components: { CourbeProgression, GraphiqueBarres },
+  components: { CarteNiveau, CalendrierDiete },
   // ressenti-envoye / wellness-envoye : la bannière du dashboard propose le
   // même questionnaire. Sans ces signaux, y répondre ici la laissait affichée,
   // à proposer quelque chose qui venait d'être fait.
   // voir-seance : la grille de régularité ne sait pas ouvrir une séance, c'est
   // le dashboard qui détient le programme et sa liste de séances.
-  emits: ['focus-consomme', 'ressenti-envoye', 'wellness-envoye', 'voir-seance'],
+  // voir-poids : la tuile Poids ouvre l'onglet Poids (calendrier + courbe).
+  emits: ['focus-consomme', 'ressenti-envoye', 'wellness-envoye', 'voir-seance', 'voir-poids'],
   props: {
     focusRessenti: { type: Boolean, default: false },
     focusWellness: { type: Boolean, default: false }
   },
   setup(props, { emit }) {
     const api = useApi()
+    const progression = useProgressionStore()
     const stats = ref(null)
     const ressenti = ref(null)
     const rpeForm = ref(null)
@@ -210,9 +236,6 @@ export default {
     // note de qualité 1-7 du questionnaire de Hooper. Les deux comptent, et
     // pour des raisons différentes (cf. monitoring_calc.py côté API).
     const wellnessForm = ref({ sommeil: null, fatigue: null, courbatures: null, stress: null, heures_sommeil: null })
-    const performances = ref([])
-    const exerciceChoisiId = ref(null)
-    const historiqueExercice = ref([])
     const ressentiEl = ref(null)
     const wellnessEl = ref(null)
 
@@ -257,55 +280,19 @@ export default {
         console.error('Erreur chargement poids:', e)
       }
     }
-    const courbePoids = computed(() =>
-      [...entriesPoids.value]
-        .sort((a, b) => new Date(a.date) - new Date(b.date))
-        .map(e => ({ date: e.date, valeur: e.poids }))
-    )
-
-    const fetchPerformances = async () => {
-      performances.value = await api.get('/performances/moi')
-      if (performances.value.length > 0 && !exerciceChoisiId.value) {
-        exerciceChoisiId.value = performances.value[0].exercice_id
-      }
-    }
-
-    const exerciceChoisi = computed(() => performances.value.find(p => p.exercice_id === exerciceChoisiId.value))
-
-    const champPourType = (type) => type === 'musculation' ? 'poids_realise' : 'reps_realisees'
-
-    const fetchHistoriqueExercice = async () => {
-      if (!exerciceChoisi.value) { historiqueExercice.value = []; return }
-      try {
-        historiqueExercice.value = await api.get(`/logs/programme/${exerciceChoisi.value.programme_id}/moi`)
-      } catch (e) {
-        console.error('Erreur chargement historique exercice:', e)
-        historiqueExercice.value = []
-      }
-    }
-
-    const cleTentative = (l) => l.session_id || l.date.split('T')[0]
-
-    const courbeExerciceChoisi = computed(() => {
-      if (!exerciceChoisi.value) return []
-      const champ = champPourType(exerciceChoisi.value.type_seance)
-      const parTentative = {}
-      historiqueExercice.value
-        .filter(l => l.exercice.nom === exerciceChoisi.value.exercice_nom)
-        .forEach(l => {
-          const valeur = parseValeurSerie(l[champ])
-          if (isNaN(valeur)) return
-          const cle = cleTentative(l)
-          if (!parTentative[cle]) parTentative[cle] = { date: l.date.split('T')[0], total: 0, n: 0 }
-          parTentative[cle].total += valeur
-          parTentative[cle].n += 1
-        })
-      return Object.values(parTentative)
-        .map(t => ({ date: t.date, valeur: Math.round((t.total / t.n) * 100) / 100 }))
-        .sort((a, b) => new Date(a.date) - new Date(b.date))
+    // Tuile Poids : la dernière pesée et le sens par rapport à la précédente,
+    // sans jugement (monter ou descendre n'est ni bien ni mal en soi).
+    const peseesTriees = computed(() => [...entriesPoids.value].sort((a, b) => new Date(a.date) - new Date(b.date)))
+    const dernierPoids = computed(() => {
+      const derniere = peseesTriees.value[peseesTriees.value.length - 1]
+      return derniere ? derniere.poids.toLocaleString('fr-FR') : null
     })
-
-    watch(exerciceChoisiId, fetchHistoriqueExercice)
+    const tendancePoids = computed(() => {
+      const p = peseesTriees.value
+      if (p.length < 2) return null
+      const ecart = p[p.length - 1].poids - p[p.length - 2].poids
+      return ecart > 0 ? 'ti-trending-up' : ecart < 0 ? 'ti-trending-down' : 'ti-minus'
+    })
 
     // Sans ces messages, un envoi qui échoue ne produisait rien du tout à
     // l'écran : le bouton restait actif et l'athlète ne savait pas si c'était
@@ -325,6 +312,7 @@ export default {
         return
       }
       ressenti.value = null
+      progression.actualiser('Ressenti')
       emit('ressenti-envoye')
       // Une autre tentative peut rester à compléter (deux séances validées
       // dans les 24 h) : on redemande au lieu de la masquer jusqu'au prochain
@@ -345,20 +333,30 @@ export default {
         return
       }
       wellnessFait.value = true
+      progression.actualiser('Wellness du jour')
       emit('wellness-envoye')
     }
 
-    const repartitionBarres = computed(() =>
-      (stats.value?.repartition_types || []).map(r => ({
-        cle: r.type_seance, nom: LABELS_TYPE[r.type_seance] || r.type_seance, valeur: r.nb_seances
-      }))
-    )
+    const labelType = (t) => LABELS_TYPE[t] || t
 
     // Date locale au format ISO : toISOString() bascule en UTC et décalait la
     // grille d'un jour entre minuit et 2 h du matin (France en UTC+1/+2),
     // marquant « aujourd'hui » sur la case de la veille.
     const pad2 = (n) => String(n).padStart(2, '0')
     const dateISOLocale = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
+
+    // Séances complétées depuis lundi (dates ISO locales, comparables en texte).
+    const seancesSemaine = computed(() => {
+      const lundi = new Date()
+      lundi.setDate(lundi.getDate() - ((lundi.getDay() + 6) % 7))
+      const debut = dateISOLocale(lundi)
+      return (stats.value?.jours_avec_seance || [])
+        .filter(j => j.date >= debut)
+        .reduce((total, j) => total + j.nb_seances, 0)
+    })
+
+    // --- Régularité : séances (grille des 35 jours) ou diète (calendrier) ---
+    const vueRegularite = ref('seances')
 
     const derniersJours = computed(() => {
       const parJour = {}
@@ -390,6 +388,10 @@ export default {
     const jourDetail = computed(() =>
       derniersJours.value.find(j => j.date === jourOuvert.value && j.seances.length > 0) || null
     )
+    const choisirVueRegularite = (vue) => {
+      vueRegularite.value = vue
+      jourOuvert.value = null
+    }
     const basculerJour = (j) => {
       if (j.seances.length === 0) return
       jourOuvert.value = jourOuvert.value === j.date ? null : j.date
@@ -436,12 +438,11 @@ export default {
       // appel en échec (réseau coupé en salle, endpoint en erreur) laissait
       // l'écran entièrement vide et sautait tout ce qui suit.
       const resultats = await Promise.allSettled([
-        fetchStats(), fetchRessenti(), fetchWellness(), fetchPerformances(), fetchPoids()
+        fetchStats(), fetchRessenti(), fetchWellness(), fetchPoids()
       ])
       resultats
         .filter(r => r.status === 'rejected')
         .forEach(r => console.error('Erreur chargement stats athlète:', r.reason))
-      await fetchHistoriqueExercice()
       if (props.focusRessenti) { await scrollVers(ressentiEl.value); emit('focus-consomme', 'ressenti') }
       if (props.focusWellness) { await scrollVers(wellnessEl.value); emit('focus-consomme', 'wellness') }
     })
@@ -451,8 +452,9 @@ export default {
       wellnessFait, wellnessForm, itemsWellness, wellnessComplet, envoyerWellness,
       ajusterSommeil, formatHeures, SOMMEIL_MIN, SOMMEIL_MAX,
       erreurRessenti, erreurWellness,
-      performances, exerciceChoisiId, exerciceChoisi, courbeExerciceChoisi,
-      repartitionBarres, derniersJours, styleJour, courbePoids,
+      seancesSemaine, dernierPoids, tendancePoids, labelType,
+      vueRegularite, choisirVueRegularite,
+      derniersJours, styleJour,
       jourOuvert, jourDetail, basculerJour, formatJourLong, couleurType,
       ressentiEl, wellnessEl
     }
@@ -490,6 +492,68 @@ export default {
 .stat-card-sub { font-size: var(--font-size-sm); color: var(--color-text-secondary); margin: 0; }
 .stat-card-note { font-size: var(--font-size-xs); color: var(--color-text-muted); margin: 0; }
 .stat-card-erreur { font-size: var(--font-size-sm); color: var(--color-danger-text); margin: 0; }
+.stat-card-periode { margin-left: auto; font-size: var(--font-size-xs); font-weight: 500; color: var(--color-text-muted); }
+
+/* --- En bref : trois tuiles, une ligne --- */
+.en-bref { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--spacing-sm); flex-shrink: 0; }
+.bref-tuile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--spacing-md);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  font-family: inherit;
+  color: inherit;
+  text-align: left;
+}
+.bref-cliquable { cursor: pointer; transition: border-color var(--transition-fast); }
+.bref-cliquable:hover { border-color: var(--color-primary); }
+.bref-valeur {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  font-size: var(--font-size-xl);
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
+}
+.bref-valeur small { font-size: var(--font-size-sm); font-weight: 600; color: var(--color-text-secondary); }
+.bref-tendance { margin-left: 4px; font-size: var(--font-size-base); color: var(--color-text-secondary); align-self: center; }
+.bref-label { display: flex; align-items: center; gap: 2px; font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+
+/* --- Bascule Séances / Diète de la régularité --- */
+.bascule {
+  margin-left: auto;
+  display: inline-flex;
+  padding: 3px;
+  gap: 2px;
+  border-radius: var(--radius-full);
+  background: var(--color-bg-tertiary);
+}
+.bascule button {
+  min-height: 30px;
+  padding: 0 var(--spacing-md);
+  border: none;
+  border-radius: var(--radius-full);
+  background: transparent;
+  font-family: inherit;
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+.bascule button.active { background: var(--color-bg); color: var(--color-primary-dark); box-shadow: var(--shadow-sm); }
+
+/* --- Légende de la régularité (fait aussi office de répartition) --- */
+.regularite-legende { display: flex; flex-wrap: wrap; gap: 4px var(--spacing-md); font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+.legende-item { display: inline-flex; align-items: center; gap: 5px; }
+.legende-item strong { color: var(--color-text); }
+.legende-puce { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
 
 .rpe-picker { display: flex; flex-wrap: wrap; gap: 6px; }
 .rpe-btn {
@@ -607,12 +671,4 @@ export default {
   cursor: pointer;
 }
 
-.select-exercice {
-  min-height: var(--tap-min);
-  padding: 0 var(--spacing-md);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  font-size: var(--font-size-base);
-  background: var(--color-bg);
-}
 </style>

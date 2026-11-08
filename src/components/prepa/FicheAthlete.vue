@@ -336,9 +336,10 @@
                     </div>
                     <div class="comparatif-grid">
                       <div class="comparatif-header">
-                        <span>Série</span><span>Prescrit</span><span></span><span>Réalisé</span><span></span>
+                        <span>Série</span><span>Prescrit</span><span></span><span>Réalisé</span><span></span><span></span>
                       </div>
-                      <div v-for="(log, i) in exo.logs" :key="log.id" class="comparatif-row" :class="getStatutClasse(log, session.typeSeance)">
+                      <template v-for="(log, i) in exo.logs" :key="log.id">
+                      <div class="comparatif-row" :class="getStatutClasse(log, session.typeSeance)">
                         <span class="serie-num">{{ i + 1 }}</span>
                         <div class="prescrit-cell">
                           <template v-if="session.typeSeance === 'natation' || session.typeSeance === 'athletisme'">
@@ -375,7 +376,31 @@
                           <span v-else class="non-fait"><i class="ti ti-x"></i> non réalisée</span>
                         </div>
                         <span class="statut-icon"><i :class="getStatutIcon(log, session.typeSeance)"></i></span>
+                        <button
+                          type="button"
+                          class="btn-reaction"
+                          :class="{ pose: log.reaction_prepa }"
+                          :title="log.reaction_prepa ? 'Changer ta réaction' : 'Réagir à cette série'"
+                          :aria-label="log.reaction_prepa ? 'Changer ta réaction' : 'Réagir à cette série'"
+                          @click="basculerReaction(log.id)"
+                        >
+                          <span v-if="log.reaction_prepa">{{ log.reaction_prepa }}</span>
+                          <i v-else class="ti ti-mood-plus"></i>
+                        </button>
                       </div>
+                      <!-- Réaction du prépa : l'athlète la voit dans son historique -->
+                      <div v-if="reactionOuverte === log.id" class="reaction-choix" role="group" aria-label="Réagir à cette série">
+                        <button
+                          v-for="r in REACTIONS_PREPA"
+                          :key="r"
+                          type="button"
+                          class="reaction-option"
+                          :class="{ active: log.reaction_prepa === r }"
+                          @click="reagir(log, r)"
+                        >{{ r }}</button>
+                        <span class="reaction-aide">Ton athlète est notifié à sa prochaine ouverture de l'appli</span>
+                      </div>
+                      </template>
                     </div>
                   </div>
                 </div>
@@ -546,6 +571,10 @@ const ONGLETS = [
 ]
 const ONGLETS_FICHE = ONGLETS.map(o => o.cle)
 
+// Réactions du prépa sur une série (liste fermée, identique à
+// REACTIONS_PREPA côté API : app/schemas/log_serie.py).
+const REACTIONS_PREPA = ['👏', '🔥', '💪', '🚀', '💯', '👀']
+
 const pad2 = (n) => String(n).padStart(2, '0')
 
 export default {
@@ -567,6 +596,21 @@ export default {
 
     const groupesDe = computed(() => props.groupes.filter(g => g.athletes.find(a => a.id === props.athlete.id)))
     const initiales = (nom) => nom.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+
+    // --- Réaction à une série de l'historique ---
+    const reactionOuverte = ref(null)
+    const basculerReaction = (logId) => { reactionOuverte.value = reactionOuverte.value === logId ? null : logId }
+    // Retoucher la réaction déjà posée la retire.
+    const reagir = async (log, reaction) => {
+      const nouvelle = log.reaction_prepa === reaction ? null : reaction
+      try {
+        const maj = await api.patch(`/logs/${log.id}/reaction`, { reaction: nouvelle })
+        log.reaction_prepa = maj.reaction_prepa
+      } catch (e) {
+        console.error('Erreur réaction série:', e)
+      }
+      reactionOuverte.value = null
+    }
 
     const retirerDuCercle = async () => {
       if (!confirm(`Retirer ${props.athlete.nom} de votre cercle ?`)) return
@@ -1036,6 +1080,7 @@ export default {
 
     return {
       estSuperPrepa, sousOnglet, modalGroupes, groupesDe, initiales, retirerDuCercle, ONGLETS,
+      REACTIONS_PREPA, reactionOuverte, basculerReaction, reagir,
       FENETRE_ACTIVITE, LABELS_NIVEAU_ACTIVITE, niveauActivite, libelleActivite,
       typeSeance, labelTypeSeance, iconeTypeSeance,
       detail, loadingApercu, pointsAcwr, pointsAigueChronique, pointsMonotonie, pointsContrainte,
@@ -1390,7 +1435,7 @@ export default {
 .comparatif-grid { display: flex; flex-direction: column; gap: 4px; }
 .comparatif-header {
   display: grid;
-  grid-template-columns: 40px 1.3fr 20px 1.3fr 24px;
+  grid-template-columns: 40px 1.3fr 20px 1.3fr 24px 40px;
   gap: var(--spacing-sm);
   font-size: var(--font-size-xs);
   color: var(--color-text-secondary);
@@ -1401,7 +1446,7 @@ export default {
 }
 .comparatif-row {
   display: grid;
-  grid-template-columns: 40px 1.3fr 20px 1.3fr 24px;
+  grid-template-columns: 40px 1.3fr 20px 1.3fr 24px 40px;
   gap: var(--spacing-sm);
   align-items: center;
   padding: var(--spacing-sm);
@@ -1419,6 +1464,50 @@ export default {
 .realise-cell { font-weight: 600; }
 .non-fait { display: inline-flex; align-items: center; gap: 4px; color: var(--color-danger-text); font-weight: 500; font-style: normal; }
 .statut-icon { display: flex; justify-content: center; }
+.btn-reaction {
+  width: 36px;
+  height: 36px;
+  border: 1px dashed var(--color-border-strong);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-lg);
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform var(--transition-fast), background var(--transition-fast);
+}
+.btn-reaction:hover { background: var(--color-bg); color: var(--color-primary-dark); }
+.btn-reaction.pose { border-style: solid; border-color: var(--color-primary); background: var(--color-primary-light); }
+.reaction-choix {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 4px var(--spacing-sm) var(--spacing-sm);
+  animation: reaction-arrivee 0.25s var(--ease-standard);
+}
+@keyframes reaction-arrivee { from { opacity: 0; transform: translateY(-4px); } }
+.reaction-option {
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  background: var(--color-bg);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  transition: transform var(--transition-fast);
+}
+.reaction-option:hover { transform: scale(1.15); }
+.reaction-option.active { border-color: var(--color-primary); background: var(--color-primary-light); }
+.reaction-aide { flex-basis: 100%; text-align: right; font-size: var(--font-size-xs); color: var(--color-text-muted); }
+@media (prefers-reduced-motion: reduce) {
+  .reaction-choix { animation: none; }
+  .reaction-option:hover { transform: none; }
+}
 .serie-num {
   font-size: var(--font-size-xs);
   font-weight: 700;
@@ -1435,7 +1524,7 @@ export default {
   .fiche-avatar { width: 48px; height: 48px; font-size: var(--font-size-base); }
   .tab { padding: var(--spacing-sm) var(--spacing-md); }
   .detail-grid { grid-template-columns: 1fr; }
-  .comparatif-header, .comparatif-row { grid-template-columns: 30px 1fr 16px 1fr 20px; gap: 6px; }
+  .comparatif-header, .comparatif-row { grid-template-columns: 30px 1fr 16px 1fr 20px 36px; gap: 6px; }
   .prescrit-cell, .non-fait { font-size: var(--font-size-xs); }
   /* L'écran est trop étroit pour aligner les séries sous le nom de l'exercice */
   .series-chips { padding-left: 0; }

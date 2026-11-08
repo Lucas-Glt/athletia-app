@@ -7,6 +7,9 @@
       <button type="button" :class="{ actif: vue === 'objectif' }" @click="vue = 'objectif'">
         <i class="ti ti-target"></i> Objectif
       </button>
+      <button type="button" :class="{ actif: vue === 'calendrier' }" @click="vue = 'calendrier'">
+        <i class="ti ti-calendar-check"></i> Calendrier
+      </button>
     </div>
 
     <template v-if="vue === 'journee'">
@@ -99,7 +102,7 @@
     </template>
 
     <!-- VUE OBJECTIF -->
-    <template v-else>
+    <template v-else-if="vue === 'objectif'">
       <div v-if="chargementBilan" class="empty">Chargement...</div>
 
       <div v-else-if="!bilan" class="empty-state">
@@ -188,6 +191,11 @@
 
       <p v-if="erreurListe" class="error">{{ erreurListe }}</p>
     </template>
+
+    <!-- VUE CALENDRIER : réussite calorique jour par jour, mois par mois -->
+    <div v-else class="diete-calendrier">
+      <CalendrierDiete />
+    </div>
 
     <!-- Création / renommage d'un repas : même modale, form.id décide. -->
     <div v-if="modaleRepas" class="modal-overlay" @click.self="fermerModaleRepas">
@@ -477,7 +485,9 @@
 <script>
 import { ref, computed, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { useApi } from '../../services/api'
+import { useProgressionStore } from '../../stores/progression'
 import CourbeObjectif from './CourbeObjectif.vue'
+import CalendrierDiete from './CalendrierDiete.vue'
 
 const REPAS_COURANTS = ['Petit-déjeuner', 'Déjeuner', 'Dîner', 'Collation']
 const RACCOURCIS_G = [50, 100, 150, 200]
@@ -547,9 +557,10 @@ const formObjectifVide = () => ({
 })
 
 export default {
-  components: { CourbeObjectif },
+  components: { CourbeObjectif, CalendrierDiete },
   setup() {
     const api = useApi()
+    const progression = useProgressionStore()
 
     const vue = ref('journee')
     const bilan = ref(null)
@@ -955,6 +966,8 @@ export default {
         }
         modaleAliment.value = false
         await charger()
+        // Un repas qui reçoit son premier aliment rapporte de l'XP
+        progression.actualiser('Repas')
       } catch (e) {
         erreurModale.value = e.message || "Erreur lors de l'enregistrement"
       } finally {
@@ -1020,6 +1033,13 @@ export default {
 }
 
 /* --- Sous-onglets Journée / Objectif --- */
+.diete-calendrier {
+  padding: var(--spacing-lg);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+}
 .sous-onglets {
   display: flex;
   gap: 2px;

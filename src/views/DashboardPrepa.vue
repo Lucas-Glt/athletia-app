@@ -10,13 +10,10 @@
       <div class="nav-item" :class="{ active: onglet === 'tests' }" @click="onglet = 'tests'">
         <i class="ti ti-clipboard-list"></i> Tests
       </div>
-      <div class="nav-item" :class="{ active: onglet === 'atelier' }" @click="onglet = 'atelier'">
-        <i class="ti ti-flask"></i> Atelier
-      </div>
     </template>
 
     <template #actions>
-      <button class="btn btn-primary" @click="vue = 'form'" v-if="onglet === 'programmes' && vue === 'liste'">
+      <button class="btn btn-primary" @click="vue = 'form'" v-if="onglet === 'programmes' && vue === 'liste' && sousOngletProgrammes === 'mes-programmes'">
         <i class="ti ti-plus"></i> Nouveau programme
       </button>
     </template>
@@ -31,11 +28,34 @@
         @modifie="onModifie"
       />
 
-      <!-- ONGLET PROGRAMMES -->
-      <div v-if="onglet === 'programmes'" class="onglet-wrapper">
+      <!-- ONGLET PROGRAMMES : les programmes existants, et l'Atelier pour en
+           construire autrement (prototype). Les sous-onglets disparaissent
+           pendant la création classique, pour ne pas en sortir par erreur. -->
+      <div v-if="onglet === 'programmes'" class="onglet-wrapper onglet-programmes">
+        <nav v-if="vue === 'liste'" class="sous-onglets" aria-label="Programmes">
+          <button
+            type="button"
+            class="sous-onglet"
+            :class="{ active: sousOngletProgrammes === 'mes-programmes' }"
+            @click="sousOngletProgrammes = 'mes-programmes'"
+          >
+            <i class="ti ti-layout-grid"></i> Mes programmes
+          </button>
+          <button
+            type="button"
+            class="sous-onglet"
+            :class="{ active: sousOngletProgrammes === 'atelier' }"
+            @click="sousOngletProgrammes = 'atelier'"
+          >
+            <i class="ti ti-flask"></i> Atelier <span class="badge-beta">bêta</span>
+          </button>
+        </nav>
+
         <ProgrammeForm v-if="vue === 'form'" @termine="onTermine" />
 
-        <div v-if="vue === 'liste'" class="content-body" :class="{ 'detail-ouvert': mobileDetail }">
+        <AtelierProgramme v-else-if="sousOngletProgrammes === 'atelier'" />
+
+        <div v-else class="content-body" :class="{ 'detail-ouvert': mobileDetail }">
           <!-- Liste des programmes : colonne desktop, écran plein mobile -->
           <div class="panel-list">
             <div class="panel-list-entete">
@@ -463,9 +483,6 @@
         :actif="onglet === 'tests'"
       />
 
-      <!-- ONGLET ATELIER (prototype de construction de programme) -->
-      <AtelierProgramme v-if="onglet === 'atelier'" />
-
     </div>
   </AppLayout>
 </template>
@@ -517,16 +534,19 @@ export default {
     const api = useApi()
 
     const jours = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche']
-    const LABELS_ONGLETS = { athletes: 'Athlètes', programmes: 'Programmes', tests: 'Tests', atelier: 'Atelier' }
+    const LABELS_ONGLETS = { athletes: 'Athlètes', programmes: 'Programmes', tests: 'Tests' }
     const vueLabel = computed(() => LABELS_ONGLETS[onglet.value] || 'Programmes')
+    // Dans l'onglet Programmes : 'mes-programmes' (liste + détail) ou 'atelier'.
+    const sousOngletProgrammes = ref('mes-programmes')
 
-    // Swipe entre les onglets Athlètes/Programmes/Tests/Atelier, même logique
-    // que le swipe de tabs du dashboard athlète. Sans effet quand la fiche
-    // d'un athlète est ouverte : FicheAthlete.vue stoppe la propagation de
-    // ses propres pointerdown/pointerup, son swipe interne (Aperçu/
-    // Programme/Séances/Poids) est alors prioritaire. L'Atelier la stoppe
-    // aussi : sa grille semaines × jours défile horizontalement sur mobile.
-    const ONGLETS_PREPA = ['athletes', 'programmes', 'tests', 'atelier']
+    // Swipe entre les onglets Athlètes/Programmes/Tests, même logique que le
+    // swipe de tabs du dashboard athlète. Sans effet quand la fiche d'un
+    // athlète est ouverte : FicheAthlete.vue stoppe la propagation de ses
+    // propres pointerdown/pointerup, son swipe interne (Aperçu/Programme/
+    // Séances/Poids) est alors prioritaire. L'Atelier la stoppe aussi : c'est
+    // un formulaire, un glissé pour sélectionner du texte ne doit pas changer
+    // d'onglet.
+    const ONGLETS_PREPA = ['athletes', 'programmes', 'tests']
     const tabSwipeState = { startX: 0, startY: 0, pointerId: null }
     const onTabSwipeStart = (e) => {
       if (e.pointerType === 'mouse' && e.button !== 0) return
@@ -760,6 +780,7 @@ export default {
     // programme déjà sélectionné.
     const ouvrirProgrammeDepuisFiche = (programme) => {
       onglet.value = 'programmes'
+      sousOngletProgrammes.value = 'mes-programmes'
       selectProgramme(programme)
       vue.value = 'liste'
       mobileDetail.value = true
@@ -946,7 +967,7 @@ export default {
       ajouterSeance, ajouterExercice, mettreAJourSerie,
       dupliquerSemaine, supprimerSemaine,
       supprimerProgramme, supprimerSeance, supprimerExercice,
-      onTermine, onModifie, ouvrirProgrammeDepuisFiche, logout, initiales,
+      onTermine, onModifie, ouvrirProgrammeDepuisFiche, logout, initiales, sousOngletProgrammes,
       mobileDetail, mettreAJourSeance, mettreAJourExercice, onFocusSeanceChamp
     }
   }
@@ -956,6 +977,46 @@ export default {
 <style scoped>
 .dashboard-root { display: flex; flex: 1; flex-direction: column; overflow: hidden; min-height: 0; touch-action: pan-y; }
 .onglet-wrapper { display: flex; flex: 1; overflow: hidden; min-height: 0; }
+.onglet-programmes { flex-direction: column; }
+
+/* --- Sous-onglets de Programmes : Mes programmes / Atelier --- */
+.sous-onglets {
+  display: flex;
+  gap: 4px;
+  padding: var(--spacing-sm) var(--spacing-lg);
+  background: var(--color-bg);
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+.sous-onglet {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 var(--spacing-md);
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+.sous-onglet:hover { background: var(--color-bg-secondary); color: var(--color-text-body); }
+.sous-onglet.active { background: var(--color-primary-light); color: var(--color-primary-dark); }
+.badge-beta {
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+  background: var(--color-bg);
+  color: var(--color-primary-text);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+.sous-onglet:not(.active) .badge-beta { background: var(--color-primary-light); }
 .content-body { display: flex; flex: 1; overflow: hidden; min-height: 0; min-width: 0; }
 
 /* --- Liste des programmes --- */
