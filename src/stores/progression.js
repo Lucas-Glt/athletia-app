@@ -42,6 +42,7 @@ export const useProgressionStore = defineStore('progression', {
           niveau: apres.niveau,
           titre: apres.titre,
           nouveauTitre: apres.titre !== avant.titre,
+          phrase: apres.phrase || '',
           icone: apres.badges.filter(b => b.debloque).pop()?.icone || 'ti-star'
         }
         this.feter()

@@ -24,6 +24,9 @@
             Nouveau titre débloqué : <strong>{{ store.niveauAtteint.titre }}</strong>
           </p>
           <p class="niveau-titre" v-else>{{ store.niveauAtteint.titre }}</p>
+          <p v-if="store.niveauAtteint.nouveauTitre && store.niveauAtteint.phrase" class="niveau-phrase">
+            « {{ store.niveauAtteint.phrase }} »
+          </p>
           <button class="btn btn-primary" @click="store.fermerNiveau()">Continuer</button>
         </div>
       </div>
@@ -194,6 +197,13 @@ export default {
 }
 .niveau-carte h2 { position: relative; margin: 0; font-size: 32px; font-weight: 800; letter-spacing: -0.5px; }
 .niveau-titre { position: relative; margin: 0 0 var(--spacing-md); color: var(--color-text-secondary); }
+.niveau-phrase {
+  position: relative;
+  margin: calc(-1 * var(--spacing-sm)) 0 var(--spacing-md);
+  font-size: var(--font-size-sm);
+  font-style: italic;
+  color: var(--color-primary-dark);
+}
 .niveau-carte .btn { position: relative; width: 100%; }
 .niveau-enter-active, .niveau-leave-active { transition: opacity 0.3s ease; }
 .niveau-enter-from, .niveau-leave-to { opacity: 0; }
