@@ -29,6 +29,38 @@
       @creee="onCompteCree"
     />
 
+    <!-- Préparateur qui a encore des programmes : un autre les reprend
+         avant que le compte soit supprimé (ses athlètes en dépendent). -->
+    <div v-if="transfert" class="modal-overlay" @click.self="transfert = null">
+      <div class="modal">
+        <div class="modal-header">
+          <h3>Supprimer {{ transfert.user.nom }}</h3>
+          <button class="modal-close" @click="transfert = null" aria-label="Fermer"><i class="ti ti-x"></i></button>
+        </div>
+        <div class="modal-body">
+          <p class="transfert-texte">{{ transfert.message }}</p>
+          <div class="field" v-if="repreneurs.length">
+            <label for="repreneur-sa">Repris par</label>
+            <select id="repreneur-sa" v-model="transfert.repreneurId">
+              <option :value="null" disabled>Choisir un préparateur</option>
+              <option v-for="r in repreneurs" :key="r.id" :value="r.id">
+                {{ r.nom }} — {{ r.organisation?.nom || 'Indépendant' }}
+              </option>
+            </select>
+            <span class="transfert-aide">Programmes, tests, groupes et athlètes suivis lui sont transférés, puis le compte est supprimé.</span>
+          </div>
+          <p v-else class="error">Aucun autre préparateur disponible pour reprendre ses programmes.</p>
+          <p v-if="erreurTransfert" class="error">{{ erreurTransfert }}</p>
+        </div>
+        <div class="modal-footer">
+          <button class="btn" @click="transfert = null">Annuler</button>
+          <button class="btn btn-danger" :disabled="!transfert.repreneurId || transfertEnCours" @click="confirmerTransfert">
+            Transférer et supprimer
+          </button>
+        </div>
+      </div>
+    </div>
+
     <ReinitialiserMotDePasseModal
       v-if="userCiblePassword"
       :user="userCiblePassword"
@@ -105,6 +137,8 @@ export default {
         const [orgs, tousLesUsers] = await Promise.all([api.get('/organisations/'), api.get('/users/')])
         organisations.value = orgs
         users.value = tousLesUsers
+      } catch (e) {
+        erreurAction.value = e.message || 'Impossible de charger les organisations'
       } finally {
         loading.value = false
       }
@@ -141,14 +175,48 @@ export default {
       }
     }
 
+    // Préparateur avec des programmes : l'API demande qui les reprend (409).
+    const transfert = ref(null)
+    const transfertEnCours = ref(false)
+    const erreurTransfert = ref('')
+    const repreneurs = computed(() =>
+      transfert.value
+        ? users.value.filter((u) => ['prepa', 'super_prepa'].includes(u.role) && u.id !== transfert.value.user.id)
+        : []
+    )
+
     const onDelete = async (user) => {
-      if (!confirm(`Supprimer "${user.nom}" ? Cette action est irréversible.`)) return
+      const message = user.role === 'athlete'
+        ? `Supprimer ${user.nom} et toutes ses données (séances, pesées, diète, blessures, tests) ? Cette action est irréversible.`
+        : `Supprimer le compte de ${user.nom} ? Cette action est irréversible.`
+      if (!confirm(message)) return
       erreurAction.value = ''
       try {
         await api.del(`/users/${user.id}`)
         users.value = users.value.filter((u) => u.id !== user.id)
       } catch (e) {
+        if (e.status === 409 && e.data?.detail?.code === 'transfert_requis') {
+          erreurTransfert.value = ''
+          transfert.value = { user, message: e.message, repreneurId: null }
+          return
+        }
         erreurAction.value = e.message || 'Erreur lors de la suppression'
+      }
+    }
+
+    const confirmerTransfert = async () => {
+      if (transfertEnCours.value) return
+      const { user, repreneurId } = transfert.value
+      transfertEnCours.value = true
+      erreurTransfert.value = ''
+      try {
+        await api.del(`/users/${user.id}?transfert_vers=${repreneurId}`)
+        users.value = users.value.filter((u) => u.id !== user.id)
+        transfert.value = null
+      } catch (e) {
+        erreurTransfert.value = e.message || 'Erreur lors de la suppression'
+      } finally {
+        transfertEnCours.value = false
       }
     }
 
@@ -159,13 +227,16 @@ export default {
       modalOrganisation, modalCompte, compteOrgPreselectionnee, userCiblePassword,
       organisationsAvecIndependant,
       onOrganisationCreee, ouvrirCreationCompte, onCompteCree,
-      ouvrirResetPassword, onReassign, onDelete
+      ouvrirResetPassword, onReassign, onDelete,
+      transfert, transfertEnCours, erreurTransfert, repreneurs, confirmerTransfert
     }
   }
 }
 </script>
 
 <style scoped>
+.transfert-texte { margin: 0; color: var(--color-text-body); }
+.transfert-aide { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
 .admin-page {
   flex: 1;
   padding: var(--spacing-xl) var(--spacing-2xl);

@@ -7,6 +7,7 @@
       </div>
 
       <div class="modal-body">
+        <div v-if="erreur" class="error" role="alert">{{ erreur }}</div>
         <!-- Athlètes déjà assignés -->
         <div class="bloc">
           <div class="section-title">Déjà assignés</div>
@@ -17,7 +18,7 @@
                 <span class="athlete-nom">{{ a.nom }}</span>
                 <span class="athlete-email">{{ a.email }}</span>
               </div>
-              <button class="btn btn-sm btn-danger" @click="retirer(a)">Retirer</button>
+              <button class="btn btn-sm btn-danger" :disabled="occupe" @click="retirer(a)">Retirer</button>
             </div>
           </div>
           <div class="empty-inline" v-else>Aucun athlète assigné</div>
@@ -46,7 +47,7 @@
                 <span class="athlete-nom">{{ a.nom }}</span>
                 <span class="athlete-email">{{ a.email }}</span>
               </div>
-              <button class="btn btn-sm btn-primary" @click="assigner(a)">Assigner</button>
+              <button class="btn btn-sm btn-primary" :disabled="occupe" @click="assigner(a)">Assigner</button>
             </div>
           </div>
           <div class="empty-inline" v-else>Tous vos athlètes sont déjà assignés</div>
@@ -68,7 +69,7 @@
               <ul class="recap-liste">
                 <li v-for="a in groupeAssignChoisi.athletes" :key="a.id">{{ a.nom }}</li>
               </ul>
-              <button class="btn btn-sm btn-primary" @click="assignerGroupe">Confirmer l'assignation</button>
+              <button class="btn btn-sm btn-primary" :disabled="occupe" @click="assignerGroupe">Confirmer l'assignation</button>
             </template>
           </div>
         </div>
@@ -86,7 +87,7 @@
               <span class="athlete-nom">{{ athleteTrouve.nom }}</span>
               <span class="athlete-email">{{ athleteTrouve.email }}</span>
             </div>
-            <button class="btn btn-sm btn-primary" @click="ajouterAuCercle">+ Cercle</button>
+            <button class="btn btn-sm btn-primary" :disabled="occupe" @click="ajouterAuCercle">+ Cercle</button>
           </div>
           <div v-if="searchError" class="error">{{ searchError }}</div>
         </div>
@@ -98,6 +99,7 @@
 <script>
 import { ref, computed } from 'vue'
 import { useApi } from '../../services/api'
+import { useActionUnique } from '../../utils/actionUnique'
 
 export default {
   emits: ['fermer', 'modifie'],
@@ -108,6 +110,7 @@ export default {
   },
   setup(props, { emit }) {
     const api = useApi()
+    const { occupe, erreur, executer } = useActionUnique()
     const searchEmail = ref('')
     const athleteTrouve = ref(null)
     const searchError = ref('')
@@ -127,33 +130,40 @@ export default {
 
     const groupeAssignChoisi = computed(() => props.groupes.find(g => g.id === groupeAssignId.value) || null)
 
-    const assignerGroupe = async () => {
+    const assignerGroupe = () => {
       if (!groupeAssignChoisi.value) return
-      const data = await api.post(`/programmes/${props.programme.id}/assigner-groupe/${groupeAssignChoisi.value.id}`)
-      athletesAssignes.value = data.athletes
-      groupeAssignId.value = null
-      emit('modifie')
+      return executer(async () => {
+        const data = await api.post(`/programmes/${props.programme.id}/assigner-groupe/${groupeAssignChoisi.value.id}`)
+        athletesAssignes.value = data.athletes
+        groupeAssignId.value = null
+        emit('modifie')
+      })
     }
 
     const initiales = (nom) => nom.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
 
-    const assigner = async (athlete) => {
+    const assigner = (athlete) => executer(async () => {
       await api.post(`/programmes/${props.programme.id}/assigner/${athlete.id}`)
       athletesAssignes.value.push(athlete)
       emit('modifie')
-    }
+    })
 
-    const retirer = async (athlete) => {
-      await api.del(`/programmes/${props.programme.id}/retirer/${athlete.id}`)
-      athletesAssignes.value = athletesAssignes.value.filter(a => a.id !== athlete.id)
-      emit('modifie')
+    // Retirer un programme le fait disparaître du téléphone de l'athlète :
+    // jamais sur un simple clic.
+    const retirer = (athlete) => {
+      if (!confirm(`Retirer « ${props.programme.nom} » à ${athlete.nom} ? Il ne le verra plus ; son historique est conservé.`)) return
+      return executer(async () => {
+        await api.del(`/programmes/${props.programme.id}/retirer/${athlete.id}`)
+        athletesAssignes.value = athletesAssignes.value.filter(a => a.id !== athlete.id)
+        emit('modifie')
+      })
     }
 
     const rechercherAthlète = async () => {
       searchError.value = ''
       athleteTrouve.value = null
       try {
-        const found = await api.get(`/users/recherche?email=${encodeURIComponent(searchEmail.value)}`)
+        const found = await api.get(`/users/recherche?email=${encodeURIComponent(searchEmail.value.trim())}`)
         if (found.detail) { searchError.value = found.detail; return }
         if (props.monCercle.find(a => a.id === found.id)) { searchError.value = 'Déjà dans votre cercle'; return }
         athleteTrouve.value = found
@@ -162,18 +172,18 @@ export default {
       }
     }
 
-    const ajouterAuCercle = async () => {
+    const ajouterAuCercle = () => executer(async () => {
       await api.post(`/users/mes-athletes/${athleteTrouve.value.id}`)
       emit('modifie')
       athleteTrouve.value = null
       searchEmail.value = ''
-    }
+    })
 
     return {
       searchEmail, athleteTrouve, searchError,
       athletesAssignes, athletesDisponibles,
       filtreGroupeId, groupeAssignId, groupeAssignChoisi, assignerGroupe,
-      initiales, assigner, retirer, rechercherAthlète, ajouterAuCercle
+      initiales, assigner, retirer, rechercherAthlète, ajouterAuCercle, occupe, erreur
     }
   }
 }

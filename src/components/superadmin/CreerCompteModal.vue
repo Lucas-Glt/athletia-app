@@ -47,6 +47,7 @@
 <script>
 import { ref, computed } from 'vue'
 import { useApi } from '../../services/api'
+import { erreurMotDePasse } from '../../utils/motDePasse'
 
 export default {
   emits: ['fermer', 'creee'],
@@ -69,7 +70,8 @@ export default {
     const formValide = computed(() => form.value.identifiant && form.value.password)
 
     const creer = async () => {
-      error.value = ''
+      error.value = erreurMotDePasse(form.value.password)
+      if (error.value) return
       loading.value = true
       try {
         const compte = await api.post('/users/comptes', {

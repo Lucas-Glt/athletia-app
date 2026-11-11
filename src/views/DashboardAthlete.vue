@@ -54,7 +54,7 @@
       v-else-if="popupWellness"
       icone="ti-heart-rate-monitor"
       titre="Remplir mon wellness du jour ?"
-      sous-titre="4 questions, moins de 20 secondes"
+      sous-titre="5 questions, moins de 30 secondes"
       texte-oui="Oui"
       texte-non="Non merci"
       @oui="repondreWellness"
@@ -462,14 +462,19 @@
                   @click="histoPlusAncienne"
                   :aria-label="`Voir le ${formatDateLongue(tentativeAncienne.date)}`"
                 >
-                  {{ formatDateCourt(tentativeAncienne.date) }}
+                  {{ dateTentative(tentativeAncienne, true) }}
                 </button>
                 <span v-else class="histo-date-cote is-vide" aria-hidden="true"></span>
 
                 <span class="histo-date-slot">
                   <Transition :name="`roulette-${sensHisto}`">
-                    <span class="histo-date-active" :key="tentativeAffichee.cle" aria-current="date">
-                      {{ formatDateNumerique(tentativeAffichee.date) }}
+                    <span
+                      class="histo-date-active"
+                      :class="{ 'avec-heure': memeJourQuUneAutre(tentativeAffichee) }"
+                      :key="tentativeAffichee.cle"
+                      aria-current="date"
+                    >
+                      {{ dateCentrale(tentativeAffichee) }}
                     </span>
                   </Transition>
                 </span>
@@ -480,7 +485,7 @@
                   @click="histoPlusRecente"
                   :aria-label="`Voir le ${formatDateLongue(tentativeRecente.date)}`"
                 >
-                  {{ formatDateCourt(tentativeRecente.date) }}
+                  {{ dateTentative(tentativeRecente, true) }}
                 </button>
                 <span v-else class="histo-date-cote is-vide" aria-hidden="true"></span>
 
@@ -498,7 +503,7 @@
                 <span class="histo-pager">{{ histoIndex + 1 }}/{{ tentativesSeance.length }}</span>
                 <template v-if="tentativeAncienne">
                   <i class="ti ti-git-compare"></i>
-                  Comparé au {{ formatDateNumerique(tentativeAncienne.date) }}
+                  Comparé au {{ dateTentative(tentativeAncienne) }}
                 </template>
                 <template v-else>
                   <i class="ti ti-info-circle"></i>
@@ -726,15 +731,15 @@
                       <span class="n1-tag">N-1</span>
                       <span class="n1-val n1-nf" v-if="!n1.fait">NF</span>
                       <template v-else-if="seanceActive.type_seance === 'musculation' || !seanceActive.type_seance">
-                        <span class="n1-val" v-if="n1.reps_realisees">{{ n1.reps_realisees }}<span class="n1-unit">reps</span></span>
-                        <span class="n1-val" v-if="n1.poids_realise">{{ n1.poids_realise }}<span class="n1-unit">kg</span></span>
+                        <span class="n1-val" v-if="n1.reps_realisees">{{ n1.reps_realisees }}<span class="n1-unit" v-if="estNombre(n1.reps_realisees)">reps</span></span>
+                        <span class="n1-val" v-if="n1.poids_realise">{{ n1.poids_realise }}<span class="n1-unit" v-if="estNombre(n1.poids_realise)">kg</span></span>
                       </template>
                       <template v-else-if="seanceActive.type_seance === 'natation' || seanceActive.type_seance === 'athletisme'">
-                        <span class="n1-val" v-if="n1.reps_realisees">{{ n1.reps_realisees }}<span class="n1-unit">m</span></span>
+                        <span class="n1-val" v-if="n1.reps_realisees">{{ n1.reps_realisees }}<span class="n1-unit" v-if="estNombre(n1.reps_realisees)">m</span></span>
                         <span class="n1-val" v-if="n1.poids_realise">{{ n1.poids_realise }}</span>
                       </template>
                       <template v-else-if="seanceActive.type_seance === 'pliometrie'">
-                        <span class="n1-val" v-if="n1.reps_realisees">{{ n1.reps_realisees }}<span class="n1-unit">bonds</span></span>
+                        <span class="n1-val" v-if="n1.reps_realisees">{{ n1.reps_realisees }}<span class="n1-unit" v-if="estNombre(n1.reps_realisees)">bonds</span></span>
                         <span class="n1-val" v-if="n1.poids_realise">{{ n1.poids_realise }}</span>
                       </template>
                     </div>
@@ -1017,6 +1022,7 @@
                   placeholder="Ex : 72,4"
                 />
               </div>
+              <p v-if="aidePoids" class="aide-poids">{{ aidePoids }}</p>
               <p v-if="erreurPoids" class="error">{{ erreurPoids }}</p>
             </div>
             <div class="modal-footer">
@@ -1555,12 +1561,16 @@ export default {
     })
 
     // Log d'une tentative correspondant à une série précise de l'exercice.
-    // Match par serie.id (stable) plutôt que par position dans le tableau :
-    // l'API trie par date décroissante, donc la dernière série saisie arrive
-    // en tête et un appariement positionnel mélangerait les séries entre elles.
+    // Par serie.id d'abord (même semaine) ; sinon par rang de la série dans
+    // son exercice : d'une semaine à l'autre d'un programme multi-semaines,
+    // les séries sont dupliquées (ids différents) et l'ancien repli sur le
+    // premier log de la tentative affichait le même N-1 sur toutes les
+    // séries. Rien d'appariable : pas de N-1, plutôt que celui d'une autre série.
     const logTentativePourSerie = (tentative, exo, serieIdx) => {
       const serieId = exo.series[serieIdx - 1]?.id
-      return tentative.find(l => l.serie.id === serieId) || tentative[0]
+      return tentative.find(l => l.serie.id === serieId)
+        || tentative.find(l => indexSerieParId.value[l.serie.id] === serieIdx - 1)
+        || null
     }
 
     // Performance à la tentative n-(historiqueIndex+1) pour cet exercice
@@ -1568,7 +1578,8 @@ export default {
     const historiqueSeriePourExo = (exo, serieIdx) => {
       const tentative = tentativesExo(exo)[historiqueIndex.value]
       if (!tentative) return null
-      return { date: tentative[0].date.split('T')[0], log: logTentativePourSerie(tentative, exo, serieIdx) }
+      const log = logTentativePourSerie(tentative, exo, serieIdx)
+      return log ? { date: tentative[0].date.split('T')[0], log } : null
     }
 
     // Dernière performance connue (n-1, toujours la plus récente, indépendante
@@ -1581,6 +1592,9 @@ export default {
     }
 
     const formatDateCourt = (d) => new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+    // Une valeur réalisée peut porter déjà son unité (« 70 kg », recopiée du
+    // prescrit) : l'unité n'est ajoutée qu'à un nombre nu, sinon « 70 kg kg ».
+    const estNombre = (v) => /^[\s\d.,+-]+$/.test(String(v ?? ''))
     const formatDateNumerique = (d) => new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' })
 
     // Écart chiffré entre deux valeurs réalisées, prêt à afficher : vert si en
@@ -1600,11 +1614,9 @@ export default {
     // immédiat sur la progression.
     const diffVsHistorique = (exo, serieIdx, champ) => {
       const tentative = tentativesExo(exo)[0]
-      if (!tentative) return null
-      return ecartValeurs(
-        getLogs(exo.id, serieIdx - 1)[champ],
-        logTentativePourSerie(tentative, exo, serieIdx)[champ]
-      )
+      const precedent = tentative && logTentativePourSerie(tentative, exo, serieIdx)
+      if (!precedent) return null
+      return ecartValeurs(getLogs(exo.id, serieIdx - 1)[champ], precedent[champ])
     }
 
     // Un seul champ tracé selon le type de séance : la dimension "charge" de
@@ -1727,6 +1739,21 @@ export default {
 
     const tentativeAffichee = computed(() => tentativesSeance.value[histoIndex.value] || null)
 
+    // Date d'une tentative dans la roulette, avec l'heure quand une autre
+    // tentative tombe le même jour : sinon trois séances du 8 novembre
+    // s'affichaient toutes « 08/11/26 », impossibles à distinguer.
+    const heureDe = (d) => new Date(d).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+    const memeJourQuUneAutre = (t) =>
+      tentativesSeance.value.some(x => x !== t && x.date.split('T')[0] === t.date.split('T')[0])
+    const dateTentative = (t, court = false) => {
+      const base = court ? formatDateCourt(t.date) : formatDateNumerique(t.date)
+      return memeJourQuUneAutre(t) ? `${base} · ${heureDe(t.date)}` : base
+    }
+    // Fenêtre centrale de la roulette, étroite : jour/mois et heure, sans l'année.
+    const dateCentrale = (t) => memeJourQuUneAutre(t)
+      ? `${new Date(t.date).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })} ${heureDe(t.date)}`
+      : formatDateNumerique(t.date)
+
     // Voisins immédiats dans la roulette de dates. La liste est triée du plus
     // récent au plus ancien : remonter dans le temps, c'est avancer d'un index.
     const tentativeAncienne = computed(() => tentativesSeance.value[histoIndex.value + 1] || null)
@@ -1767,7 +1794,7 @@ export default {
         .map(c => ({
           champ: c.champ,
           valeur: log[c.champ],
-          unite: c.unite,
+          unite: estNombre(log[c.champ]) ? c.unite : '',
           diff: precedent?.fait ? ecartValeurs(log[c.champ], precedent[c.champ]) : null
         }))
     }
@@ -1960,26 +1987,31 @@ export default {
       if (!cle || !seanceActive.value) return
       if (!confirm('Supprimer cette séance de l\'historique ?')) return
 
-      const idsSeries = new Set(
-        (seanceActive.value.exercices || []).flatMap(e => e.series).map(s => s.id)
-      )
+      // Tous les logs de cette tentative sur ce créneau. Pas seulement ceux
+      // des séries de la séance ouverte : une tentative d'une semaine
+      // précédente (programme multi-semaines) porte sur des séries dupliquées,
+      // d'ids différents — rien n'était supprimé, sans un mot.
       const logsASupprimer = historique.value.filter(
-        l => idsSeries.has(l.serie.id) && cleTentative(l) === cle
+        l => creneauLog(l) === seanceActive.value.nom && cleTentative(l) === cle
       )
       for (const log of logsASupprimer) {
         await supprimerLog(log.serie.id, log.id)
         historiqueEnEdition.value.delete(log.id)
       }
+      const seancesDeLaTentative = new Set(logsASupprimer.map(l => l.seance?.id).filter(Boolean))
+      if (seancesDeLaTentative.size === 0) seancesDeLaTentative.add(seanceActive.value.id)
 
       // La ligne de charge de la tentative ne suit pas les logs : sans ça la
       // séance restait comptée dans « Mes stats » et l'ACWR, et son
       // questionnaire de ressenti continuait d'être proposé — un fantôme
       // sans séance derrière. Sans effet si la tentative est antérieure au
       // monitoring (pas de ligne de charge).
-      try {
-        await api.del(`/seances/${seanceActive.value.id}/charge?session_id=${encodeURIComponent(cle)}`)
-      } catch (e) {
-        console.error('Erreur suppression charge séance:', e)
+      for (const seanceId of seancesDeLaTentative) {
+        try {
+          await api.del(`/seances/${seanceId}/charge?session_id=${encodeURIComponent(cle)}`)
+        } catch (e) {
+          console.error('Erreur suppression charge séance:', e)
+        }
       }
 
       // La bannière proposait peut-être le ressenti de cette tentative-là.
@@ -2158,7 +2190,7 @@ export default {
     // enregistrées, positionnées sur la date de cette occurrence-là (on vient
     // les consulter) ; les autres sur la feuille de saisie.
     const ouvrirDepuisPlanning = async ({ seance, dateFait }) => {
-      await demarrerSeance(seance)
+      if (!(await demarrerSeance(seance))) return
       if (!dateFait) return
       vueSeance.value = 'historique'
       const jour = dateFait.split('T')[0]
@@ -2322,7 +2354,23 @@ export default {
       if (brouillon) brouillonPropose.value = brouillon
     }
 
+    // Valeurs tapées mais pas encore validées (une série validée, elle, est
+    // déjà enregistrée sur le serveur).
+    const saisieNonEnregistree = () =>
+      Object.values(logs.value || {}).some(series =>
+        Object.values(series || {}).some(l => !l.fait && (l.reps_realisees || l.poids_realise))
+      )
+
+    // Renvoie false si l'athlète préfère garder sa saisie en cours.
     const demarrerSeance = async (seance) => {
+      // Ouvrir une autre séance repart d'une saisie vierge : ce qui avait été
+      // tapé sur la précédente sans être validé disparaissait sans prévenir.
+      if (seanceEnCoursId.value && seanceEnCoursId.value !== seance.id && saisieNonEnregistree()) {
+        const enCours = seances.value.find(s => s.id === seanceEnCoursId.value)
+        const nom = enCours ? `« ${enCours.nom} »` : 'la séance précédente'
+        if (!confirm(`Des valeurs saisies sur ${nom} n'ont pas été validées. Les abandonner pour ouvrir « ${seance.nom} » ? (Les séries validées restent enregistrées.)`)) return false
+        effacerBrouillon()
+      }
       seanceActive.value = seance
       vueSeance.value = 'seance'
       histoIndex.value = 0
@@ -2347,6 +2395,7 @@ export default {
       // Attendu : l'ouverture depuis le calendrier a besoin des tentatives
       // rechargées pour se positionner sur la bonne date.
       await fetchHistorique()
+      return true
     }
 
     const validerSeance = async () => {
@@ -2357,6 +2406,19 @@ export default {
       // (aucun remplissage automatique) : le bouton fige ce qui a été fait,
       // il ne complète pas ce qui ne l'a pas été.
       const groupes = grouperExercices(seanceActive.value.exercices)
+      // Une séance sans aucune série faite n'est pas une séance faite : elle
+      // était pourtant comptée (XP, régularité, semaine suivante débloquée),
+      // au premier appui distrait sur le bouton.
+      const uneSerieFaite = groupes.some(groupe =>
+        Array.from({ length: nbSeriesGroupe(groupe) }, (_, i) => i)
+          .some(i => exosDeLaSerie(groupe, i).some(exo => getLogs(exo.id, i).fait))
+      )
+      if (!uneSerieFaite) {
+        erreurValidation.value = modeSeance.value === 'simple'
+          ? 'Coche au moins un exercice fait avant de valider la séance.'
+          : 'Aucune série validée : valide au moins une série avant de valider la séance.'
+        return
+      }
       let echecs = 0
       for (const groupe of groupes) {
         const nbSeries = nbSeriesGroupe(groupe)
@@ -2613,15 +2675,26 @@ export default {
       return map
     })
 
-    const poidsPourDate = (date) => poidsParDate.value[date]?.poids ?? null
+    const poidsPourDate = (date) => {
+      const poids = poidsParDate.value[date]?.poids
+      return poids === undefined || poids === null ? null : poids.toLocaleString('fr-FR')
+    }
 
     const entreeExistante = computed(() => dateSaisiePoids.value ? poidsParDate.value[dateSaisiePoids.value] : null)
 
     const parseNombre = (v) => parseFloat(String(v).replace(',', '.'))
 
+    // Mêmes bornes que l'API (schemas/poids.py) : 724 pour 72,4 faussait la
+    // courbe, la moyenne du mois et la cible calorique de la diète.
+    const POIDS_MIN = 20
+    const POIDS_MAX = 300
     const poidsValide = computed(() => {
       const v = parseNombre(poidsSaisi.value)
-      return !isNaN(v) && v > 0
+      return !isNaN(v) && v >= POIDS_MIN && v <= POIDS_MAX
+    })
+    const aidePoids = computed(() => {
+      if (!String(poidsSaisi.value).trim() || poidsValide.value) return ''
+      return `Entre ${POIDS_MIN} et ${POIDS_MAX} kg (ex : 72,4)`
     })
 
     const labelMois = computed(() => {
@@ -2688,7 +2761,8 @@ export default {
 
     const ouvrirSaisiePoids = (date) => {
       dateSaisiePoids.value = date
-      poidsSaisi.value = poidsParDate.value[date]?.poids ?? ''
+      const existant = poidsParDate.value[date]?.poids
+      poidsSaisi.value = existant === undefined || existant === null ? '' : existant.toLocaleString('fr-FR')
       erreurPoids.value = ''
     }
     const fermerSaisiePoids = () => {
@@ -2823,7 +2897,8 @@ export default {
       tentativesSeance, tentativeAffichee, tentativeAncienne, tentativeRecente,
       histoIndex, histoPlusAncienne, histoPlusRecente, sensHisto, valeursHistorique, courbesSeance,
       performances, toggleSuivi, toggleSuiviPerformance, dateTentativeGroupe,
-      dateSaisiePoids, poidsSaisi, erreurPoids, poidsPourDate, entreeExistante, poidsValide,
+      dateSaisiePoids, poidsSaisi, erreurPoids, poidsPourDate, entreeExistante, poidsValide, aidePoids,
+      estNombre, dateTentative, dateCentrale, memeJourQuUneAutre,
       labelMois, joursGrille, courbePoids, moyennePoidsMois, moisPrecedent, moisSuivant, formatDateLongue,
       ouvrirSaisiePoids, fermerSaisiePoids, enregistrerPoids, supprimerPoids,
       popupRessenti, popupWellness, focusRessenti, focusWellness,
@@ -3078,6 +3153,7 @@ export default {
   overflow: hidden;
   border-radius: var(--radius-full);
 }
+.histo-date-active.avec-heure { font-size: var(--font-size-xs); }
 .histo-date-active {
   position: absolute;
   inset: 0;
@@ -3933,6 +4009,7 @@ export default {
 .poids-calendrier-head { display: flex; align-items: center; justify-content: space-between; }
 .poids-mois-label { font-size: var(--font-size-base); font-weight: 700; text-transform: capitalize; }
 
+.aide-poids { margin: 0; font-size: var(--font-size-xs); color: var(--color-warning-text-strong); }
 .poids-moyenne {
   display: flex;
   align-items: baseline;

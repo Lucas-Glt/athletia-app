@@ -6,12 +6,19 @@
         <span>Plateforme de suivi sportif</span>
       </div>
       <form @submit.prevent="handleLogin" class="login-form">
+        <p v-if="sessionExpiree" class="info-session">
+          <i class="ti ti-clock"></i> Votre session a expiré : reconnectez-vous.
+        </p>
         <div class="field">
-          <label>Email</label>
+          <!-- Les comptes ne sont pas des adresses email réelles mais des
+               identifiants donnés par le club (prenom.nom@athlete.club) :
+               « votre@email.com » poussait à taper son email perso. -->
+          <label for="login-identifiant">Identifiant</label>
           <!-- type="text" et non "email" : la validation native de type="email"
                bloque l'envoi sur certains identifiants valides côté serveur
                (ex. domaine super_prepa.fr), sans message clair sur mobile. -->
           <input
+            id="login-identifiant"
             v-model="email"
             type="text"
             inputmode="email"
@@ -20,13 +27,16 @@
             autocapitalize="none"
             autocorrect="off"
             spellcheck="false"
-            placeholder="votre@email.com"
+            placeholder="prenom.nom@athlete.club"
+            aria-describedby="aide-identifiant"
             required
           />
+          <span id="aide-identifiant" class="aide-login">Celui fourni par votre club, pas votre email personnel.</span>
         </div>
         <div class="field">
-          <label>Mot de passe</label>
+          <label for="login-mdp">Mot de passe</label>
           <input
+            id="login-mdp"
             v-model="password"
             type="password"
             name="password"
@@ -36,6 +46,9 @@
           />
         </div>
         <p v-if="error" class="error">{{ error }}</p>
+        <p class="aide-login aide-oubli">
+          Mot de passe oublié ? Demandez à l'administrateur de votre club de le réinitialiser.
+        </p>
         <button type="submit" class="btn btn-primary btn-login" :disabled="loading">
           <span v-if="loading">Connexion...</span>
           <span v-else>Se connecter</span>
@@ -86,7 +99,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
-import { lireCorps, messageErreur, requeteReseau } from '../services/api'
+import { lireCorps, messageErreur, requeteReseau, CLE_SESSION_EXPIREE } from '../services/api'
 import { MOT_DU_PREPA, SIGNATURE_MOT, NOTES_MAJ } from '../data/notesMaj'
 
 const ROUTES_PAR_ROLE = {
@@ -102,6 +115,18 @@ export default {
     const email = ref('')
     const password = ref('')
     const error = ref('')
+    // Posé par services/api.js quand une requête revient en 401 : affiché
+    // une fois, puis oublié.
+    const lireSessionExpiree = () => {
+      try {
+        const expiree = sessionStorage.getItem(CLE_SESSION_EXPIREE) === '1'
+        sessionStorage.removeItem(CLE_SESSION_EXPIREE)
+        return expiree
+      } catch {
+        return false
+      }
+    }
+    const sessionExpiree = ref(lireSessionExpiree())
     const loading = ref(false)
     const router = useRouter()
     const authStore = useAuthStore()
@@ -123,6 +148,7 @@ export default {
 
     const handleLogin = async () => {
       error.value = ''
+      sessionExpiree.value = false
       loading.value = true
       try {
         const formData = new URLSearchParams()
@@ -153,7 +179,7 @@ export default {
     const [derniereNote, ...notesPrecedentes] = NOTES_MAJ
 
     return {
-      email, password, error, loading, handleLogin,
+      email, password, error, loading, handleLogin, sessionExpiree,
       MOT_DU_PREPA, SIGNATURE_MOT, derniereNote, notesPrecedentes
     }
   }
@@ -195,6 +221,19 @@ export default {
 }
 .login-brand span { font-size: var(--font-size-sm); color: var(--color-text-secondary); }
 .login-form { display: flex; flex-direction: column; gap: var(--spacing-lg); }
+.aide-login { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+.aide-oubli { margin: 0; text-align: center; }
+.info-session {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-md);
+  background: var(--color-warning-bg-soft);
+  color: var(--color-warning-text);
+  font-size: var(--font-size-sm);
+}
 .btn-login {
   min-height: var(--input-h);
   font-size: var(--font-size-base);

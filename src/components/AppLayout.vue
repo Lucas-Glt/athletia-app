@@ -41,6 +41,40 @@
       </div>
     </header>
 
+    <!-- Proposition d'installation : sous l'en-tête et non plus collée en
+         bas d'écran, où elle recouvrait les bannières de l'application
+         (récap, wellness, ressenti…). Écartée, elle ne revient pas avant
+         plusieurs jours au lieu de réapparaître à chaque ouverture. -->
+    <!-- Bannière PWA Android/Chrome -->
+    <div v-if="installPrompt && showInstallBanner && !isInStandaloneMode" class="install-banner">
+      <div class="install-banner-content">
+        <i class="ti ti-device-mobile install-icon"></i>
+        <div>
+          <div class="install-title">Installer Athletia</div>
+          <div class="install-sub">Accès rapide depuis ton écran d'accueil</div>
+        </div>
+      </div>
+      <div class="install-actions">
+        <button class="btn btn-primary btn-sm" @click="installerApp">Installer</button>
+        <button class="btn btn-sm" @click="ignorerInstallation(7)">Plus tard</button>
+      </div>
+    </div>
+
+    <!-- Bannière PWA iOS -->
+    <div v-if="isIos && !isInStandaloneMode && showIosBanner" class="install-banner">
+      <div class="install-banner-content">
+        <i class="ti ti-device-mobile install-icon"></i>
+        <div>
+          <div class="install-title">Installer Athletia</div>
+          <div class="install-sub">
+            Appuie sur <i class="ti ti-share"></i> puis "Sur l'écran d'accueil"
+          </div>
+        </div>
+      </div>
+      <div class="install-actions">
+        <button class="btn btn-sm" @click="ignorerInstallation(30)">OK</button>
+      </div>
+    </div>
     <div class="main-content">
       <slot />
     </div>
@@ -62,15 +96,15 @@
         <div class="modal-body">
           <div class="field">
             <label>Ancien mot de passe</label>
-            <input v-model="form.ancien" type="password" placeholder="••••••••" />
+            <input v-model="form.ancien" type="password" autocomplete="current-password" placeholder="••••••••" />
           </div>
           <div class="field">
             <label>Nouveau mot de passe</label>
-            <input v-model="form.nouveau" type="password" placeholder="••••••••" />
+            <input v-model="form.nouveau" type="password" autocomplete="new-password" placeholder="8 caractères minimum" />
           </div>
           <div class="field">
             <label>Confirmer le nouveau mot de passe</label>
-            <input v-model="form.confirmation" type="password" placeholder="••••••••" />
+            <input v-model="form.confirmation" type="password" autocomplete="new-password" placeholder="••••••••" />
           </div>
           <p v-if="passwordError" class="error">{{ passwordError }}</p>
           <p v-if="passwordSuccess" class="success">{{ passwordSuccess }}</p>
@@ -84,36 +118,6 @@
       </div>
     </div>
 
-    <!-- Bannière PWA Android/Chrome -->
-    <div v-if="installPrompt && showInstallBanner && !isInStandaloneMode" class="install-banner">
-      <div class="install-banner-content">
-        <i class="ti ti-device-mobile install-icon"></i>
-        <div>
-          <div class="install-title">Installer Athletia</div>
-          <div class="install-sub">Accès rapide depuis ton écran d'accueil</div>
-        </div>
-      </div>
-      <div class="install-actions">
-        <button class="btn btn-primary btn-sm" @click="installerApp">Installer</button>
-        <button class="btn btn-sm" @click="showInstallBanner = false">Plus tard</button>
-      </div>
-    </div>
-
-    <!-- Bannière PWA iOS -->
-    <div v-if="isIos && !isInStandaloneMode && showIosBanner" class="install-banner">
-      <div class="install-banner-content">
-        <i class="ti ti-device-mobile install-icon"></i>
-        <div>
-          <div class="install-title">Installer Athletia</div>
-          <div class="install-sub">
-            Appuie sur <i class="ti ti-share"></i> puis "Sur l'écran d'accueil"
-          </div>
-        </div>
-      </div>
-      <div class="install-actions">
-        <button class="btn btn-sm" @click="showIosBanner = false">OK</button>
-      </div>
-    </div>
   </div>
 </template>
 
@@ -124,6 +128,17 @@ import { useThemeStore } from '../stores/theme'
 import { useRouter } from 'vue-router'
 import { useApi } from '../services/api'
 import { promptInstallation as installPrompt } from '../services/installationPwa'
+import { erreurMotDePasse } from '../utils/motDePasse'
+
+// Proposition d'installation écartée : date jusqu'à laquelle ne plus la montrer.
+const CLE_INSTALLATION_IGNOREE = 'athletia:installation-ignoree'
+const installationIgnoree = () => {
+  try {
+    return Date.now() < Number(localStorage.getItem(CLE_INSTALLATION_IGNOREE) || 0)
+  } catch {
+    return false
+  }
+}
 
 export default {
   props: {
@@ -213,8 +228,9 @@ export default {
         passwordError.value = 'Tous les champs sont obligatoires'
         return
       }
-      if (form.value.nouveau.length < 8) {
-        passwordError.value = 'Le nouveau mot de passe doit faire au moins 8 caractères'
+      const erreurNouveau = erreurMotDePasse(form.value.nouveau)
+      if (erreurNouveau) {
+        passwordError.value = erreurNouveau
         return
       }
       if (form.value.nouveau !== form.value.confirmation) {
@@ -238,7 +254,7 @@ export default {
       }
     }
 
-    const showInstallBanner = ref(true)
+    const showInstallBanner = ref(!installationIgnoree())
     // iPadOS 13+ se présente comme un Mac (« Macintosh ») : seul l'écran
     // tactile le distingue, sinon les utilisateurs d'iPad n'avaient jamais
     // la bannière.
@@ -251,7 +267,16 @@ export default {
     // permanence… dans l'app déjà installée.
     const isInStandaloneMode =
       window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true
-    const showIosBanner = ref(isIos && !isInStandaloneMode)
+    const showIosBanner = ref(isIos && !isInStandaloneMode && !installationIgnoree())
+    const ignorerInstallation = (jours) => {
+      showInstallBanner.value = false
+      showIosBanner.value = false
+      try {
+        localStorage.setItem(CLE_INSTALLATION_IGNOREE, String(Date.now() + jours * 24 * 60 * 60 * 1000))
+      } catch {
+        // stockage indisponible : la bannière reviendra au prochain lancement
+      }
+    }
 
     const installerApp = () => {
       const prompt = installPrompt.value
@@ -267,7 +292,7 @@ export default {
       menuOuvert, toggleMenu, avatarRef, deconnexion,
       modalePassword, ouvrirModalePassword, fermerModalePassword,
       form, changerPassword, loadingPassword, passwordError, passwordSuccess,
-      installPrompt, showInstallBanner, isIos, isInStandaloneMode, showIosBanner, installerApp
+      installPrompt, showInstallBanner, isIos, isInStandaloneMode, showIosBanner, installerApp, ignorerInstallation
     }
   }
 }
@@ -392,19 +417,14 @@ export default {
 }
 
 .install-banner {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
+  flex-shrink: 0;
   background: var(--color-bg);
-  border-top: 1px solid var(--color-primary-light);
-  box-shadow: var(--shadow-banner);
+  border-bottom: 1px solid var(--color-primary-light);
   padding: var(--spacing-md) var(--spacing-lg);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--spacing-md);
-  z-index: 300;
 }
 
 .install-banner-content {
@@ -480,6 +500,5 @@ export default {
   /* Le contenu ne doit jamais passer sous la barre */
   .main-content { padding-bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom)); }
 
-  .install-banner { bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom)); }
 }
 </style>

@@ -42,6 +42,7 @@
 <script>
 import { ref, computed } from 'vue'
 import { useApi } from '../../services/api'
+import { erreurMotDePasse } from '../../utils/motDePasse'
 
 export default {
   emits: ['fermer', 'creee'],
@@ -56,7 +57,8 @@ export default {
     )
 
     const creer = async () => {
-      error.value = ''
+      error.value = erreurMotDePasse(form.value.admin_password)
+      if (error.value) return
       loading.value = true
       try {
         const admin = await api.post('/organisations/', form.value)

@@ -180,7 +180,7 @@
                 :class="'zone-' + (a.resume.acwr.zone || 'insuffisant')"
                 title="ACWR : charge des 7 derniers jours / moyenne des 28"
               >
-                <small>ACWR</small>{{ a.resume.acwr.valeur !== null ? a.resume.acwr.valeur.toFixed(2) : '—' }}
+                <small>ACWR</small>{{ a.resume.acwr.valeur !== null ? a.resume.acwr.valeur.toFixed(2).replace('.', ',') : '—' }}
               </span>
               <i class="ti ti-chevron-right carte-chevron"></i>
             </span>
@@ -556,7 +556,7 @@ export default {
       searchError.value = ''
       athleteTrouve.value = null
       try {
-        const found = await api.get(`/users/recherche?email=${encodeURIComponent(searchEmail.value)}`)
+        const found = await api.get(`/users/recherche?email=${encodeURIComponent(searchEmail.value.trim())}`)
         if (found.detail) { searchError.value = found.detail; return }
         if (props.monCercle.find(a => a.id === found.id)) { searchError.value = 'Déjà dans votre cercle'; return }
         athleteTrouve.value = found

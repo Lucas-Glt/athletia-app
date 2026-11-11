@@ -3,7 +3,7 @@
     <div class="gacwr-head">
       <span class="gacwr-label">ACWR (charge aiguë / chronique)</span>
       <span class="gacwr-valeur" :class="'zone-' + (actuel.zone || 'insuffisant')">
-        {{ actuel.valeur !== null ? actuel.valeur.toFixed(2) : '—' }}
+        {{ actuel.valeur !== null ? actuel.valeur.toFixed(2).replace('.', ',') : '—' }}
         <span class="gacwr-zone-txt">{{ libelleZone(actuel.zone) }}</span>
       </span>
     </div>
@@ -70,8 +70,8 @@ export default {
     })
 
     const libelleZone = (zone) => ({
-      sous_charge: 'sous-charge', optimale: 'optimale', vigilance: 'vigilance', surcharge: 'surcharge'
-    }[zone] || 'données insuffisantes')
+      sous_charge: 'Sous-charge', optimale: 'Optimale', vigilance: 'Vigilance', surcharge: 'Surcharge'
+    }[zone] || 'Données insuffisantes')
 
     const formatDate = (d) => new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
 
@@ -85,7 +85,7 @@ export default {
 .gacwr-head { display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-sm); flex-wrap: wrap; }
 .gacwr-label { font-size: var(--font-size-xs); font-weight: 700; color: var(--color-text-secondary); }
 .gacwr-valeur { font-size: var(--font-size-lg); font-weight: 700; display: inline-flex; align-items: baseline; gap: 6px; }
-.gacwr-zone-txt { font-size: var(--font-size-xs); font-weight: 600; text-transform: capitalize; }
+.gacwr-zone-txt { font-size: var(--font-size-xs); font-weight: 600; }
 .gacwr-valeur.zone-optimale { color: var(--color-valid-text-strong); }
 .gacwr-valeur.zone-vigilance { color: var(--color-warning-text-strong); }
 .gacwr-valeur.zone-surcharge { color: var(--color-danger-text); }

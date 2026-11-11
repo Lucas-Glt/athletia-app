@@ -6,13 +6,14 @@
         <h3 v-else>Mes groupes</h3>
         <button class="modal-close" @click="$emit('fermer')"><i class="ti ti-x"></i></button>
       </div>
+      <p v-if="erreur" class="error erreur-groupes" role="alert">{{ erreur }}</p>
 
       <!-- MODE FICHE ATHLÈTE : voir/cocher ses groupes -->
       <div class="modal-body" v-if="athleteFocus">
         <div v-if="groupes.length === 0" class="empty-inline">Aucun groupe créé pour l'instant.</div>
         <div class="groupes-check-list">
           <label class="groupe-check-row" v-for="g in groupes" :key="g.id">
-            <input type="checkbox" :checked="estMembre(g, athleteFocus)" @change="toggleMembre(g, athleteFocus)" />
+            <input type="checkbox" :checked="estMembre(g, athleteFocus)" :disabled="occupe" @change="toggleMembre(g, athleteFocus)" />
             <span class="groupe-dot" :style="{ background: g.couleur || 'var(--color-primary)' }"></span>
             <span class="groupe-nom">{{ g.nom }}</span>
           </label>
@@ -52,7 +53,7 @@
                 @click="nouvelleCouleur = c"
               ></button>
             </div>
-            <button class="btn btn-sm btn-primary" @click="creerGroupe" :disabled="!nouveauNom.trim()">
+            <button class="btn btn-sm btn-primary" @click="creerGroupe" :disabled="occupe || !nouveauNom.trim()">
               <i class="ti ti-plus"></i> Créer
             </button>
           </div>
@@ -68,7 +69,7 @@
                 <span class="athlete-nom">{{ a.nom }}</span>
                 <span class="athlete-email">{{ a.email }}</span>
               </div>
-              <button class="btn btn-sm btn-danger" @click="retirer(a)">Retirer</button>
+              <button class="btn btn-sm btn-danger" :disabled="occupe" @click="retirer(a)">Retirer</button>
             </div>
           </div>
 
@@ -87,7 +88,7 @@
           <button
             v-if="disponibles.length > 0"
             class="btn btn-sm btn-primary btn-ajouter-selection"
-            :disabled="selection.length === 0"
+            :disabled="occupe || selection.length === 0"
             @click="ajouterSelection"
           >
             <i class="ti ti-plus"></i> Ajouter la sélection ({{ selection.length }})
@@ -104,6 +105,7 @@
 <script>
 import { ref, computed, watch } from 'vue'
 import { useApi } from '../../services/api'
+import { useActionUnique } from '../../utils/actionUnique'
 
 const PALETTE = ['#7F77DD', '#EF4444', '#F59E0B', '#10B981', '#3B82F6', '#EC4899']
 
@@ -116,6 +118,8 @@ export default {
   },
   setup(props, { emit }) {
     const api = useApi()
+    // Une action à la fois (double-clic = deux groupes) et l'échec affiché.
+    const { occupe, erreur, executer } = useActionUnique()
     const groupeActifId = ref(null)
     const nouveauNom = ref('')
     const nouvelleCouleur = ref(PALETTE[0])
@@ -141,57 +145,63 @@ export default {
       selection.value = []
     }
 
-    const creerGroupe = async () => {
+    const creerGroupe = () => {
       if (!nouveauNom.value.trim()) return
-      await api.post('/groupes/', { nom: nouveauNom.value.trim(), couleur: nouvelleCouleur.value })
-      nouveauNom.value = ''
-      emit('modifie')
+      return executer(async () => {
+        await api.post('/groupes/', { nom: nouveauNom.value.trim(), couleur: nouvelleCouleur.value })
+        nouveauNom.value = ''
+        emit('modifie')
+      })
     }
 
-    const commencerRenommage = async (g) => {
+    const commencerRenommage = (g) => {
       const nom = prompt('Renommer le groupe', g.nom)
       if (nom === null || !nom.trim()) return
-      await api.patch(`/groupes/${g.id}`, { nom: nom.trim(), couleur: g.couleur })
-      emit('modifie')
+      return executer(async () => {
+        await api.patch(`/groupes/${g.id}`, { nom: nom.trim(), couleur: g.couleur })
+        emit('modifie')
+      })
     }
 
-    const supprimerGroupe = async (g) => {
+    const supprimerGroupe = (g) => {
       if (!confirm(`Supprimer le groupe "${g.nom}" ? Les athlètes et leurs programmes ne sont pas affectés.`)) return
-      await api.del(`/groupes/${g.id}`)
-      emit('modifie')
+      return executer(async () => {
+        await api.del(`/groupes/${g.id}`)
+        emit('modifie')
+      })
     }
 
-    const retirer = async (athlete) => {
+    const retirer = (athlete) => executer(async () => {
       await api.del(`/groupes/${groupeActifId.value}/athletes/${athlete.id}`)
       emit('modifie')
-    }
+    })
 
-    const ajouterSelection = async () => {
+    const ajouterSelection = () => executer(async () => {
       const ids = [...selection.value]
       for (const id of ids) {
         await api.post(`/groupes/${groupeActifId.value}/athletes/${id}`)
       }
       selection.value = []
       emit('modifie')
-    }
+    })
 
     const estMembre = (groupe, athlete) => !!groupe.athletes.find(a => a.id === athlete.id)
 
-    const toggleMembre = async (groupe, athlete) => {
+    const toggleMembre = (groupe, athlete) => executer(async () => {
       if (estMembre(groupe, athlete)) {
         await api.del(`/groupes/${groupe.id}/athletes/${athlete.id}`)
       } else {
         await api.post(`/groupes/${groupe.id}/athletes/${athlete.id}`)
       }
       emit('modifie')
-    }
+    })
 
     return {
       palette: PALETTE,
       groupeActifId, groupeActif, disponibles,
       nouveauNom, nouvelleCouleur, selection,
       initiales, ouvrirGroupe, creerGroupe, commencerRenommage, supprimerGroupe,
-      retirer, ajouterSelection, estMembre, toggleMembre
+      retirer, ajouterSelection, estMembre, toggleMembre, occupe, erreur
     }
   }
 }
@@ -199,6 +209,7 @@ export default {
 
 <style scoped>
 .modal-large { max-width: 720px; }
+.erreur-groupes { margin: var(--spacing-md) var(--spacing-xl) 0; }
 .gestion-body { display: flex; gap: var(--spacing-lg); flex-wrap: wrap; }
 .bloc { display: flex; flex-direction: column; gap: var(--spacing-sm); }
 .groupes-colonne { flex: 1; min-width: 220px; }

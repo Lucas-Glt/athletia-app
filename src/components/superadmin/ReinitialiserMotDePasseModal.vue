@@ -33,6 +33,7 @@
 <script>
 import { ref } from 'vue'
 import { useApi } from '../../services/api'
+import { erreurMotDePasse } from '../../utils/motDePasse'
 
 export default {
   emits: ['fermer'],
@@ -49,12 +50,9 @@ export default {
     const initiales = (nom) => nom.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
 
     const reinitialiser = async () => {
-      error.value = ''
+      error.value = erreurMotDePasse(newPassword.value)
       success.value = ''
-      if (newPassword.value.length < 8) {
-        error.value = 'Le mot de passe doit faire au moins 8 caractères'
-        return
-      }
+      if (error.value) return
       loading.value = true
       try {
         await api.patch(`/users/${props.user.id}/password`, { nouveau_mdp: newPassword.value })

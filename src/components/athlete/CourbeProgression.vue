@@ -1,7 +1,7 @@
 <template>
   <div class="courbe">
     <div class="courbe-head">
-      <span class="courbe-label">{{ label }}<span v-if="unite" class="courbe-unite"> ({{ unite }})</span></span>
+      <span class="courbe-label">{{ label }}<span v-if="unite.trim()" class="courbe-unite"> ({{ unite.trim() }})</span></span>
       <span v-if="delta" class="courbe-delta" :class="delta.classe">{{ delta.texte }}</span>
     </div>
 
@@ -111,7 +111,7 @@ export default {
       const ecart = Math.round((dernier - premier) * 100) / 100
       if (ecart === 0) return { texte: '=', classe: 'diff-neutre' }
       return {
-        texte: (ecart > 0 ? '+' : '') + ecart + props.unite,
+        texte: (ecart > 0 ? '+' : '') + nombre(ecart) + uniteValeur.value,
         classe: classeVariation(ecart)
       }
     })
@@ -122,7 +122,12 @@ export default {
       return classeVariation(props.points[i].valeur - props.points[i - 1].valeur)
     }
 
-    const formatValeur = (v) => `${v}${props.unite}`
+    // Conventions françaises (« 58,4 kg ») : la virgule, et une espace avant
+    // l'unité. L'unité arrive avec ou sans espace selon l'appelant (« kg »,
+    // « UA » ou « UA » précédé d'une espace) : on la normalise ici.
+    const nombre = (v) => Number(v).toLocaleString('fr-FR', { maximumFractionDigits: 2 })
+    const uniteValeur = computed(() => (props.unite.trim() ? ` ${props.unite.trim()}` : ''))
+    const formatValeur = (v) => `${nombre(v)}${uniteValeur.value}`
     const formatDateAxe = (d) => new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
 
     return { coords, lignePoints, delta, minY, maxY, couleurPoint, classeVariation, formatValeur, formatDateAxe }

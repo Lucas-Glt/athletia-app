@@ -29,7 +29,7 @@
           </div>
           <div class="field">
             <label>Mot de passe</label>
-            <input v-model="newUser.password" type="password" placeholder="••••••••" />
+            <input v-model="newUser.password" type="password" autocomplete="new-password" placeholder="8 caractères minimum" />
           </div>
           <div class="field">
             <label>Rôle</label>
@@ -42,7 +42,7 @@
         </div>
         <div class="modal-footer">
           <button class="btn" @click="modalCreation = false">Annuler</button>
-          <button class="btn btn-primary" @click="creerUtilisateur" :disabled="!newUser.identifiant || !newUser.password">
+          <button class="btn btn-primary" @click="creerUtilisateur" :disabled="!newUser.identifiant || !newUser.password || occupe">
             Créer
           </button>
         </div>
@@ -66,7 +66,7 @@
           </div>
           <div class="field">
             <label>Nouveau mot de passe</label>
-            <input v-model="newPassword" type="password" placeholder="8 caractères minimum" />
+            <input v-model="newPassword" type="password" autocomplete="new-password" placeholder="8 caractères minimum" />
           </div>
           <div v-if="resetError" class="error">{{ resetError }}</div>
           <div v-if="resetSuccess" class="success">{{ resetSuccess }}</div>
@@ -80,8 +80,46 @@
       </div>
     </div>
 
+    <!-- Suppression d'un préparateur qui a encore des programmes : ses
+         athlètes en dépendent, un autre préparateur doit les reprendre. -->
+    <div v-if="transfert" class="modal-overlay" @click.self="transfert = null">
+      <div class="modal">
+        <div class="modal-header">
+          <h3>Supprimer {{ transfert.user.nom }}</h3>
+          <button class="modal-close" @click="transfert = null" aria-label="Fermer"><i class="ti ti-x"></i></button>
+        </div>
+        <div class="modal-body">
+          <p class="transfert-texte">{{ transfert.message }}</p>
+          <div class="field" v-if="repreneurs.length">
+            <label for="repreneur">Repris par</label>
+            <select id="repreneur" v-model="transfert.repreneurId">
+              <option :value="null" disabled>Choisir un préparateur</option>
+              <option v-for="r in repreneurs" :key="r.id" :value="r.id">{{ r.nom }}</option>
+            </select>
+            <span class="transfert-aide">Programmes, tests, groupes et athlètes suivis lui sont transférés, puis le compte est supprimé.</span>
+          </div>
+          <p v-else class="error">Aucun autre préparateur dans l'organisation : créez-en un pour reprendre ses programmes.</p>
+          <p v-if="erreurAction" class="error">{{ erreurAction }}</p>
+        </div>
+        <div class="modal-footer">
+          <button class="btn" @click="transfert = null">Annuler</button>
+          <button class="btn btn-danger" :disabled="!transfert.repreneurId || occupe" @click="confirmerTransfert">
+            Transférer et supprimer
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Liste des utilisateurs -->
     <div v-if="onglet === 'users'" class="admin-page">
+      <!-- Dupliqué du slot #actions, masqué sur mobile par AppLayout : sans
+           ça, impossible de créer un compte depuis un téléphone. -->
+      <div class="mobile-actions">
+        <button class="btn btn-primary" @click="ouvrirCreation">
+          <i class="ti ti-plus"></i> Nouvel utilisateur
+        </button>
+      </div>
+      <p v-if="erreurAction && !transfert" class="error" role="alert">{{ erreurAction }}</p>
       <div class="filters">
         <button
           v-for="role in ['tous', 'admin', 'prepa', 'athlete']"
@@ -115,7 +153,8 @@
             <select
               v-if="user.role !== 'admin'"
               :value="user.role"
-              @change="changerRole(user, $event.target.value)"
+              :disabled="occupe"
+              @change="changerRole(user, $event)"
               class="role-select"
               :class="`role-${user.role}`"
             >
@@ -136,7 +175,7 @@
               <button
                 class="btn btn-sm btn-danger"
                 @click="supprimerUtilisateur(user)"
-                :disabled="user.id === moi?.id"
+                :disabled="user.id === moi?.id || occupe"
                 title="Supprimer"
               >
                 <i class="ti ti-trash"></i>
@@ -156,6 +195,10 @@
 import { ref, computed, onMounted } from 'vue'
 import { useApi } from '../services/api'
 import AppLayout from '../components/AppLayout.vue'
+import { useActionUnique } from '../utils/actionUnique'
+import { erreurMotDePasse } from '../utils/motDePasse'
+
+const LIBELLES_ROLE = { athlete: 'athlète', prepa: 'préparateur' }
 
 export default {
   components: { AppLayout },
@@ -166,6 +209,9 @@ export default {
     const filtreRole = ref('tous')
     const onglet = ref('users')
     const api = useApi()
+    // Suppressions et changements de rôle : une action à la fois, échec
+    // affiché (une suppression refusée ne disait rien jusqu'ici).
+    const { occupe, erreur: erreurAction, executer } = useActionUnique()
 
     // Création
     const modalCreation = ref(false)
@@ -185,6 +231,8 @@ export default {
       try {
         users.value = await api.get('/users/')
         moi.value = await api.get('/users/me')
+      } catch (e) {
+        erreurAction.value = e.message || 'Impossible de charger les utilisateurs'
       } finally {
         loading.value = false
       }
@@ -207,28 +255,80 @@ export default {
     }
 
     const creerUtilisateur = async () => {
-      createError.value = ''
-      try {
-        const data = await api.post('/users/organisation', newUser.value)
-        users.value.push(data)
-        modalCreation.value = false
-      } catch (e) {
-        createError.value = e.message || 'Erreur lors de la création'
+      createError.value = erreurMotDePasse(newUser.value.password)
+      if (createError.value) return
+      await executer(async () => {
+        try {
+          const data = await api.post('/users/organisation', newUser.value)
+          users.value.push(data)
+          modalCreation.value = false
+        } catch (e) {
+          createError.value = e.message || 'Erreur lors de la création'
+        }
+      })
+    }
+
+    // Changer de rôle change tout l'espace de la personne (athlète ↔ prépa) :
+    // plus jamais sur une simple sélection, et le menu revient à l'ancien rôle
+    // si on annule ou si l'API refuse.
+    const changerRole = (user, event) => {
+      const select = event.target
+      const nouveauRole = select.value
+      if (user.id === moi.value?.id || nouveauRole === user.role) return
+      if (!confirm(`Passer ${user.nom} en ${LIBELLES_ROLE[nouveauRole]} ? Son espace dans l'application change aussitôt.`)) {
+        select.value = user.role
+        return
       }
+      return executer(async () => {
+        try {
+          await api.patch(`/users/${user.id}`, { role: nouveauRole })
+          user.role = nouveauRole
+        } catch (e) {
+          select.value = user.role
+          throw e
+        }
+      })
     }
 
-    const changerRole = async (user, newRole) => {
-      if (user.id === moi.value?.id) return
-      await api.patch(`/users/${user.id}`, { role: newRole })
-      user.role = newRole
-    }
+    // Préparateur avec des programmes : l'API demande qui les reprend (409),
+    // la suppression se termine dans la fenêtre de transfert.
+    const transfert = ref(null)
+    const repreneurs = computed(() =>
+      transfert.value
+        ? users.value.filter(u => u.role === 'prepa' && u.id !== transfert.value.user.id)
+        : []
+    )
 
-    const supprimerUtilisateur = async (user) => {
-      if (user.id === moi.value?.id) return
-      if (!confirm(`Supprimer "${user.nom}" ? Cette action est irréversible.`)) return
-      await api.del(`/users/${user.id}`)
+    const retirerDeLaListe = (user) => {
       users.value = users.value.filter(u => u.id !== user.id)
     }
+
+    const supprimerUtilisateur = (user) => {
+      if (user.id === moi.value?.id) return
+      const message = user.role === 'athlete'
+        ? `Supprimer ${user.nom} et toutes ses données (séances, pesées, diète, blessures, tests) ? Cette action est irréversible.`
+        : `Supprimer le compte de ${user.nom} ? Cette action est irréversible.`
+      if (!confirm(message)) return
+      return executer(async () => {
+        try {
+          await api.del(`/users/${user.id}`)
+          retirerDeLaListe(user)
+        } catch (e) {
+          if (e.status === 409 && e.data?.detail?.code === 'transfert_requis') {
+            transfert.value = { user, message: e.message, repreneurId: null }
+            return
+          }
+          throw e
+        }
+      })
+    }
+
+    const confirmerTransfert = () => executer(async () => {
+      const { user, repreneurId } = transfert.value
+      await api.del(`/users/${user.id}?transfert_vers=${repreneurId}`)
+      retirerDeLaListe(user)
+      transfert.value = null
+    })
 
     const ouvrirResetPassword = (user) => {
       userCible.value = user
@@ -239,12 +339,9 @@ export default {
     }
 
     const resetPassword = async () => {
-      resetError.value = ''
+      resetError.value = erreurMotDePasse(newPassword.value)
       resetSuccess.value = ''
-      if (newPassword.value.length < 8) {
-        resetError.value = 'Le mot de passe doit faire au moins 8 caractères'
-        return
-      }
+      if (resetError.value) return
       loadingReset.value = true
       try {
         await api.patch(`/users/${userCible.value.id}/password`, { nouveau_mdp: newPassword.value })
@@ -267,6 +364,7 @@ export default {
       modalResetPassword, userCible, newPassword, resetError, resetSuccess, loadingReset,
       usersFiltres, compteRole,
       ouvrirCreation, creerUtilisateur, changerRole, supprimerUtilisateur,
+      occupe, erreurAction, transfert, repreneurs, confirmerTransfert,
       ouvrirResetPassword, resetPassword,
       initiales
     }
@@ -304,6 +402,9 @@ export default {
 }
 
 .filters { display: flex; gap: var(--spacing-sm); flex-wrap: wrap; }
+.mobile-actions { display: none; }
+.transfert-texte { margin: 0; color: var(--color-text-body); }
+.transfert-aide { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
 .filter-btn {
   display: inline-flex;
   align-items: center;
@@ -427,5 +528,6 @@ export default {
   .actions-cell { justify-content: flex-start; }
 
   .filters { gap: 6px; }
+  .mobile-actions { display: flex; }
 }
 </style>

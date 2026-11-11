@@ -27,16 +27,30 @@ export async function requeteReseau(path, options) {
   }
 }
 
+// Lu par l'écran de connexion : sans ça, une session expirée renvoyait sur
+// le formulaire sans un mot d'explication.
+export const CLE_SESSION_EXPIREE = 'athletia:session-expiree'
+
 async function handleResponse(response) {
   if (response.status === 401) {
     const authStore = useAuthStore()
     authStore.logout()
+    try {
+      sessionStorage.setItem(CLE_SESSION_EXPIREE, '1')
+    } catch {
+      // stockage indisponible : la reconnexion se fera sans le message
+    }
     router.push('/')
     throw new Error('Session expirée')
   }
   const data = await lireCorps(response)
   if (!response.ok) {
-    throw new Error(messageErreur(data, response.status))
+    // status et corps joints à l'erreur : certains écrans réagissent à un
+    // refus précis (ex. 409 « transfert requis » à la suppression d'un compte).
+    const erreur = new Error(messageErreur(data, response.status))
+    erreur.status = response.status
+    erreur.data = data
+    throw erreur
   }
   return data
 }
@@ -59,6 +73,8 @@ export async function lireCorps(response) {
 export function messageErreur(data, status) {
   const detail = data?.detail
   if (typeof detail === 'string' && detail) return detail
+  // Refus détaillé ({ code, message, … }) : le message est fait pour l'écran.
+  if (typeof detail?.message === 'string' && detail.message) return detail.message
   if (Array.isArray(detail)) {
     const messages = detail.map(d => d?.msg).filter(Boolean)
     if (messages.length) return messages.join(', ')

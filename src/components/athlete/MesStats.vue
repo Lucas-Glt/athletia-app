@@ -21,9 +21,12 @@
 
       <div class="field-inline">
         <label>Durée de la séance</label>
-        <input v-model.number="dureeForm" type="number" inputmode="numeric" min="1" placeholder="ex : 60" />
+        <input v-model.number="dureeForm" type="number" inputmode="numeric" min="1" :max="DUREE_MAX" placeholder="ex : 60" />
         <span>min</span>
       </div>
+      <!-- Le ressenti n'est plus modifiable une fois envoyé : la durée en
+           heures rend une faute de frappe (600 pour 60) visible avant. -->
+      <p class="duree-heures" v-if="dureeForm > 0">soit {{ dureeEnHeures }}</p>
 
       <button
         class="btn btn-primary btn-envoyer"
@@ -93,6 +96,9 @@
         <button class="btn btn-primary btn-envoyer" :disabled="!wellnessComplet" @click="envoyerWellness">
           <i class="ti ti-check"></i> Envoyer
         </button>
+        <!-- Bouton grisé sans explication : on dit ce qui manque (souvent le
+             temps de sommeil, à régler avec + / −). -->
+        <p v-if="wellnessManquants" class="wellness-manque">Il manque : {{ wellnessManquants }}</p>
         <p v-if="erreurWellness" class="stat-card-erreur">{{ erreurWellness }}</p>
       </template>
     </div>
@@ -206,6 +212,11 @@ const COULEUR_TYPE = {
   pliometrie: 'var(--color-type-pliometrie-text)'
 }
 
+// Durée de séance déclarée : maximum accepté par l'API, et seuil au-delà
+// duquel on fait confirmer (ressenti non modifiable une fois envoyé).
+const DUREE_MAX = 600
+const DUREE_A_CONFIRMER = 240
+
 const LABELS_RPE = {
   0: 'Repos', 1: 'Très très facile', 2: 'Facile', 3: 'Modéré', 4: 'Assez dur',
   5: 'Dur', 6: 'Très dur', 7: 'Très dur', 8: 'Très très dur', 9: 'Très très dur', 10: 'Maximal'
@@ -300,8 +311,19 @@ export default {
     const erreurRessenti = ref('')
     const erreurWellness = ref('')
 
+    const dureeEnHeures = computed(() => {
+      const minutes = Math.round(Number(dureeForm.value) || 0)
+      return `${Math.floor(minutes / 60)} h ${String(minutes % 60).padStart(2, '0')}`
+    })
+
     const envoyerRessenti = async () => {
       if (rpeForm.value === null || !dureeForm.value) return
+      if (dureeForm.value < 1 || dureeForm.value > DUREE_MAX) {
+        erreurRessenti.value = `Durée invalide : entre 1 et ${DUREE_MAX} minutes (${DUREE_MAX / 60} h)`
+        return
+      }
+      // Ressenti définitif : une durée inhabituelle est confirmée avant envoi.
+      if (dureeForm.value > DUREE_A_CONFIRMER && !confirm(`Séance de ${dureeForm.value} min, soit ${dureeEnHeures.value} : c'est bien ça ?`)) return
       erreurRessenti.value = ''
       try {
         await api.post(`/seances/${ressenti.value.seance_id}/charge`, {
@@ -322,6 +344,13 @@ export default {
     }
 
     const wellnessComplet = computed(() => Object.values(wellnessForm.value).every(v => v !== null))
+    // Ce qui manque, dès qu'une réponse a été donnée (rien au départ).
+    const wellnessManquants = computed(() => {
+      const f = wellnessForm.value
+      if (wellnessComplet.value || Object.values(f).every(v => v === null)) return ''
+      const libelles = { heures_sommeil: 'temps de sommeil', sommeil: 'qualité du sommeil', fatigue: 'fatigue', courbatures: 'courbatures', stress: 'stress' }
+      return Object.keys(libelles).filter(cle => f[cle] === null).map(cle => libelles[cle]).join(', ')
+    })
 
     const envoyerWellness = async () => {
       if (!wellnessComplet.value) return
@@ -448,8 +477,8 @@ export default {
     })
 
     return {
-      stats, ressenti, rpeForm, dureeForm, labelRpe, envoyerRessenti,
-      wellnessFait, wellnessForm, itemsWellness, wellnessComplet, envoyerWellness,
+      stats, ressenti, rpeForm, dureeForm, labelRpe, envoyerRessenti, dureeEnHeures, DUREE_MAX,
+      wellnessFait, wellnessForm, itemsWellness, wellnessComplet, wellnessManquants, envoyerWellness,
       ajusterSommeil, formatHeures, SOMMEIL_MIN, SOMMEIL_MAX,
       erreurRessenti, erreurWellness,
       seancesSemaine, dernierPoids, tendancePoids, labelType,
@@ -492,6 +521,8 @@ export default {
 .stat-card-sub { font-size: var(--font-size-sm); color: var(--color-text-secondary); margin: 0; }
 .stat-card-note { font-size: var(--font-size-xs); color: var(--color-text-muted); margin: 0; }
 .stat-card-erreur { font-size: var(--font-size-sm); color: var(--color-danger-text); margin: 0; }
+.wellness-manque { font-size: var(--font-size-xs); color: var(--color-text-secondary); margin: 0; }
+.duree-heures { font-size: var(--font-size-xs); color: var(--color-text-secondary); margin: 0; }
 .stat-card-periode { margin-left: auto; font-size: var(--font-size-xs); font-weight: 500; color: var(--color-text-muted); }
 
 /* --- En bref : trois tuiles, une ligne --- */

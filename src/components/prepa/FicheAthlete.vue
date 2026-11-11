@@ -42,7 +42,7 @@
         :class="'zone-' + (athlete.resume.acwr.zone || 'insuffisant')"
         title="ACWR : charge des 7 derniers jours / moyenne des 28"
       >
-        <small>ACWR</small>{{ athlete.resume.acwr.valeur !== null ? athlete.resume.acwr.valeur.toFixed(2) : '—' }}
+        <small>ACWR</small>{{ athlete.resume.acwr.valeur !== null ? athlete.resume.acwr.valeur.toFixed(2).replace('.', ',') : '—' }}
       </span>
       <div class="fiche-signaux" v-if="athlete.resume && (athlete.resume.signaux.length > 0 || athlete.resume.blessures_en_cours > 0)">
         <span class="signal signal-blessure" v-if="athlete.resume.blessures_en_cours > 0">
@@ -54,6 +54,11 @@
         </span>
       </div>
     </div>
+
+    <p v-if="erreurFiche" class="error erreur-fiche" role="alert">
+      <i class="ti ti-alert-triangle"></i> {{ erreurFiche }}
+      <button type="button" class="erreur-fiche-fermer" aria-label="Fermer" @click="erreurFiche = ''"><i class="ti ti-x"></i></button>
+    </p>
 
     <GroupesManagerModal
       v-if="modalGroupes"
@@ -612,9 +617,16 @@ export default {
       reactionOuverte.value = null
     }
 
+    const erreurFiche = ref('')
     const retirerDuCercle = async () => {
       if (!confirm(`Retirer ${props.athlete.nom} de votre cercle ?`)) return
-      await api.del(`/users/mes-athletes/${props.athlete.id}`)
+      erreurFiche.value = ''
+      try {
+        await api.del(`/users/mes-athletes/${props.athlete.id}`)
+      } catch (e) {
+        erreurFiche.value = e.message || 'Impossible de retirer cet athlète'
+        return
+      }
       emit('modifie')
       emit('fermer')
     }
@@ -624,8 +636,14 @@ export default {
     const loadingApercu = ref(false)
     const fetchApercu = async () => {
       loadingApercu.value = true
-      detail.value = await api.get(`/monitoring/athlete/${props.athlete.id}`)
-      loadingApercu.value = false
+      try {
+        detail.value = await api.get(`/monitoring/athlete/${props.athlete.id}`)
+      } catch (e) {
+        // sans ça, « Chargement… » restait affiché indéfiniment
+        erreurFiche.value = e.message || "Impossible de charger l'aperçu"
+      } finally {
+        loadingApercu.value = false
+      }
     }
 
     const pointsAcwr = computed(() => detail.value ? detail.value.aigue_chronique.map(p => ({ date: p.date, acwr: p.acwr })) : [])
@@ -664,18 +682,27 @@ export default {
 
     const assignerProgramme = async (p) => {
       enCours.value.add(p.id)
+      erreurFiche.value = ''
       try {
         await api.post(`/programmes/${p.id}/assigner/${props.athlete.id}`)
         emit('modifie')
+      } catch (e) {
+        erreurFiche.value = e.message || "Impossible d'assigner ce programme"
       } finally {
         enCours.value.delete(p.id)
       }
     }
+    // Un clic suffisait à retirer le programme à l'athlète : il le perd
+    // aussitôt de son téléphone.
     const retirerProgramme = async (p) => {
+      if (!confirm(`Retirer « ${p.nom} » à ${props.athlete.nom} ? Il ne le verra plus ; son historique est conservé.`)) return
       enCours.value.add(p.id)
+      erreurFiche.value = ''
       try {
         await api.del(`/programmes/${p.id}/retirer/${props.athlete.id}`)
         emit('modifie')
+      } catch (e) {
+        erreurFiche.value = e.message || 'Impossible de retirer ce programme'
       } finally {
         enCours.value.delete(p.id)
         programmesOuverts.value.delete(p.id)
@@ -750,11 +777,31 @@ export default {
     const seanceFiltre = ref('toutes')
     const sessionsOuvertes = ref(new Set())
 
+    // Séries prévues par séance (ids), pour le bilan « x/y séries » d'une
+    // séance de l'historique : compter les seules séries enregistrées
+    // affichait « 1/1 » en vert pour une séance arrêtée après 1 série sur 6.
+    const seriesPrevuesParSeance = ref({})
     const fetchLogs = async () => {
       if (!programmeLogsId.value) { logs.value = []; return }
+      const programmeId = programmeLogsId.value
       loadingLogs.value = true
-      logs.value = await api.get(`/logs/programme/${programmeLogsId.value}/athlete/${props.athlete.id}`)
-      loadingLogs.value = false
+      try {
+        const [donnees, seances] = await Promise.all([
+          api.get(`/logs/programme/${programmeId}/athlete/${props.athlete.id}`),
+          api.get(`/programmes/${programmeId}/seances/`)
+        ])
+        // un autre programme a pu être choisi pendant le chargement
+        if (programmeLogsId.value !== programmeId) return
+        logs.value = donnees
+        seriesPrevuesParSeance.value = Object.fromEntries(seances.map(seance => [
+          seance.id,
+          (seance.exercices || []).flatMap(e => (e.series || []).map(sr => sr.id))
+        ]))
+      } catch (e) {
+        erreurFiche.value = e.message || "Impossible de charger l'historique"
+      } finally {
+        loadingLogs.value = false
+      }
     }
 
     const ouvrirHistorique = () => {
@@ -781,7 +828,7 @@ export default {
         const key = log.session_id || `${dateStr}__${log.seance.id}`
         if (!sessions[key]) {
           sessions[key] = {
-            key, date: dateStr, seanceNom: log.seance.nom, jour: log.seance.jour,
+            key, date: dateStr, seanceId: log.seance.id, seanceNom: log.seance.nom, jour: log.seance.jour,
             semaine: log.seance.semaine, typeSeance: log.seance.type_seance, exercices: {}
           }
         }
@@ -796,7 +843,10 @@ export default {
           const exercices = Object.values(s.exercices)
             .sort((a, b) => a.ordre - b.ordre)
             .map(e => ({ ...e, logs: [...e.logs].sort((a, b) => a.serie.id - b.serie.id) }))
-          const total = exercices.reduce((n, e) => n + e.logs.length, 0)
+          // Prévues = séries actuelles de la séance, plus celles enregistrées
+          // qui n'en font plus partie (retirées depuis par le prépa).
+          const enregistrees = exercices.flatMap(e => e.logs.map(l => l.serie.id))
+          const total = new Set([...(seriesPrevuesParSeance.value[s.seanceId] || []), ...enregistrees]).size
           const faites = exercices.reduce((n, e) => n + e.logs.filter(l => l.fait).length, 0)
           return { ...s, exercices, total, faites, taux: total ? Math.round((faites / total) * 100) : 0 }
         })
@@ -1079,7 +1129,7 @@ export default {
     onMounted(fetchApercu)
 
     return {
-      estSuperPrepa, sousOnglet, modalGroupes, groupesDe, initiales, retirerDuCercle, ONGLETS,
+      estSuperPrepa, sousOnglet, modalGroupes, groupesDe, initiales, retirerDuCercle, ONGLETS, erreurFiche,
       REACTIONS_PREPA, reactionOuverte, basculerReaction, reagir,
       FENETRE_ACTIVITE, LABELS_NIVEAU_ACTIVITE, niveauActivite, libelleActivite,
       typeSeance, labelTypeSeance, iconeTypeSeance,
@@ -1117,6 +1167,16 @@ export default {
 .retour-fiche { flex-shrink: 0; margin-left: calc(-1 * var(--spacing-md)); }
 .fiche-topbar-actions { display: flex; gap: var(--spacing-sm); flex-shrink: 0; flex-wrap: wrap; }
 .btn-retirer { color: var(--color-danger-text); }
+.erreur-fiche { display: flex; align-items: center; gap: 6px; margin: 0; }
+.erreur-fiche-fermer {
+  margin-left: auto;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  min-width: 32px;
+  min-height: 32px;
+}
 .btn-retirer:hover:not(:disabled) { background: var(--color-danger-bg-soft); color: var(--color-danger-text); }
 
 .fiche-header {

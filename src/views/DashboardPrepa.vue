@@ -19,6 +19,16 @@
     </template>
 
     <div class="dashboard-root" @pointerdown="onTabSwipeStart" @pointerup="onTabSwipeEnd" @pointercancel="onTabSwipeCancel">
+      <!-- Échec d'une action sur un programme : affiché quel que soit le
+           défilement, au lieu de l'échec silencieux d'avant. -->
+      <div v-if="erreurAction" class="toast-erreur" role="alert">
+        <i class="ti ti-alert-triangle"></i>
+        <span>{{ erreurAction }}</span>
+        <button type="button" class="toast-fermer" aria-label="Fermer" @click="erreurAction = ''">
+          <i class="ti ti-x"></i>
+        </button>
+      </div>
+
       <AssignerAthleteModal
         v-if="modalAssigner"
         :programme="programmeActif"
@@ -95,7 +105,7 @@
 
             <div v-if="editMode" class="edit-banner">
               <i class="ti ti-edit"></i>
-              <span>Mode édition activé</span>
+              <span>Mode édition : chaque modification est enregistrée automatiquement.</span>
             </div>
 
             <div class="detail-top">
@@ -111,11 +121,10 @@
                 <template v-if="!editMode">
                   <button class="btn btn-sm" @click="modalAssigner = true"><i class="ti ti-user-plus"></i> Assigner</button>
                   <button class="btn btn-sm btn-primary" @click="startEditMode"><i class="ti ti-edit"></i> Modifier</button>
-                  <button class="btn btn-sm btn-danger" @click="supprimerProgramme(programmeActif)"><i class="ti ti-trash"></i> Supprimer</button>
+                  <button class="btn btn-sm btn-danger" :disabled="occupe" @click="supprimerProgramme(programmeActif)"><i class="ti ti-trash"></i> Supprimer</button>
                 </template>
                 <template v-else>
-                  <button class="btn btn-sm btn-primary" @click="sauvegarderEditMode">✓ Sauvegarder</button>
-                  <button class="btn btn-sm" @click="annulerEditMode">Annuler</button>
+                  <button class="btn btn-sm btn-primary" :disabled="occupe" @click="terminerEditMode">✓ Terminer</button>
                 </template>
               </div>
             </div>
@@ -166,11 +175,11 @@
                   @click="semaineActive = sem"
                 >
                   <span>Semaine {{ sem }}</span>
-                  <button v-if="editMode && semainesDisponibles.length > 1" class="btn-icon-tiny" @click.stop="supprimerSemaine(sem)">
+                  <button v-if="editMode && semainesDisponibles.length > 1" class="btn-icon-tiny" :disabled="occupe" @click.stop="supprimerSemaine(sem)">
                     <i class="ti ti-x"></i>
                   </button>
                 </div>
-                <button v-if="editMode" class="semaine-tab semaine-add" @click="dupliquerSemaine">
+                <button v-if="editMode" class="semaine-tab semaine-add" :disabled="occupe" @click="dupliquerSemaine">
                   <i class="ti ti-plus"></i> Nouvelle semaine
                 </button>
               </div>
@@ -216,7 +225,7 @@
                     <span class="exo-count-badge">{{ seance.exercices?.length || 0 }} exo{{ seance.exercices?.length > 1 ? 's' : '' }}</span>
                   </template>
                   <i class="ti seance-chevron" :class="isSeanceOuverte(seance.id) ? 'ti-chevron-up' : 'ti-chevron-down'"></i>
-                  <button v-if="editMode" class="btn btn-sm btn-danger" @click.stop="supprimerSeance(seance)">
+                  <button v-if="editMode" class="btn btn-sm btn-danger" :disabled="occupe" @click.stop="supprimerSeance(seance)">
                     <i class="ti ti-trash"></i>
                   </button>
                 </div>
@@ -233,10 +242,10 @@
                     :class="{ 'is-superset': groupe.exercices.length > 1 }"
                   >
                     <div v-if="editMode" class="exo-group-toolbar">
-                      <button class="btn-icon-tiny" title="Monter" :disabled="estPremierGroupe(seance, groupe)" @click="deplacerGroupe(seance, groupe, -1)">
+                      <button class="btn-icon-tiny" title="Monter" :disabled="occupe || estPremierGroupe(seance, groupe)" @click="deplacerGroupe(seance, groupe, -1)">
                         <i class="ti ti-arrow-up"></i>
                       </button>
-                      <button class="btn-icon-tiny" title="Descendre" :disabled="estDernierGroupe(seance, groupe)" @click="deplacerGroupe(seance, groupe, 1)">
+                      <button class="btn-icon-tiny" title="Descendre" :disabled="occupe || estDernierGroupe(seance, groupe)" @click="deplacerGroupe(seance, groupe, 1)">
                         <i class="ti ti-arrow-down"></i>
                       </button>
                       <span class="exo-group-toolbar-label">Réordonner</span>
@@ -277,7 +286,7 @@
                             <input type="checkbox" v-model="exo.optionnel" @change="mettreAJourExercice(exo)" />
                             Optionnelle
                           </label>
-                          <button v-if="editMode" class="btn btn-sm btn-danger" @click="supprimerExercice(seance, exo)">
+                          <button v-if="editMode" class="btn btn-sm btn-danger" :disabled="occupe" @click="supprimerExercice(seance, exo)">
                             <i class="ti ti-trash"></i>
                           </button>
                         </div>
@@ -298,7 +307,7 @@
                           placeholder="Nom de l'exercice à enchaîner"
                           @select="item => getGroupeForm(groupe, groupe.exercices[0])._nouvelExoCatalogueId = item?.id ?? null"
                         />
-                        <button class="btn btn-sm btn-primary" @click="ajouterAuSupersetEdit(seance, groupe)" :disabled="!getGroupeForm(groupe, groupe.exercices[0])._nouvelExoNom">+ Ajouter</button>
+                        <button class="btn btn-sm btn-primary" @click="ajouterAuSupersetEdit(seance, groupe)" :disabled="occupe || !getGroupeForm(groupe, groupe.exercices[0])._nouvelExoNom">+ Ajouter</button>
                         <button class="btn btn-sm btn-secondary" @click="getGroupeForm(groupe, groupe.exercices[0])._formSupersetOuvert = false">Annuler</button>
                       </div>
                     </template>
@@ -372,12 +381,12 @@
                               </template>
                             </div>
                           </div>
-                          <button v-if="editMode" class="btn-icon-tiny serie-delete-btn" title="Supprimer cette série" @click="supprimerSerieIndex(groupe, serieIdx - 1)">
+                          <button v-if="editMode" class="btn-icon-tiny serie-delete-btn" title="Supprimer cette série" :disabled="occupe" @click="supprimerSerieIndex(groupe, serieIdx - 1)">
                             <i class="ti ti-trash"></i>
                           </button>
                         </div>
 
-                        <button v-if="editMode" class="btn btn-sm btn-secondary btn-ajouter-serie" @click="ajouterSerieGroupe(groupe, seance)">
+                        <button v-if="editMode" class="btn btn-sm btn-secondary btn-ajouter-serie" :disabled="occupe" @click="ajouterSerieGroupe(groupe, seance)">
                           <i class="ti ti-plus"></i> Ajouter une série
                         </button>
                       </div>
@@ -418,7 +427,7 @@
                           <label class="mini-field"><span>Nb séries</span>
                             <input v-model.number="getGroupeForm(groupe, groupe.exercices[0]).nb_series" type="number" min="1" placeholder="4" class="mini-input" />
                           </label>
-                          <button class="btn btn-sm btn-primary" @click="genererSeriesGroupeEdit(groupe, seance)">
+                          <button class="btn btn-sm btn-primary" :disabled="occupe" @click="genererSeriesGroupeEdit(groupe, seance)">
                             Générer {{ getGroupeForm(groupe, groupe.exercices[0]).nb_series || '?' }} séries
                           </button>
                         </div>
@@ -434,7 +443,7 @@
                       placeholder="Nom de l'exercice"
                       @select="item => seance._nouvelExercice.catalogueId = item?.id ?? null"
                     />
-                    <button class="btn btn-sm" @click="ajouterExercice(seance)" :disabled="!seance._nouvelExercice.nom">+ Exercice</button>
+                    <button class="btn btn-sm" @click="ajouterExercice(seance)" :disabled="occupe || !seance._nouvelExercice.nom">+ Exercice</button>
                   </div>
                 </div>
               </div>
@@ -451,7 +460,7 @@
                   <option value="">Jour</option>
                   <option v-for="j in jours" :key="j" :value="j">{{ j }}</option>
                 </select>
-                <button class="btn btn-sm" @click="ajouterSeance" :disabled="!nouvelleSeance.nom">+ Séance</button>
+                <button class="btn btn-sm" @click="ajouterSeance" :disabled="occupe || !nouvelleSeance.nom">+ Séance</button>
               </div>
             </div>
 
@@ -502,6 +511,7 @@ import ExerciceAutocomplete from '../components/prepa/ExerciceAutocomplete.vue'
 import ExerciceImage from '../components/ExerciceImage.vue'
 import { TYPES_GROUPE, TYPE_GROUPE_DEFAUT, typeGroupe, labelTypeGroupe } from '../data/typesGroupe'
 import { typeSeance, labelTypeSeance, iconeTypeSeance } from '../data/typesSeance'
+import { useActionUnique } from '../utils/actionUnique'
 
 // Distance horizontale minimale pour valider un swipe. Volontairement haute :
 // un doigt qui ripe sur un simple appui ne doit jamais changer d'onglet.
@@ -532,6 +542,9 @@ export default {
     const router = useRouter()
     const authStore = useAuthStore()
     const api = useApi()
+    // Une création/suppression à la fois (double-clic = doublons), et un
+    // message à l'écran quand l'API refuse — jusqu'ici rien ne s'affichait.
+    const { occupe, erreur: erreurAction, executer, signaler } = useActionUnique()
 
     const jours = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche']
     const LABELS_ONGLETS = { athletes: 'Athlètes', programmes: 'Programmes', tests: 'Tests' }
@@ -622,7 +635,7 @@ export default {
       return {}
     }
 
-    const genererSeriesGroupeEdit = async (groupe, seance) => {
+    const genererSeriesGroupeEdit = (groupe, seance) => executer(async () => {
       const form = groupeForms.value[groupe.key]
       if (!form) return
       const type = seance.type_seance || 'musculation'
@@ -631,28 +644,30 @@ export default {
         for (let i = 0; i < form.nb_series; i++) await api.post(`/exercices/${exo.id}/series/`, buildSeriePayload(type, params, form.temps_repos))
       }
       await fetchSeances(programmeActif.value.id)
-    }
+    })
 
     // Ajoute une seule série à un groupe déjà généré, en reprenant les
     // valeurs de la dernière série comme point de départ (repos compris).
-    const ajouterSerieGroupe = async (groupe, seance) => {
+    const ajouterSerieGroupe = (groupe, seance) => executer(async () => {
       const type = seance.type_seance || 'musculation'
       for (const exo of groupe.exercices) {
         const derniere = exo.series[exo.series.length - 1] || {}
         const data = await api.post(`/exercices/${exo.id}/series/`, buildSeriePayload(type, derniere, derniere.temps_repos))
         exo.series.push(data)
       }
-    }
+    })
 
-    const supprimerSerieIndex = async (groupe, idx) => {
-      if (!confirm(`Supprimer la série ${idx + 1} ?`)) return
-      for (const exo of groupe.exercices) {
-        const serie = exo.series[idx]
-        if (serie) {
-          await api.del(`/series/${serie.id}`)
-          exo.series.splice(idx, 1)
+    const supprimerSerieIndex = (groupe, idx) => {
+      if (!confirm(`Supprimer la série ${idx + 1} ? Les résultats déjà enregistrés par vos athlètes restent dans leur historique.`)) return
+      return executer(async () => {
+        for (const exo of groupe.exercices) {
+          const serie = exo.series[idx]
+          if (serie) {
+            await api.del(`/series/${serie.id}`)
+            exo.series.splice(idx, 1)
+          }
         }
-      }
+      })
     }
 
     // Réordonnancement des groupes d'exercices (drag manuel via flèches) :
@@ -664,7 +679,7 @@ export default {
       return groupes[groupes.length - 1]?.key === groupe.key
     }
 
-    const deplacerGroupe = async (seance, groupe, direction) => {
+    const deplacerGroupe = (seance, groupe, direction) => executer(async () => {
       const groupesOrdre = grouperExercices(seance.exercices)
       const idx = groupesOrdre.findIndex(g => g.key === groupe.key)
       const cible = idx + direction
@@ -682,17 +697,17 @@ export default {
         }
       }
       for (const exo of aPatcher) await mettreAJourExercice(exo)
-    }
+    })
 
-    const syncReposSuperset = async (groupe, serieIdx) => {
+    const syncReposSuperset = (groupe, serieIdx) => signaler(async () => {
       const repos = groupe.exercices[0].series[serieIdx]?.temps_repos
       for (const exo of groupe.exercices) {
         const serie = exo.series[serieIdx]
         if (serie) { serie.temps_repos = repos; await mettreAJourSerie(serie) }
       }
-    }
+    })
 
-    const ajouterAuSupersetEdit = async (seance, groupe) => {
+    const ajouterAuSupersetEdit = (seance, groupe) => executer(async () => {
       const form = groupeForms.value[groupe.key]
       if (!form?._nouvelExoNom) return
       let numGroupe = groupe.exercices[0].groupe
@@ -710,7 +725,7 @@ export default {
       form._nouvelExoCatalogueId = null
       form._formSupersetOuvert = false
       await fetchSeances(programmeActif.value.id)
-    }
+    })
 
     const semainesDisponibles = computed(() => {
       const set = new Set(seances.value.map(s => s.semaine || 1))
@@ -737,17 +752,23 @@ export default {
 
     const fetchSeances = async (programmeId) => {
       loadingSeances.value = true
-      const data = await api.get(`/programmes/${programmeId}/seances/`)
-      seances.value = data.map(s => ({ ...s, _nouvelExercice: { nom: '', catalogueId: null } }))
-      seances.value.forEach(s => {
-        if (seancesOuvertes.value[s.id] === undefined) {
-          seancesOuvertes.value[s.id] = false
-        }
-      })
-      groupesSeriesOuverts.value = {}
-      const semaines = [...new Set(seances.value.map(s => s.semaine || 1))]
-      if (!semaines.includes(semaineActive.value)) semaineActive.value = semaines[0] || 1
-      loadingSeances.value = false
+      try {
+        const data = await api.get(`/programmes/${programmeId}/seances/`)
+        seances.value = data.map(s => ({ ...s, _nouvelExercice: { nom: '', catalogueId: null } }))
+        seances.value.forEach(s => {
+          if (seancesOuvertes.value[s.id] === undefined) {
+            seancesOuvertes.value[s.id] = false
+          }
+        })
+        groupesSeriesOuverts.value = {}
+        const semaines = [...new Set(seances.value.map(s => s.semaine || 1))]
+        if (!semaines.includes(semaineActive.value)) semaineActive.value = semaines[0] || 1
+      } catch (e) {
+        // sans ça « Chargement… » restait affiché indéfiniment
+        erreurAction.value = e.message || 'Impossible de charger les séances'
+      } finally {
+        loadingSeances.value = false
+      }
     }
 
     const fetchMonCercle = async () => {
@@ -759,10 +780,12 @@ export default {
       groupes.value = await api.get('/groupes/')
     }
 
-    const selectProgramme = (p) => {
+    const selectProgramme = async (p) => {
+      // Rien n'est en attente en mode édition (chaque champ s'enregistre à la
+      // volée) : changer de programme termine simplement l'édition.
       if (editMode.value) {
-        if (!confirm('Annuler les modifications en cours ?')) return
-        editMode.value = false
+        await terminerEditMode()
+        if (editMode.value) return
       }
       programmeActif.value = p
       semaineActive.value = 1
@@ -793,20 +816,23 @@ export default {
       groupeForms.value = {}
     }
 
-    const sauvegarderEditMode = async () => {
-      const data = await api.patch(`/programmes/${programmeActif.value.id}`, { nom: editNom.value, description: editDesc.value || null })
-      programmeActif.value = data
-      programmes.value = programmes.value.map(p => p.id === data.id ? data : p)
-      editMode.value = false
-    }
-
-    const annulerEditMode = () => {
+    // Séances, exercices et séries s'enregistrent à chaque modification :
+    // « Annuler » laissait croire le contraire. Seuls le nom et la
+    // description sont enregistrés ici, s'ils ont changé.
+    const terminerEditMode = () => executer(async () => {
+      const nom = editNom.value.trim()
+      if (!nom) throw new Error('Le nom du programme est obligatoire')
+      const description = editDesc.value.trim() || null
+      if (nom !== programmeActif.value.nom || description !== (programmeActif.value.description || null)) {
+        const data = await api.patch(`/programmes/${programmeActif.value.id}`, { nom, description })
+        programmeActif.value = data
+        programmes.value = programmes.value.map(p => p.id === data.id ? data : p)
+      }
       editMode.value = false
       groupeForms.value = {}
-      fetchSeances(programmeActif.value.id)
-    }
+    })
 
-    const ajouterSeance = async () => {
+    const ajouterSeance = () => executer(async () => {
       const seancesSemaine = seances.value.filter(s => (s.semaine || 1) === semaineActive.value)
       const data = await api.post(`/programmes/${programmeActif.value.id}/seances/`, {
         nom: nouvelleSeance.value.nom, ordre: seancesSemaine.length + 1,
@@ -816,52 +842,58 @@ export default {
       seances.value.push({ ...data, exercices: [], _nouvelExercice: { nom: '', catalogueId: null } })
       seancesOuvertes.value[data.id] = true
       nouvelleSeance.value = { nom: '', jour: '', type_seance: 'musculation' }
-    }
+    })
 
-    const dupliquerSemaine = async () => {
+    const dupliquerSemaine = () => executer(async () => {
       const nouvellesSeances = await api.post(`/programmes/${programmeActif.value.id}/seances/dupliquer-semaine/${semaineActive.value}`)
       await fetchSeances(programmeActif.value.id)
       if (nouvellesSeances.length > 0) semaineActive.value = nouvellesSeances[0].semaine
-    }
+    })
 
-    const supprimerSemaine = async (numero) => {
-      if (!confirm(`Supprimer toute la semaine ${numero} ?`)) return
-      await api.del(`/programmes/${programmeActif.value.id}/seances/semaine/${numero}`)
-      await fetchSeances(programmeActif.value.id)
-    }
-
-    const ajouterExercice = async (seance) => {
-      const data = await api.post(`/seances/${seance.id}/exercices/`, { nom: seance._nouvelExercice.nom, ordre: seance.exercices.length + 1, groupe: null, catalogue_id: seance._nouvelExercice.catalogueId })
-      seance.exercices.push({ ...data, series: [] })
-      seance._nouvelExercice = { nom: '', catalogueId: null }
-    }
-
-    const mettreAJourSerie = async (serie) => {
-      await api.patch(`/series/${serie.id}`, {
-        nb_reps: serie.nb_reps || null, poids_cible: serie.poids_cible || null,
-        rm: serie.rm || null, tempo: serie.tempo || null, metres: serie.metres || null,
-        bonds: serie.bonds || null, nb_series: serie.nb_series || null,
-        intensite: serie.intensite || null, temps_repos: serie.temps_repos || null
+    const supprimerSemaine = (numero) => {
+      if (!confirm(`Supprimer toute la semaine ${numero} ? Les résultats déjà enregistrés par vos athlètes restent dans leur historique.`)) return
+      return executer(async () => {
+        await api.del(`/programmes/${programmeActif.value.id}/seances/semaine/${numero}`)
+        await fetchSeances(programmeActif.value.id)
       })
     }
 
-    const supprimerProgramme = async (p) => {
-      if (!confirm(`Supprimer "${p.nom}" ?`)) return
-      await api.del(`/programmes/${p.id}`)
-      programmes.value = programmes.value.filter(x => x.id !== p.id)
-      if (programmeActif.value?.id === p.id) { programmeActif.value = programmes.value[0] || null; editMode.value = false }
+    const ajouterExercice = (seance) => executer(async () => {
+      const data = await api.post(`/seances/${seance.id}/exercices/`, { nom: seance._nouvelExercice.nom, ordre: seance.exercices.length + 1, groupe: null, catalogue_id: seance._nouvelExercice.catalogueId })
+      seance.exercices.push({ ...data, series: [] })
+      seance._nouvelExercice = { nom: '', catalogueId: null }
+    })
+
+    const mettreAJourSerie = (serie) => signaler(() => api.patch(`/series/${serie.id}`, {
+      nb_reps: serie.nb_reps || null, poids_cible: serie.poids_cible || null,
+      rm: serie.rm || null, tempo: serie.tempo || null, metres: serie.metres || null,
+      bonds: serie.bonds || null, nb_series: serie.nb_series || null,
+      intensite: serie.intensite || null, temps_repos: serie.temps_repos || null
+    }))
+
+    const supprimerProgramme = (p) => {
+      if (!confirm(`Supprimer « ${p.nom} » ? Il disparaîtra aussi chez les athlètes à qui il est assigné. Les résultats déjà enregistrés par vos athlètes restent dans leur historique.`)) return
+      return executer(async () => {
+        await api.del(`/programmes/${p.id}`)
+        programmes.value = programmes.value.filter(x => x.id !== p.id)
+        if (programmeActif.value?.id === p.id) { programmeActif.value = programmes.value[0] || null; editMode.value = false }
+      })
     }
 
-    const supprimerSeance = async (seance) => {
-      if (!confirm(`Supprimer la séance "${seance.nom}" ?`)) return
-      await api.del(`/seances/${seance.id}`)
-      seances.value = seances.value.filter(s => s.id !== seance.id)
+    const supprimerSeance = (seance) => {
+      if (!confirm(`Supprimer la séance « ${seance.nom} » ? Les résultats déjà enregistrés par vos athlètes restent dans leur historique.`)) return
+      return executer(async () => {
+        await api.del(`/seances/${seance.id}`)
+        seances.value = seances.value.filter(s => s.id !== seance.id)
+      })
     }
 
-    const supprimerExercice = async (seance, exo) => {
-      if (!confirm(`Supprimer l'exercice "${exo.nom}" ?`)) return
-      await api.del(`/exercices/${exo.id}`)
-      seance.exercices = seance.exercices.filter(e => e.id !== exo.id)
+    const supprimerExercice = (seance, exo) => {
+      if (!confirm(`Supprimer l'exercice « ${exo.nom} » ? Les résultats déjà enregistrés par vos athlètes restent dans leur historique.`)) return
+      return executer(async () => {
+        await api.del(`/exercices/${exo.id}`)
+        seance.exercices = seance.exercices.filter(e => e.id !== exo.id)
+      })
     }
 
     const onTermine = () => { vue.value = 'liste'; fetchProgrammes() }
@@ -882,7 +914,7 @@ export default {
       await fetchGroupes()
     })
 
-    const mettreAJourExercice = async (exo) => {
+    const mettreAJourExercice = (exo) => signaler(async () => {
       const data = await api.patch(`/exercices/${exo.id}`, {
         nom: exo.nom,
         ordre: exo.ordre,
@@ -894,7 +926,7 @@ export default {
       // la vignette suit immédiatement le choix dans le catalogue (ou son
       // retrait quand le nom est retapé à la main), sans recharger les séances
       exo.image_url = data.image_url
-    }
+    })
 
     // Le type est porté par chaque exercice du groupe (le champ `groupe`
     // n'est qu'un numéro, sans entité propre côté backend) : on les met tous
@@ -916,7 +948,7 @@ export default {
     // ou change le jour d'une seule occurrence, la clé diverge des autres
     // semaines et l'athlète voit apparaître un créneau fantôme en double :
     // on propage donc le changement aux séances sœurs des autres semaines.
-    const mettreAJourSeance = async (seance) => {
+    const mettreAJourSeance = (seance) => signaler(async () => {
       const avant = seanceEnEdition.value && seanceEnEdition.value.id === seance.id ? seanceEnEdition.value : null
 
       await api.patch(`/seances/${seance.id}`, {
@@ -948,7 +980,7 @@ export default {
       }
 
       seanceEnEdition.value = null
-    }
+    })
     return {
       programmes, programmeActif, seances, monCercle, groupes,
       loadingSeances, modalAssigner, vue, onglet, vueLabel,
@@ -963,7 +995,7 @@ export default {
       syncReposSuperset, ajouterAuSupersetEdit,
       seancesOuvertes, toggleSeance, isSeanceOuverte,
       groupesSeriesOuverts, toggleGroupeSeries, isGroupeSeriesOuvert,
-      selectProgramme, startEditMode, sauvegarderEditMode, annulerEditMode,
+      selectProgramme, startEditMode, terminerEditMode, occupe, erreurAction,
       ajouterSeance, ajouterExercice, mettreAJourSerie,
       dupliquerSemaine, supprimerSemaine,
       supprimerProgramme, supprimerSeance, supprimerExercice,
@@ -975,6 +1007,37 @@ export default {
 </script>
 
 <style scoped>
+.toast-erreur {
+  position: fixed;
+  left: 50%;
+  bottom: var(--spacing-lg);
+  transform: translateX(-50%);
+  z-index: 260;
+  width: min(560px, calc(100% - 2 * var(--spacing-lg)));
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-sm) var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-danger-border);
+  background: var(--color-danger-bg-soft);
+  color: var(--color-danger-text);
+  font-size: var(--font-size-sm);
+  box-shadow: 0 6px 20px -6px rgba(0, 0, 0, 0.25);
+}
+.toast-erreur span { flex: 1; }
+.toast-fermer {
+  flex-shrink: 0;
+  width: var(--tap-min);
+  height: var(--tap-min);
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+@media (max-width: 768px) {
+  .toast-erreur { bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom) + var(--spacing-sm)); }
+}
 .dashboard-root { display: flex; flex: 1; flex-direction: column; overflow: hidden; min-height: 0; touch-action: pan-y; }
 .onglet-wrapper { display: flex; flex: 1; overflow: hidden; min-height: 0; }
 .onglet-programmes { flex-direction: column; }

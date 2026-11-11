@@ -14,8 +14,9 @@
       </div>
       <div class="actions">
         <button class="btn btn-secondary" @click="$emit('termine')">Annuler</button>
-        <button class="btn btn-primary" @click="creerProgramme" :disabled="!programme.nom">Créer et continuer →</button>
+        <button class="btn btn-primary" @click="creerProgramme" :disabled="!programme.nom || occupe">Créer et continuer →</button>
       </div>
+      <p v-if="erreur" class="error">{{ erreur }}</p>
     </div>
 
     <!-- Étape 2 : Séances + Exercices + Séries -->
@@ -36,7 +37,7 @@
           </span>
           <span class="badge badge-purple" v-if="seance.jour">{{ seance.jour }}</span>
           <span class="seance-nom">{{ seance.nom }}</span>
-          <button class="btn btn-sm btn-danger" @click="supprimerSeance(seance)" title="Supprimer">
+          <button class="btn btn-sm btn-danger" :disabled="occupe" @click="supprimerSeance(seance)" title="Supprimer">
             <i class="ti ti-trash"></i>
           </button>
         </div>
@@ -71,7 +72,7 @@
                   <input type="checkbox" v-model="exo.optionnel" @change="toggleOptionnel(exo)" />
                   Optionnelle
                 </label>
-                <button class="btn btn-sm btn-danger" @click="supprimerExercice(seance, groupe, exo)">
+                <button class="btn btn-sm btn-danger" :disabled="occupe" @click="supprimerExercice(seance, groupe, exo)">
                   <i class="ti ti-trash"></i>
                 </button>
               </div>
@@ -116,7 +117,7 @@
                 placeholder="Nom de l'exercice à enchaîner"
                 @select="item => groupe._nouvelExoCatalogueId = item?.id ?? null"
               />
-              <button class="btn btn-sm btn-primary" @click="ajouterAuSuperset(seance, groupe)" :disabled="!groupe._nouvelExoNom">+ Ajouter</button>
+              <button class="btn btn-sm btn-primary" @click="ajouterAuSuperset(seance, groupe)" :disabled="!groupe._nouvelExoNom || occupe">+ Ajouter</button>
               <button class="btn btn-sm btn-secondary" @click="groupe._formOpen = false">Annuler</button>
             </div>
 
@@ -130,7 +131,7 @@
                 <label>Repos (commun)</label>
                 <input v-model="groupe._temps_repos" placeholder="ex: 1min30" />
               </div>
-              <button class="btn btn-primary" @click="genererSeriesGroupe(groupe, seance)" :disabled="groupe._nb_series < 1">
+              <button class="btn btn-primary" @click="genererSeriesGroupe(groupe, seance)" :disabled="groupe._nb_series < 1 || occupe">
                 Générer {{ groupe._nb_series || '?' }} séries
               </button>
             </div>
@@ -169,7 +170,7 @@
               </div>
             </div>
 
-            <button class="btn btn-sm btn-secondary btn-reset" @click="resetSeriesGroupe(seance, groupe)">↺ Réinitialiser</button>
+            <button class="btn btn-sm btn-secondary btn-reset" :disabled="occupe" @click="resetSeriesGroupe(seance, groupe)">↺ Réinitialiser</button>
           </div>
         </div>
 
@@ -179,7 +180,7 @@
             placeholder="Nom du nouvel exercice"
             @select="item => seance._nouvelExercice.catalogueId = item?.id ?? null"
           />
-          <button class="btn btn-secondary" @click="ajouterExercice(seance)" :disabled="!seance._nouvelExercice.nom">
+          <button class="btn btn-secondary" @click="ajouterExercice(seance)" :disabled="!seance._nouvelExercice.nom || occupe">
             + Exercice
           </button>
         </div>
@@ -197,8 +198,11 @@
           <option value="">Jour</option>
           <option v-for="j in jours" :key="j" :value="j">{{ j }}</option>
         </select>
-        <button class="btn btn-primary" @click="ajouterSeance" :disabled="!nouvelleSeance.nom">+ Séance</button>
+        <button class="btn btn-primary" @click="ajouterSeance" :disabled="!nouvelleSeance.nom || occupe">+ Séance</button>
       </div>
+
+      <!-- Collé en bas de l'écran : visible où que soit l'action ratée -->
+      <p v-if="erreur" class="error erreur-collee" role="alert">{{ erreur }}</p>
 
       <div class="actions">
         <button class="btn btn-secondary" @click="$emit('termine')">← Retour au dashboard</button>
@@ -215,12 +219,15 @@ import { useApi } from '../../services/api'
 import ExerciceAutocomplete from './ExerciceAutocomplete.vue'
 import ExerciceImage from '../ExerciceImage.vue'
 import { TYPES_GROUPE, TYPE_GROUPE_DEFAUT, typeGroupe } from '../../data/typesGroupe'
+import { useActionUnique } from '../../utils/actionUnique'
 
 export default {
   components: { ExerciceAutocomplete, ExerciceImage },
   emits: ['termine'],
   setup(_, { emit }) {
     const api = useApi()
+    // Une requête à la fois (double-clic = doublons) et un message si l'API refuse.
+    const { occupe, erreur, executer, signaler } = useActionUnique()
     const etape = ref(1)
     const jours = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche']
 
@@ -252,16 +259,16 @@ export default {
       _nouvelExoCatalogueId: null
     })
 
-    const creerProgramme = async () => {
+    const creerProgramme = () => executer(async () => {
       const data = await api.post('/programmes/', {
         nom: programme.value.nom,
         description: programme.value.description || null
       })
       programme.value.id = data.id
       etape.value = 2
-    }
+    })
 
-    const ajouterSeance = async () => {
+    const ajouterSeance = () => executer(async () => {
       const data = await api.post(`/programmes/${programme.value.id}/seances/`, {
         nom: nouvelleSeance.value.nom,
         ordre: seances.value.length + 1,
@@ -276,15 +283,17 @@ export default {
         _nouvelExercice: { nom: '', catalogueId: null }
       })
       nouvelleSeance.value = { nom: '', jour: '', type_seance: 'musculation' }
-    }
+    })
 
-    const supprimerSeance = async (seance) => {
+    const supprimerSeance = (seance) => {
       if (!confirm(`Supprimer la séance "${seance.nom}" ?`)) return
-      await api.del(`/seances/${seance.id}`)
-      seances.value = seances.value.filter(s => s.id !== seance.id)
+      return executer(async () => {
+        await api.del(`/seances/${seance.id}`)
+        seances.value = seances.value.filter(s => s.id !== seance.id)
+      })
     }
 
-    const ajouterExercice = async (seance) => {
+    const ajouterExercice = (seance) => executer(async () => {
       const data = await api.post(`/seances/${seance.id}/exercices/`, {
         nom: seance._nouvelExercice.nom,
         ordre: seance.exercices.length + 1,
@@ -295,9 +304,9 @@ export default {
       seance.exercices.push(exo)
       seance._groupes.push(nouveauGroupe(exo))
       seance._nouvelExercice = { nom: '', catalogueId: null }
-    }
+    })
 
-    const ajouterAuSuperset = async (seance, groupe) => {
+    const ajouterAuSuperset = (seance, groupe) => executer(async () => {
       if (!groupe.groupeNum) {
         const maxGroupe = Math.max(0, ...seance.exercices.map(e => e.groupe || 0))
         groupe.groupeNum = maxGroupe + 1
@@ -320,16 +329,18 @@ export default {
       groupe._nouvelExoNom = ''
       groupe._nouvelExoCatalogueId = null
       groupe._formOpen = false
-    }
+    })
 
-    const supprimerExercice = async (seance, groupe, exercice) => {
+    const supprimerExercice = (seance, groupe, exercice) => {
       if (!confirm(`Supprimer l'exercice "${exercice.nom}" ?`)) return
-      await api.del(`/exercices/${exercice.id}`)
-      seance.exercices = seance.exercices.filter(e => e.id !== exercice.id)
-      groupe.exercices = groupe.exercices.filter(e => e.id !== exercice.id)
-      if (groupe.exercices.length === 0) {
-        seance._groupes = seance._groupes.filter(g => g.id !== groupe.id)
-      }
+      return executer(async () => {
+        await api.del(`/exercices/${exercice.id}`)
+        seance.exercices = seance.exercices.filter(e => e.id !== exercice.id)
+        groupe.exercices = groupe.exercices.filter(e => e.id !== exercice.id)
+        if (groupe.exercices.length === 0) {
+          seance._groupes = seance._groupes.filter(g => g.id !== groupe.id)
+        }
+      })
     }
 
     // PATCH complet : la route remplace tous les champs, en omettre un le
@@ -343,20 +354,20 @@ export default {
       catalogue_id: exo.catalogue_id
     })
 
-    const toggleOptionnel = (exo) => patchExercice(exo)
+    const toggleOptionnel = (exo) => signaler(() => patchExercice(exo))
 
     // Le type est porté par chaque exercice du groupe (le champ `groupe`
     // n'est qu'un numéro, sans entité propre côté backend) : on les met tous
     // à jour pour que supprimer un exercice ne fasse pas perdre le type.
-    const changerTypeGroupe = async (groupe, valeur) => {
+    const changerTypeGroupe = (groupe, valeur) => signaler(async () => {
       for (const exo of groupe.exercices) {
         exo.type_groupe = valeur
         await patchExercice(exo)
       }
-    }
+    })
 
     // Génère N séries en utilisant les params PROPRES de chaque exo + repos commun
-    const genererSeriesGroupe = async (groupe, seance) => {
+    const genererSeriesGroupe = (groupe, seance) => executer(async () => {
       const type = seance.type_seance || 'musculation'
       const tempsRepos = groupe._temps_repos || null
 
@@ -397,10 +408,9 @@ export default {
         }
       }
       groupe.hasSeries = true
-    }
+    })
 
-    const mettreAJourSerie = async (serie) => {
-      await api.patch(`/series/${serie.id}`, {
+    const mettreAJourSerie = (serie) => signaler(() => api.patch(`/series/${serie.id}`, {
         nb_reps: serie.nb_reps || null,
         poids_cible: serie.poids_cible || null,
         rm: serie.rm || null,
@@ -410,27 +420,28 @@ export default {
         nb_series: serie.nb_series || null,
         intensite: serie.intensite || null,
         temps_repos: serie.temps_repos || null
-      })
-    }
+    }))
 
-    const resetSeriesGroupe = async (seance, groupe) => {
+    const resetSeriesGroupe = (seance, groupe) => {
       if (!confirm('Supprimer toutes les séries de ce groupe ?')) return
-      for (const exo of groupe.exercices) {
-        for (const serie of exo.series) {
-          await api.del(`/series/${serie.id}`)
+      return executer(async () => {
+        for (const exo of groupe.exercices) {
+          for (const serie of exo.series) {
+            await api.del(`/series/${serie.id}`)
+          }
+          exo.series = []
+          exo._params = paramsVides()
         }
-        exo.series = []
-        exo._params = paramsVides()
-      }
-      groupe.hasSeries = false
-      groupe._nb_series = 4
-      groupe._temps_repos = ''
+        groupe.hasSeries = false
+        groupe._nb_series = 4
+        groupe._temps_repos = ''
+      })
     }
 
     const terminer = () => emit('termine')
 
     return {
-      etape, jours, programme, seances, nouvelleSeance,
+      etape, jours, programme, seances, nouvelleSeance, occupe, erreur,
       labelType, letterFor,
       TYPES_GROUPE, typeGroupe, changerTypeGroupe,
       creerProgramme, ajouterSeance, supprimerSeance,
@@ -453,6 +464,15 @@ export default {
   overflow-y: auto;
 }
 .etape { display: flex; flex-direction: column; gap: var(--spacing-lg); }
+.erreur-collee {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-md);
+  background: var(--color-danger-bg-soft);
+  border: 1px solid var(--color-danger-border);
+}
 .etape-creation { max-width: 480px; }
 .etape-header { display: flex; justify-content: space-between; align-items: center; gap: var(--spacing-md); flex-wrap: wrap; }
 h2 { font-size: var(--font-size-xl); font-weight: 700; margin: 0; }

@@ -1,5 +1,6 @@
 <template>
   <div class="tests-panel">
+    <div v-if="erreurTests" class="error" role="alert">{{ erreurTests }}</div>
     <!-- LISTE DES TESTS (une page par test créé) -->
     <template v-if="!testSelectionne">
       <div class="tests-panel-header">
@@ -140,10 +141,18 @@ export default {
     const categorieFiltre = ref('tous')
     const rechercheTest = ref('')
 
+    // Échec affiché au lieu d'un « Chargement… » sans fin ou d'un clic sans effet.
+    const erreurTests = ref('')
     const fetchTests = async () => {
       loading.value = true
-      tests.value = await api.get('/tests/')
-      loading.value = false
+      erreurTests.value = ''
+      try {
+        tests.value = await api.get('/tests/')
+      } catch (e) {
+        erreurTests.value = e.message || 'Impossible de charger les tests'
+      } finally {
+        loading.value = false
+      }
     }
 
     const testsFiltres = computed(() =>
@@ -160,8 +169,13 @@ export default {
 
     const supprimerTest = async (t) => {
       if (!confirm(`Supprimer le test "${t.type_test}" et tous ses résultats ?`)) return
-      await api.del(`/tests/${t.id}`)
-      tests.value = tests.value.filter((x) => x.id !== t.id)
+      erreurTests.value = ''
+      try {
+        await api.del(`/tests/${t.id}`)
+        tests.value = tests.value.filter((x) => x.id !== t.id)
+      } catch (e) {
+        erreurTests.value = e.message || 'Impossible de supprimer ce test'
+      }
     }
 
     // --- Détail d'un test : résultats par athlète (recherche + tri vivent ici) ---
@@ -174,8 +188,14 @@ export default {
 
     const fetchResultats = async (testId) => {
       loadingResultats.value = true
-      resultats.value = await api.get(`/tests/${testId}/resultats`)
-      loadingResultats.value = false
+      erreurTests.value = ''
+      try {
+        resultats.value = await api.get(`/tests/${testId}/resultats`)
+      } catch (e) {
+        erreurTests.value = e.message || 'Impossible de charger les résultats'
+      } finally {
+        loadingResultats.value = false
+      }
     }
 
     const ouvrirTest = (t) => {
@@ -205,7 +225,13 @@ export default {
 
     const supprimerResultat = async (r) => {
       if (!confirm(`Supprimer ce résultat (${r.athlete.nom}) ?`)) return
-      await api.del(`/tests/${testSelectionne.value.id}/resultats/${r.id}`)
+      erreurTests.value = ''
+      try {
+        await api.del(`/tests/${testSelectionne.value.id}/resultats/${r.id}`)
+      } catch (e) {
+        erreurTests.value = e.message || 'Impossible de supprimer ce résultat'
+        return
+      }
       resultats.value = resultats.value.filter((x) => x.id !== r.id)
       const t = tests.value.find((x) => x.id === testSelectionne.value.id)
       if (t) t.nb_resultats--
@@ -220,7 +246,7 @@ export default {
     onMounted(() => { if (props.actif) fetchTests() })
 
     return {
-      CATEGORIES_TEST, tests, loading, modalNouveauTest, categorieFiltre, rechercheTest, testsFiltres,
+      CATEGORIES_TEST, tests, loading, erreurTests, modalNouveauTest, categorieFiltre, rechercheTest, testsFiltres,
       onTestCree, supprimerTest,
       testSelectionne, resultats, loadingResultats, modalAjouterResultat, ouvrirTest, fermerTest,
       rechercheNom, tri, resultatsFiltres, onResultatCree, supprimerResultat,
