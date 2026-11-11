@@ -26,7 +26,10 @@
             <button class="btn" type="submit" :disabled="!searchEmail">Rechercher</button>
           </div>
           <div v-if="athleteTrouve" class="athlete-trouve">
-            <span class="avatar-athlete">{{ initiales(athleteTrouve.nom) }}</span>
+            <span class="avatar-athlete">
+              <img v-if="athleteTrouve.photo_url" class="avatar-photo" :src="urlApi(athleteTrouve.photo_url)" alt="" />
+              <template v-else>{{ initiales(athleteTrouve.nom) }}</template>
+            </span>
             <div class="athlete-trouve-info">
               <div class="athlete-trouve-nom">{{ athleteTrouve.nom }}</div>
               <div class="athlete-trouve-email">{{ athleteTrouve.email }}</div>
@@ -34,6 +37,11 @@
             <button class="btn btn-sm btn-primary" type="button" @click="ajouterAuCercle"><i class="ti ti-plus"></i> Ajouter</button>
           </div>
           <div v-if="searchError" class="error">{{ searchError }}</div>
+          <p v-if="codeCoach" class="code-coach-aide">
+            <i class="ti ti-key"></i>
+            Vos athlètes peuvent aussi vous rejoindre eux-mêmes avec votre code coach <b>{{ codeCoach }}</b>
+            (à l'inscription ou dans leur profil).
+          </p>
         </form>
       </Transition>
 
@@ -159,7 +167,8 @@
           >
             <span class="carte-haut">
               <span class="avatar-athlete">
-                {{ initiales(a.nom) }}
+                <img v-if="a.photo_url" class="avatar-photo" :src="urlApi(a.photo_url)" alt="" />
+                <template v-else>{{ initiales(a.nom) }}</template>
                 <span class="avatar-pastille" :title="LABELS_NIVEAU_ACTIVITE[niveauActivite(a.resume)]"></span>
               </span>
               <span class="carte-identite">
@@ -347,7 +356,7 @@
 
 <script>
 import { ref, computed, watch, onMounted } from 'vue'
-import { useApi } from '../../services/api'
+import { useApi, urlApi } from '../../services/api'
 import { useAuthStore } from '../../stores/auth'
 import FicheAthlete from './FicheAthlete.vue'
 import GroupesManagerModal from './GroupesManagerModal.vue'
@@ -478,11 +487,21 @@ export default {
     const searchEmail = ref('')
     const athleteTrouve = ref(null)
     const searchError = ref('')
-    const basculerAjout = () => {
+    // Code coach du préparateur, rappelé dans le formulaire d'ajout : les
+    // athlètes peuvent rejoindre son cercle eux-mêmes.
+    const codeCoach = ref('')
+    const basculerAjout = async () => {
       ajoutOuvert.value = !ajoutOuvert.value
       searchEmail.value = ''
       athleteTrouve.value = null
       searchError.value = ''
+      if (ajoutOuvert.value && !codeCoach.value) {
+        try {
+          codeCoach.value = (await api.get('/users/me/profil')).code_coach || ''
+        } catch {
+          // sans code affiché, l'ajout par email reste possible
+        }
+      }
     }
 
     const groupesDe = (athleteId) => props.groupes.filter(g => g.athletes.find(a => a.id === athleteId))
@@ -560,11 +579,17 @@ export default {
         if (found.detail) { searchError.value = found.detail; return }
         if (props.monCercle.find(a => a.id === found.id)) { searchError.value = 'Déjà dans votre cercle'; return }
         athleteTrouve.value = found
-      } catch { searchError.value = 'Athlète introuvable' }
+      } catch (e) { searchError.value = e.message || 'Athlète introuvable' }
     }
 
     const ajouterAuCercle = async () => {
-      await api.post(`/users/mes-athletes/${athleteTrouve.value.id}`)
+      searchError.value = ''
+      try {
+        await api.post(`/users/mes-athletes/${athleteTrouve.value.id}`)
+      } catch (e) {
+        searchError.value = e.message || "Impossible d'ajouter cet athlète"
+        return
+      }
       basculerAjout()
       await onModifie()
     }
@@ -576,6 +601,7 @@ export default {
     onMounted(() => { if (props.actif) fetchResumes() })
 
     return {
+      urlApi, codeCoach,
       INDICATEURS, GROUPES_INDICATEURS, CLES_INDICATEURS, compteurs, sansZoneAcwr, indicateurFiltre, filtrerPar, estRAS, detailsOuverts,
       FENETRE_ACTIVITE, SEUIL_REGULIER, SEUIL_INACTIF_JOURS, LABELS_NIVEAU_ACTIVITE,
       niveauActivite, libelleActivite, formatJourRelatif,
@@ -777,6 +803,8 @@ export default {
 .athlete-carte.activite-inactif:hover { box-shadow: var(--shadow-card); }
 
 .carte-haut { display: flex; align-items: center; gap: var(--spacing-md); }
+.code-coach-aide { margin: 0; font-size: var(--font-size-xs); color: var(--color-text-secondary); display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; }
+.code-coach-aide b { color: var(--color-primary-text); letter-spacing: 1px; }
 .avatar-athlete {
   position: relative; flex-shrink: 0;
   width: 44px; height: 44px; border-radius: 50%;

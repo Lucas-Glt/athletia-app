@@ -3,6 +3,10 @@ import router from '../router'
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
+// URL complète d'une ressource servie par l'API sans jeton (photo de profil :
+// une balise <img> n'envoie pas l'en-tête Authorization).
+export const urlApi = (chemin) => (chemin ? `${BASE_URL}${chemin}` : '')
+
 // fetch natif n'a pas de timeout : une connexion qui stagne (4G qui dégrade
 // plutôt que de couper franchement, salle en sous-sol) laisse la promesse
 // pendue indéfiniment au lieu de rejeter — le bouton reste bloqué "en cours"

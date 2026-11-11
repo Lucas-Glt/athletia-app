@@ -16,7 +16,10 @@
       <div class="header-right">
         <slot name="actions" />
         <div class="avatar-wrapper" ref="avatarRef">
-          <button class="avatar" @click="toggleMenu">{{ initiales }}</button>
+          <button class="avatar" @click="toggleMenu" aria-label="Menu du compte">
+            <img v-if="authStore.user?.photo_url" class="avatar-photo" :src="urlApi(authStore.user.photo_url)" alt="" />
+            <template v-else>{{ initiales }}</template>
+          </button>
           <Transition name="dropdown">
             <div v-if="menuOuvert" class="profile-dropdown">
               <div class="profile-info">
@@ -24,6 +27,9 @@
                 <div class="profile-role">{{ roleLabel }}</div>
               </div>
               <div class="dropdown-divider"></div>
+              <button class="dropdown-item" @click="ouvrirProfil">
+                <i class="ti ti-user-circle"></i> Mon profil
+              </button>
               <button class="dropdown-item" @click="ouvrirModalePassword">
                 <i class="ti ti-lock"></i> Changer le mot de passe
               </button>
@@ -84,6 +90,8 @@
       <slot name="nav" />
     </nav>
 
+    <ProfilModal v-if="profilOuvert" @fermer="profilOuvert = false" @modifie="rafraichirUtilisateur" />
+
     <!-- Modale changement de mot de passe -->
     <div v-if="modalePassword" class="modal-overlay" @click.self="fermerModalePassword">
       <div class="modal">
@@ -126,7 +134,8 @@ import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { useThemeStore } from '../stores/theme'
 import { useRouter } from 'vue-router'
-import { useApi } from '../services/api'
+import { useApi, urlApi } from '../services/api'
+import ProfilModal from './ProfilModal.vue'
 import { promptInstallation as installPrompt } from '../services/installationPwa'
 import { erreurMotDePasse } from '../utils/motDePasse'
 
@@ -141,6 +150,7 @@ const installationIgnoree = () => {
 }
 
 export default {
+  components: { ProfilModal },
   props: {
     title: { type: String, required: true }
   },
@@ -148,7 +158,7 @@ export default {
     const authStore = useAuthStore()
     const themeStore = useThemeStore()
     const router = useRouter()
-    const { patch } = useApi()
+    const { patch, get } = useApi()
 
     const menuOuvert = ref(false)
     const modalePassword = ref(false)
@@ -202,6 +212,22 @@ export default {
     onUnmounted(() => {
       document.removeEventListener('click', fermerMenu)
     })
+
+    // Profil : photo et nom affichés partout suivent ce qui vient d'être
+    // enregistré (l'utilisateur en mémoire est relu sur l'API).
+    const profilOuvert = ref(false)
+    const ouvrirProfil = () => {
+      menuOuvert.value = false
+      profilOuvert.value = true
+    }
+    const rafraichirUtilisateur = async () => {
+      try {
+        const user = await get('/users/me')
+        authStore.setAuth(authStore.token, user.role, user)
+      } catch (e) {
+        console.error('Erreur rechargement du compte:', e)
+      }
+    }
 
     const deconnexion = () => {
       authStore.logout()
@@ -288,7 +314,8 @@ export default {
     }
 
     return {
-      authStore, themeStore, roleLabel, brandLetter, brandColor, initiales,
+      authStore, themeStore, roleLabel, brandLetter, brandColor, initiales, urlApi,
+      profilOuvert, ouvrirProfil, rafraichirUtilisateur,
       menuOuvert, toggleMenu, avatarRef, deconnexion,
       modalePassword, ouvrirModalePassword, fermerModalePassword,
       form, changerPassword, loadingPassword, passwordError, passwordSuccess,
@@ -349,6 +376,7 @@ export default {
   cursor: pointer;
   border: none;
   padding: 0;
+  overflow: hidden;
   transition: opacity 0.15s;
 }
 .avatar:hover { box-shadow: 0 2px 10px -2px rgba(31, 25, 84, 0.4); }

@@ -22,15 +22,21 @@
           </select>
         </div>
         <div class="field">
-          <label>Identifiant</label>
-          <input v-model="form.identifiant" placeholder="prenom.nom" />
-          <span class="domain-preview" v-if="form.identifiant">
-            → {{ form.identifiant }}@{{ form.role }}.{{ domaine }}
-          </span>
+          <label>Prénom</label>
+          <input v-model="form.prenom" autocomplete="off" />
+        </div>
+        <div class="field">
+          <label>Nom</label>
+          <input v-model="form.nom" autocomplete="off" />
+        </div>
+        <div class="field">
+          <label>Email</label>
+          <input v-model="form.email" type="email" autocomplete="off" placeholder="prenom.nom@exemple.fr" />
+          <span class="domain-preview">Son identifiant de connexion.</span>
         </div>
         <div class="field">
           <label>Mot de passe</label>
-          <input v-model="form.password" type="password" placeholder="••••••••" />
+          <input v-model="form.password" type="password" autocomplete="new-password" placeholder="8 caractères minimum" />
         </div>
         <div v-if="error" class="error">{{ error }}</div>
       </div>
@@ -57,17 +63,12 @@ export default {
   },
   setup(props, { emit }) {
     const api = useApi()
-    const form = ref({ identifiant: '', password: '', role: 'athlete' })
+    const form = ref({ email: '', prenom: '', nom: '', password: '', role: 'athlete' })
     const organisationIdSelectionnee = ref(props.preselectedOrgId)
     const error = ref('')
     const loading = ref(false)
 
-    const domaine = computed(() => {
-      const org = props.organisations.find(o => o.id === organisationIdSelectionnee.value)
-      return org ? org.slug : 'fr'
-    })
-
-    const formValide = computed(() => form.value.identifiant && form.value.password)
+    const formValide = computed(() => form.value.email && form.value.prenom && form.value.nom && form.value.password)
 
     const creer = async () => {
       error.value = erreurMotDePasse(form.value.password)
@@ -86,7 +87,7 @@ export default {
       }
     }
 
-    return { form, organisationIdSelectionnee, error, loading, domaine, formValide, creer }
+    return { form, organisationIdSelectionnee, error, loading, formValide, creer }
   }
 }
 </script>

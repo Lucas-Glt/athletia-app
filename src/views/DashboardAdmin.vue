@@ -20,12 +20,20 @@
           <button class="modal-close" @click="modalCreation = false"><i class="ti ti-x"></i></button>
         </div>
         <div class="modal-body">
+          <div class="deux-champs">
+            <div class="field">
+              <label>Prénom</label>
+              <input v-model="newUser.prenom" autocomplete="off" />
+            </div>
+            <div class="field">
+              <label>Nom</label>
+              <input v-model="newUser.nom" autocomplete="off" />
+            </div>
+          </div>
           <div class="field">
-            <label>Identifiant</label>
-            <input v-model="newUser.identifiant" placeholder="prenom.nom" />
-            <span class="domain-preview" v-if="newUser.identifiant">
-              → {{ newUser.identifiant }}@{{ newUser.role }}.{{ moi?.organisation?.slug }}
-            </span>
+            <label>Email</label>
+            <input v-model="newUser.email" type="email" autocomplete="off" placeholder="prenom.nom@exemple.fr" />
+            <span class="domain-preview">Son identifiant de connexion.</span>
           </div>
           <div class="field">
             <label>Mot de passe</label>
@@ -42,7 +50,7 @@
         </div>
         <div class="modal-footer">
           <button class="btn" @click="modalCreation = false">Annuler</button>
-          <button class="btn btn-primary" @click="creerUtilisateur" :disabled="!newUser.identifiant || !newUser.password || occupe">
+          <button class="btn btn-primary" @click="creerUtilisateur" :disabled="!newUser.email || !newUser.prenom || !newUser.nom || !newUser.password || occupe">
             Créer
           </button>
         </div>
@@ -120,6 +128,24 @@
         </button>
       </div>
       <p v-if="erreurAction && !transfert" class="error" role="alert">{{ erreurAction }}</p>
+
+      <!-- Codes d'inscription : donnés aux athlètes et aux préparateurs pour
+           qu'ils créent eux-mêmes leur compte, directement dans le club. -->
+      <section v-if="codes" class="codes-club">
+        <div class="codes-entete">
+          <span class="section-title">Codes d'inscription du club</span>
+          <span class="codes-aide">À saisir sur l'écran « Créer un compte » (ou dans le profil).</span>
+        </div>
+        <div class="codes-grille">
+          <div v-for="c in TYPES_CODE" :key="c.cle" class="code-carte">
+            <span class="code-libelle"><i class="ti" :class="c.icone"></i> {{ c.label }}</span>
+            <span class="code-valeur">{{ codes[c.cle] }}</span>
+            <button type="button" class="btn btn-sm btn-ghost" :disabled="occupe" @click="regenererCode(c)">
+              <i class="ti ti-refresh"></i> Nouveau code
+            </button>
+          </div>
+        </div>
+      </section>
       <div class="filters">
         <button
           v-for="role in ['tous', 'admin', 'prepa', 'athlete']"
@@ -145,7 +171,10 @@
 
         <div v-for="user in usersFiltres" :key="user.id" class="table-row">
           <div class="user-info">
-            <div class="avatar">{{ initiales(user.nom) }}</div>
+            <div class="avatar">
+              <img v-if="user.photo_url" class="avatar-photo" :src="urlApi(user.photo_url)" alt="" />
+              <template v-else>{{ initiales(user.nom) }}</template>
+            </div>
             <span class="user-nom">{{ user.nom }}</span>
           </div>
           <span class="user-email">{{ user.email }}</span>
@@ -193,12 +222,16 @@
 
 <script>
 import { ref, computed, onMounted } from 'vue'
-import { useApi } from '../services/api'
+import { useApi, urlApi } from '../services/api'
 import AppLayout from '../components/AppLayout.vue'
 import { useActionUnique } from '../utils/actionUnique'
 import { erreurMotDePasse } from '../utils/motDePasse'
 
 const LIBELLES_ROLE = { athlete: 'athlète', prepa: 'préparateur' }
+const TYPES_CODE = [
+  { cle: 'athletes', label: 'Athlètes', icone: 'ti-run' },
+  { cle: 'prepas', label: 'Préparateurs (à ne donner qu\'aux coachs)', icone: 'ti-clipboard-list' }
+]
 
 export default {
   components: { AppLayout },
@@ -216,7 +249,7 @@ export default {
     // Création
     const modalCreation = ref(false)
     const createError = ref('')
-    const newUser = ref({ identifiant: '', password: '', role: 'athlete' })
+    const newUser = ref({ email: '', prenom: '', nom: '', password: '', role: 'athlete' })
 
     // Reset password
     const modalResetPassword = ref(false)
@@ -249,7 +282,7 @@ export default {
     }
 
     const ouvrirCreation = () => {
-      newUser.value = { identifiant: '', password: '', role: 'athlete' }
+      newUser.value = { email: '', prenom: '', nom: '', password: '', role: 'athlete' }
       createError.value = ''
       modalCreation.value = true
     }
@@ -292,6 +325,22 @@ export default {
 
     // Préparateur avec des programmes : l'API demande qui les reprend (409),
     // la suppression se termine dans la fenêtre de transfert.
+    // Codes d'inscription du club (créés à la première consultation).
+    const codes = ref(null)
+    const chargerCodes = async () => {
+      try {
+        codes.value = await api.get('/organisations/mes-codes')
+      } catch (e) {
+        console.error('Erreur codes du club:', e)
+      }
+    }
+    const regenererCode = (c) => {
+      if (!confirm(`Remplacer le code « ${c.label} » ? L'ancien ne marchera plus pour s'inscrire ; les comptes déjà créés ne changent pas.`)) return
+      return executer(async () => {
+        codes.value = await api.post(`/organisations/mes-codes/${c.cle}/regenerer`)
+      })
+    }
+
     const transfert = ref(null)
     const repreneurs = computed(() =>
       transfert.value
@@ -356,7 +405,7 @@ export default {
 
     const initiales = (nom) => nom.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
 
-    onMounted(fetchUsers)
+    onMounted(() => { fetchUsers(); chargerCodes() })
 
     return {
       users, moi, loading, filtreRole, onglet,
@@ -365,6 +414,7 @@ export default {
       usersFiltres, compteRole,
       ouvrirCreation, creerUtilisateur, changerRole, supprimerUtilisateur,
       occupe, erreurAction, transfert, repreneurs, confirmerTransfert,
+      codes, TYPES_CODE, regenererCode, urlApi,
       ouvrirResetPassword, resetPassword,
       initiales
     }
@@ -403,6 +453,22 @@ export default {
 
 .filters { display: flex; gap: var(--spacing-sm); flex-wrap: wrap; }
 .mobile-actions { display: none; }
+.deux-champs { display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-md); }
+.codes-club {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md) var(--spacing-lg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg);
+}
+.codes-entete { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--spacing-sm); }
+.codes-aide { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+.codes-grille { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--spacing-sm); }
+.code-carte { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.code-libelle { font-size: var(--font-size-sm); color: var(--color-text-body); display: inline-flex; align-items: center; gap: 6px; }
+.code-valeur { font-size: var(--font-size-lg); font-weight: 800; letter-spacing: 2px; color: var(--color-primary-text); font-variant-numeric: tabular-nums; }
 .transfert-texte { margin: 0; color: var(--color-text-body); }
 .transfert-aide { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
 .filter-btn {
@@ -472,6 +538,7 @@ export default {
   width: var(--avatar-md);
   height: var(--avatar-md);
   border-radius: 50%;
+  overflow: hidden;
   background: var(--color-avatar-prepa-bg);
   color: var(--color-avatar-prepa-text);
   display: flex;

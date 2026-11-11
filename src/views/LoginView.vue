@@ -5,15 +5,18 @@
         <h1>Athletia</h1>
         <span>Plateforme de suivi sportif</span>
       </div>
-      <form @submit.prevent="handleLogin" class="login-form">
+      <InscriptionForm v-if="modeInscription" @inscrit="surInscription" @annuler="modeInscription = false" />
+
+      <form v-else @submit.prevent="handleLogin" class="login-form">
         <p v-if="sessionExpiree" class="info-session">
           <i class="ti ti-clock"></i> Votre session a expiré : reconnectez-vous.
         </p>
         <div class="field">
-          <!-- Les comptes ne sont pas des adresses email réelles mais des
-               identifiants donnés par le club (prenom.nom@athlete.club) :
-               « votre@email.com » poussait à taper son email perso. -->
-          <label for="login-identifiant">Identifiant</label>
+          <!-- Email réel pour les comptes récents ; les anciens comptes se
+               connectent encore avec l'identifiant donné par leur club
+               (prenom.nom@athlete.club), tant qu'ils ne l'ont pas remplacé
+               par leur email dans leur profil. -->
+          <label for="login-identifiant">Email ou identifiant</label>
           <!-- type="text" et non "email" : la validation native de type="email"
                bloque l'envoi sur certains identifiants valides côté serveur
                (ex. domaine super_prepa.fr), sans message clair sur mobile. -->
@@ -27,11 +30,11 @@
             autocapitalize="none"
             autocorrect="off"
             spellcheck="false"
-            placeholder="prenom.nom@athlete.club"
+            placeholder="vous@exemple.fr"
             aria-describedby="aide-identifiant"
             required
           />
-          <span id="aide-identifiant" class="aide-login">Celui fourni par votre club, pas votre email personnel.</span>
+          <span id="aide-identifiant" class="aide-login">Votre email, ou l'identifiant fourni par votre club (prenom.nom@athlete.club).</span>
         </div>
         <div class="field">
           <label for="login-mdp">Mot de passe</label>
@@ -46,6 +49,9 @@
           />
         </div>
         <p v-if="error" class="error">{{ error }}</p>
+        <button type="button" class="btn btn-ghost btn-creer-compte" @click="modeInscription = true">
+          <i class="ti ti-user-plus"></i> Créer un compte
+        </button>
         <p class="aide-login aide-oubli">
           Mot de passe oublié ? Demandez à l'administrateur de votre club de le réinitialiser.
         </p>
@@ -101,6 +107,7 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { lireCorps, messageErreur, requeteReseau, CLE_SESSION_EXPIREE } from '../services/api'
 import { MOT_DU_PREPA, SIGNATURE_MOT, NOTES_MAJ } from '../data/notesMaj'
+import InscriptionForm from '../components/InscriptionForm.vue'
 
 const ROUTES_PAR_ROLE = {
   athlete: '/athlete',
@@ -111,6 +118,7 @@ const ROUTES_PAR_ROLE = {
 }
 
 export default {
+  components: { InscriptionForm },
   setup() {
     const email = ref('')
     const password = ref('')
@@ -146,6 +154,31 @@ export default {
       return data
     }
 
+    // Jeton obtenu (connexion ou inscription) : compte chargé, puis tableau
+    // de bord du rôle.
+    const modeInscription = ref(false)
+    const finaliserConnexion = async (accessToken) => {
+      // Rôle lu sur /users/me plutôt qu'en décodant le JWT à la main.
+      const user = await requete('/users/me', {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      })
+      const route = ROUTES_PAR_ROLE[user?.role]
+      if (!route) throw new Error('Rôle de compte non reconnu')
+      authStore.setAuth(accessToken, user.role, user)
+      router.push(route)
+    }
+
+    // Compte créé mais chargement raté (réseau) : le compte existe, on
+    // repasse sur la connexion avec le message plutôt que de rester bloqué.
+    const surInscription = async (accessToken) => {
+      try {
+        await finaliserConnexion(accessToken)
+      } catch (e) {
+        modeInscription.value = false
+        error.value = `Compte créé : ${e.message}. Connectez-vous avec votre email.`
+      }
+    }
+
     const handleLogin = async () => {
       error.value = ''
       sessionExpiree.value = false
@@ -160,15 +193,7 @@ export default {
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
           body: formData
         })
-        // Rôle lu sur /users/me plutôt qu'en décodant le JWT à la main.
-        const user = await requete('/users/me', {
-          headers: { Authorization: `Bearer ${access_token}` }
-        })
-        const route = ROUTES_PAR_ROLE[user?.role]
-        if (!route) throw new Error('Rôle de compte non reconnu')
-
-        authStore.setAuth(access_token, user.role, user)
-        router.push(route)
+        await finaliserConnexion(access_token)
       } catch (e) {
         error.value = e.message
       } finally {
@@ -179,7 +204,7 @@ export default {
     const [derniereNote, ...notesPrecedentes] = NOTES_MAJ
 
     return {
-      email, password, error, loading, handleLogin, sessionExpiree,
+      email, password, error, loading, handleLogin, sessionExpiree, modeInscription, surInscription,
       MOT_DU_PREPA, SIGNATURE_MOT, derniereNote, notesPrecedentes
     }
   }
@@ -223,6 +248,7 @@ export default {
 .login-form { display: flex; flex-direction: column; gap: var(--spacing-lg); }
 .aide-login { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
 .aide-oubli { margin: 0; text-align: center; }
+.btn-creer-compte { width: 100%; }
 .info-session {
   display: flex;
   align-items: center;

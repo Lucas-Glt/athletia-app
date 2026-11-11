@@ -12,7 +12,8 @@
 
     <div class="fiche-header" :class="`activite-${niveauActivite(athlete.resume)}`">
       <span class="fiche-avatar">
-        {{ initiales(athlete.nom) }}
+        <img v-if="photoUrl" class="avatar-photo" :src="urlApi(photoUrl)" alt="" />
+        <template v-else>{{ initiales(athlete.nom) }}</template>
         <span class="avatar-pastille" :title="LABELS_NIVEAU_ACTIVITE[niveauActivite(athlete.resume)]"></span>
       </span>
       <div class="fiche-header-info">
@@ -53,6 +54,16 @@
           <i class="ti ti-alert-triangle"></i> {{ s }}
         </span>
       </div>
+    </div>
+
+    <!-- Profil renseigné par l'athlète : âge, sports, objectif, et de quoi le
+         joindre. Rien ne s'affiche tant qu'il n'a rien rempli. -->
+    <div v-if="profil && lignesProfil.length" class="fiche-profil">
+      <span v-for="l in lignesProfil" :key="l.cle" class="fiche-profil-item">
+        <i class="ti" :class="l.icone"></i>
+        <a v-if="l.lien" :href="l.lien">{{ l.texte }}</a>
+        <template v-else>{{ l.texte }}</template>
+      </span>
     </div>
 
     <p v-if="erreurFiche" class="error erreur-fiche" role="alert">
@@ -537,7 +548,7 @@
 
 <script>
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
-import { useApi } from '../../services/api'
+import { useApi, urlApi } from '../../services/api'
 import { useAuthStore } from '../../stores/auth'
 import CourbeProgression from '../athlete/CourbeProgression.vue'
 import GraphiqueDouble from '../monitoring/GraphiqueDouble.vue'
@@ -1126,10 +1137,40 @@ export default {
       else if (dx >= SEUIL_SWIPE && idx > 0) allerA(ONGLETS_FICHE[idx - 1])
     }
 
-    onMounted(fetchApercu)
+    // Profil de l'athlète (photo, âge, sports, objectif, contact).
+    const profil = ref(null)
+    const photoUrl = computed(() => profil.value?.photo_url || props.athlete.photo_url || null)
+    const ageDe = (iso) => {
+      const naissance = new Date(`${iso}T00:00:00`)
+      const auj = new Date()
+      let age = auj.getFullYear() - naissance.getFullYear()
+      if (auj < new Date(auj.getFullYear(), naissance.getMonth(), naissance.getDate())) age -= 1
+      return age
+    }
+    const lignesProfil = computed(() => {
+      const p = profil.value
+      if (!p) return []
+      const lignes = []
+      const identite = [p.sexe === 'homme' ? 'Homme' : p.sexe === 'femme' ? 'Femme' : null, p.date_naissance ? `${ageDe(p.date_naissance)} ans` : null].filter(Boolean)
+      if (identite.length) lignes.push({ cle: 'identite', icone: 'ti-user', texte: identite.join(' · ') })
+      if (p.sports) lignes.push({ cle: 'sports', icone: 'ti-ball-football', texte: p.sports })
+      if (p.objectif_sportif) lignes.push({ cle: 'objectif', icone: 'ti-target-arrow', texte: p.objectif_sportif })
+      if (p.telephone) lignes.push({ cle: 'tel', icone: 'ti-phone', texte: p.telephone, lien: `tel:${p.telephone.replace(/[^0-9+]/g, '')}` })
+      return lignes
+    })
+    const fetchProfil = async () => {
+      try {
+        profil.value = await api.get(`/users/${props.athlete.id}/profil`)
+      } catch (e) {
+        console.error('Erreur profil athlète:', e)
+      }
+    }
+
+    onMounted(() => { fetchApercu(); fetchProfil() })
 
     return {
       estSuperPrepa, sousOnglet, modalGroupes, groupesDe, initiales, retirerDuCercle, ONGLETS, erreurFiche,
+      profil, photoUrl, lignesProfil, urlApi,
       REACTIONS_PREPA, reactionOuverte, basculerReaction, reagir,
       FENETRE_ACTIVITE, LABELS_NIVEAU_ACTIVITE, niveauActivite, libelleActivite,
       typeSeance, labelTypeSeance, iconeTypeSeance,
@@ -1193,6 +1234,20 @@ export default {
   font-size: var(--font-size-lg); font-weight: 700;
 }
 .activite-inactif .fiche-avatar { background: var(--color-bg-tertiary); color: var(--color-text-muted); }
+.fiche-profil {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm) var(--spacing-lg);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-body);
+}
+.fiche-profil-item { display: inline-flex; align-items: center; gap: 6px; }
+.fiche-profil-item .ti { color: var(--color-text-muted); }
+.fiche-profil-item a { color: var(--color-primary-text); }
 .avatar-pastille {
   position: absolute; right: 0; bottom: 0;
   width: 15px; height: 15px; border-radius: 50%;

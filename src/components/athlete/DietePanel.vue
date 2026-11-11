@@ -715,6 +715,20 @@ export default {
         : formObjectifVide()
       erreurModale.value = ''
       modaleObjectif.value = true
+      // Premier objectif : sexe et date de naissance repris du profil, pour
+      // ne pas les saisir deux fois.
+      if (!bilan.value) prefillDepuisProfil()
+    }
+
+    const prefillDepuisProfil = async () => {
+      try {
+        const profil = await api.get('/users/me/profil')
+        if (!modaleObjectif.value || bilan.value) return
+        if (profil.sexe) formObjectif.value.sexe = profil.sexe
+        if (profil.date_naissance && !formObjectif.value.date_naissance) formObjectif.value.date_naissance = profil.date_naissance
+      } catch {
+        // profil indisponible : le formulaire reste à remplir à la main
+      }
     }
 
     const fermerObjectif = () => {

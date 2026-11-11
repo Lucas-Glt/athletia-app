@@ -13,19 +13,25 @@
         <div class="field">
           <label>Slug</label>
           <input v-model="form.slug" placeholder="ours" />
-          <span class="domain-preview">domaine des comptes : @role.{{ form.slug || '…' }}</span>
+          <span class="domain-preview">Identifiant technique du club (minuscules, chiffres, tirets).</span>
         </div>
         <div class="section-title">Admin de l'organisation (obligatoire)</div>
         <div class="field">
-          <label>Identifiant</label>
-          <input v-model="form.admin_identifiant" placeholder="prenom.nom" />
-          <span class="domain-preview" v-if="form.admin_identifiant && form.slug">
-            → {{ form.admin_identifiant }}@admin.{{ form.slug }}
-          </span>
+          <label>Prénom</label>
+          <input v-model="form.admin_prenom" autocomplete="off" />
+        </div>
+        <div class="field">
+          <label>Nom</label>
+          <input v-model="form.admin_nom" autocomplete="off" />
+        </div>
+        <div class="field">
+          <label>Email</label>
+          <input v-model="form.admin_email" type="email" autocomplete="off" placeholder="admin@club.fr" />
+          <span class="domain-preview">Son identifiant de connexion.</span>
         </div>
         <div class="field">
           <label>Mot de passe</label>
-          <input v-model="form.admin_password" type="password" placeholder="••••••••" />
+          <input v-model="form.admin_password" type="password" autocomplete="new-password" placeholder="8 caractères minimum" />
         </div>
         <div v-if="error" class="error">{{ error }}</div>
       </div>
@@ -48,12 +54,12 @@ export default {
   emits: ['fermer', 'creee'],
   setup(props, { emit }) {
     const api = useApi()
-    const form = ref({ nom: '', slug: '', admin_identifiant: '', admin_password: '' })
+    const form = ref({ nom: '', slug: '', admin_email: '', admin_prenom: '', admin_nom: '', admin_password: '' })
     const error = ref('')
     const loading = ref(false)
 
     const formValide = computed(() =>
-      form.value.nom && form.value.slug && form.value.admin_identifiant && form.value.admin_password
+      form.value.nom && form.value.slug && form.value.admin_email && form.value.admin_prenom && form.value.admin_nom && form.value.admin_password
     )
 
     const creer = async () => {
