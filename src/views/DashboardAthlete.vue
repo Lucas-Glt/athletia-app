@@ -2077,8 +2077,9 @@ export default {
     })
 
     // --- Semaine type de l'athlète ---
-    // Il place lui-même chaque séance de son programme sur un jour. Tant
-    // qu'aucune n'est placée, l'écran garde la liste de séances classique.
+    // Il compose lui-même chaque jour avec les séances de son programme (une
+    // même séance peut revenir plusieurs jours). Tant qu'aucune n'est placée,
+    // l'écran garde la liste de séances classique.
     const planning = ref([])
     const modalPlanning = ref(false)
     const erreurPlanning = ref('')
@@ -2101,17 +2102,18 @@ export default {
       planning.value.some(e => creneaux.value.some(s => s.nom === e.creneau))
     )
 
-    // Séances validées, indexées par créneau ET par semaine : le calendrier
-    // colore l'occurrence de la semaine où la séance a été faite, même si elle
-    // l'a été un autre jour que celui prévu (rattachement hebdomadaire).
+    // Séances validées, indexées par créneau ET par semaine, de la plus
+    // ancienne à la plus récente : le calendrier les répartit sur les jours où
+    // la séance est prévue cette semaine-là, même faites un autre jour
+    // (rattachement hebdomadaire).
     const seancesFaites = computed(() => {
       const map = {}
       tentativesProgramme.value.forEach(t => {
         const cle = cleOccurrence(t.creneau, new Date(t.date))
-        // Plusieurs tentatives la même semaine : on garde la première, c'est
-        // celle qui a rempli le créneau.
-        if (!map[cle] || new Date(t.date) < new Date(map[cle])) map[cle] = t.date
+        if (!map[cle]) map[cle] = []
+        map[cle].push(t.date)
       })
+      Object.values(map).forEach(dates => dates.sort((a, b) => new Date(a) - new Date(b)))
       return map
     })
 

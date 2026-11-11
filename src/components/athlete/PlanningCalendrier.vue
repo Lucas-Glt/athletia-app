@@ -126,11 +126,12 @@
 
 <script>
 import { ref, computed } from 'vue'
-import { lundiDeLaSemaine, dateISO, cleOccurrence, jourDeLaDate } from '../../data/joursSemaine'
+import { JOURS_SEMAINE, lundiDeLaSemaine, dateISO, cleOccurrence, jourDeLaDate } from '../../data/joursSemaine'
 
 const LABELS_TYPE = { musculation: 'Musculation', natation: 'Natation', athletisme: 'Athlétisme', pliometrie: 'Pliométrie' }
 const LABELS_COURTS = ['L', 'M', 'M', 'J', 'V', 'S', 'D']
 const TYPES = Object.keys(LABELS_TYPE)
+const RANG_JOUR = Object.fromEntries(JOURS_SEMAINE.map((j, i) => [j.cle, i]))
 
 export default {
   emits: ['ouvrir', 'modifier'],
@@ -138,11 +139,12 @@ export default {
     // Une séance par créneau (la version de la semaine courante, cf.
     // seancesAffichees côté dashboard).
     creneaux: { type: Array, required: true },
-    // [{ creneau, jour }] — la semaine type enregistrée.
+    // [{ creneau, jour }] — la semaine type enregistrée, une ligne par jour
+    // où la séance est prévue.
     planning: { type: Array, required: true },
-    // { 'creneau||lundi ISO': date ISO de la séance validée } — le rattachement
-    // est hebdomadaire : une séance faite avec un jour de retard reste celle de
-    // son créneau.
+    // { 'creneau||lundi ISO': [dates ISO des séances validées, croissantes] }
+    // — le rattachement est hebdomadaire : une séance faite avec un jour de
+    // retard reste celle de son créneau.
     faites: { type: Object, default: () => ({}) }
   },
   setup(props) {
@@ -157,22 +159,53 @@ export default {
     const moisAffiche = ref(new Date(aujourdhui.getFullYear(), aujourdhui.getMonth(), 1))
     const jourSelectionne = ref(dateISO(aujourdhui))
 
-    const jourParCreneau = computed(() => {
-      const map = {}
-      props.planning.forEach(e => { map[e.creneau] = e.jour })
+    // Jours où chaque séance est prévue, dans l'ordre de la semaine.
+    const joursParCreneau = computed(() => {
+      const map = Object.create(null)
+      props.planning.forEach(e => {
+        if (!map[e.creneau]) map[e.creneau] = []
+        map[e.creneau].push(e.jour)
+      })
+      Object.values(map).forEach(jours => jours.sort((a, b) => RANG_JOUR[a] - RANG_JOUR[b]))
       return map
     })
+
+    // Répartit les séances validées d'une semaine sur les jours où le créneau
+    // est prévu cette semaine-là -> { jour: date faite }. Une séance faite un
+    // jour prévu remplit ce jour ; faite un autre jour, elle rattrape le
+    // dernier jour prévu encore libre avant elle, sinon elle prend de l'avance
+    // sur le prochain. Au-delà du nombre de jours prévus, rien à colorer.
+    const repartirFaites = (jours, dates) => {
+      const parJour = {}
+      const horsJour = []
+      dates.forEach(d => {
+        const jour = jourDeLaDate(new Date(d))
+        if (jours.includes(jour) && !parJour[jour]) parJour[jour] = d
+        else horsJour.push(d)
+      })
+      horsJour.forEach(d => {
+        const libres = jours.filter(j => !parJour[j])
+        if (!libres.length) return
+        const rang = RANG_JOUR[jourDeLaDate(new Date(d))]
+        const avant = libres.filter(j => RANG_JOUR[j] < rang)
+        parJour[avant.length ? avant[avant.length - 1] : libres[0]] = d
+      })
+      return parJour
+    }
 
     // Séances tombant sur cette date d'après la semaine type, avec leur état.
     // « Manquée » ne se dit que d'une semaine révolue : dans la semaine en
     // cours, une séance non faite reste à faire, quel que soit le jour.
-    const occurrences = (date) => {
+    // `cache` mémorise la répartition d'une semaine, commune à ses 7 cases.
+    const occurrences = (date, cache) => {
       const jour = jourDeLaDate(date)
       const semainePassee = lundiDeLaSemaine(date) < lundiDeLaSemaine(aujourdhui)
       return props.creneaux
-        .filter(s => jourParCreneau.value[s.nom] === jour)
+        .filter(s => joursParCreneau.value[s.nom]?.includes(jour))
         .map(s => {
-          const dateFait = props.faites[cleOccurrence(s.nom, date)] || null
+          const cle = cleOccurrence(s.nom, date)
+          if (!cache[cle]) cache[cle] = repartirFaites(joursParCreneau.value[s.nom], props.faites[cle] || [])
+          const dateFait = cache[cle][jour] || null
           return {
             seance: s,
             dateFait,
@@ -192,13 +225,14 @@ export default {
       const decalage = (new Date(annee, mois, 1).getDay() + 6) % 7
 
       const cases = new Array(decalage).fill(null)
+      const cache = {}
       for (let n = 1; n <= nbJours; n++) {
         const date = new Date(annee, mois, n)
         cases.push({
           date: dateISO(date),
           numero: n,
           estAujourdhui: date.getTime() === aujourdhui.getTime(),
-          occurrences: occurrences(date)
+          occurrences: occurrences(date, cache)
         })
       }
       while (cases.length % 7 !== 0) cases.push(null)
@@ -215,7 +249,7 @@ export default {
     )
 
     const nonPlanifiees = computed(() =>
-      props.creneaux.filter(s => !jourParCreneau.value[s.nom])
+      props.creneaux.filter(s => !joursParCreneau.value[s.nom])
     )
 
     // Légende : seulement les types que le programme contient réellement, dans

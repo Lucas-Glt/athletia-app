@@ -49,13 +49,12 @@
         <div class="diete-reste" :class="`statut-${reste.statut}`">{{ reste.texte }}</div>
       </template>
 
-      <div class="diete-macros">
-        <span class="diete-macro">
-          <b>{{ fr(totalJour.proteines) }}</b><template v-if="bilan">/{{ fr(bilan.proteines_cible_g) }}</template> g prot.
-        </span>
-        <span class="diete-macro"><b>{{ fr(totalJour.glucides) }}</b> g gluc.</span>
-        <span class="diete-macro"><b>{{ fr(totalJour.lipides) }}</b> g lip.</span>
-      </div>
+      <CamembertMacros
+        :proteines="totalJour.proteines"
+        :glucides="totalJour.glucides"
+        :lipides="totalJour.lipides"
+        :proteines-cible="bilan?.proteines_cible_g ?? null"
+      />
     </div>
 
     <p v-if="erreurListe" class="error">{{ erreurListe }}</p>
@@ -492,6 +491,7 @@ import { useApi } from '../../services/api'
 import { useProgressionStore } from '../../stores/progression'
 import CourbeObjectif from './CourbeObjectif.vue'
 import CalendrierDiete from './CalendrierDiete.vue'
+import CamembertMacros from './CamembertMacros.vue'
 
 const REPAS_COURANTS = ['Petit-déjeuner', 'Déjeuner', 'Dîner', 'Collation']
 const RACCOURCIS_G = [50, 100, 150, 200]
@@ -561,7 +561,7 @@ const formObjectifVide = () => ({
 })
 
 export default {
-  components: { CourbeObjectif, CalendrierDiete },
+  components: { CourbeObjectif, CalendrierDiete, CamembertMacros },
   setup() {
     const api = useApi()
     const progression = useProgressionStore()
@@ -1146,15 +1146,6 @@ export default {
 .diete-reste.statut-reussi { color: var(--color-valid-text-strong); }
 .diete-reste.statut-proche { color: var(--color-warning-text-strong); }
 .diete-reste.statut-loin { color: var(--color-danger-text); }
-.diete-macros {
-  display: flex;
-  justify-content: center;
-  gap: var(--spacing-lg);
-  margin-top: var(--spacing-sm);
-  font-size: var(--font-size-xs);
-  color: var(--color-primary-text);
-}
-.diete-macro b { font-size: var(--font-size-sm); }
 
 /* --- Carte repas --- */
 .repas-carte {
