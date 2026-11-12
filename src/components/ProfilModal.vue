@@ -44,7 +44,7 @@
           <input id="profil-email" v-model="form.email" type="email" autocomplete="email" />
           <span v-if="profil.identifiant_court" class="aide">
             Vous vous connectez avec <b>{{ profil.identifiant_court }}</b>. Remplacez cette adresse par votre email :
-            il deviendra votre identifiant et vous permettra de récupérer votre mot de passe.
+            il deviendra votre identifiant{{ emailsActifs ? ' et vous permettra de récupérer votre mot de passe' : '' }}.
           </span>
           <template v-else>
             <span class="aide">C'est aussi votre identifiant de connexion.</span>
