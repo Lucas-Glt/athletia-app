@@ -4,7 +4,7 @@
    =========================== */
 
 * {
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Inter Variable', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -115,7 +115,7 @@ input, select, textarea, button {
   /* --- Typographie ---
      6 tailles au lieu de 11. Base 16px : lisible sous néons,
      et empêche le zoom automatique iOS au focus des inputs. */
-  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-sans: 'Inter Variable', system-ui, -apple-system, sans-serif;
   --font-size-xs: 12px;   /* badges, méta */
   --font-size-sm: 14px;   /* labels, texte secondaire */
   --font-size-base: 16px; /* corps, inputs */

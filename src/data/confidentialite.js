@@ -59,7 +59,6 @@ export const SECTIONS = [
     titre: 'Où elles sont stockées',
     paragraphes: [
       `Sur un serveur loué chez OVHcloud, en France, hébergeur de l'application. Les échanges entre votre téléphone et le serveur sont chiffrés (HTTPS).`,
-      'La police de caractères de l\'application est chargée depuis les serveurs de Google (Google Fonts), qui reçoivent à cette occasion votre adresse IP, comme pour n\'importe quel site qui l\'utilise.',
       'Votre navigateur garde votre session de connexion et vos préférences d\'affichage (thème, affichage des séances). Il n\'y a ni cookie publicitaire, ni outil de mesure d\'audience.'
     ]
   },

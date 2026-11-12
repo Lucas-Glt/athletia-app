@@ -8,6 +8,10 @@ import { useThemeStore } from './stores/theme'
 import './services/installationPwa'
 
 import '@tabler/icons-webfont/dist/tabler-icons.min.css'
+// Police servie par l'application elle-même (et gardée hors connexion par le
+// service worker) plutôt que par Google Fonts, qui recevait l'adresse IP de
+// chaque visiteur.
+import '@fontsource-variable/inter/wght.css'
 import './assets/tokens.css'
 import './assets/base.css'
 
