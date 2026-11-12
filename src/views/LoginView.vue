@@ -12,10 +12,10 @@
           <i class="ti ti-clock"></i> Votre session a expiré : reconnectez-vous.
         </p>
         <div class="field">
-          <!-- Email réel pour les comptes récents ; les anciens comptes se
-               connectent encore avec l'identifiant donné par leur club
-               (prenom.nom@athlete.club), tant qu'ils ne l'ont pas remplacé
-               par leur email dans leur profil. -->
+          <!-- Email réel pour les comptes récents ; les comptes créés avec un
+               identifiant (prenom.nom@athlete.club…) se connectent avec ce
+               prenom.nom seul, tant qu'ils ne l'ont pas remplacé par leur
+               email dans leur profil. -->
           <label for="login-identifiant">Email ou identifiant</label>
           <!-- type="text" et non "email" : la validation native de type="email"
                bloque l'envoi sur certains identifiants valides côté serveur
@@ -30,11 +30,11 @@
             autocapitalize="none"
             autocorrect="off"
             spellcheck="false"
-            placeholder="vous@exemple.fr"
+            placeholder="prenom.nom ou vous@exemple.fr"
             aria-describedby="aide-identifiant"
             required
           />
-          <span id="aide-identifiant" class="aide-login">Votre email, ou l'identifiant fourni par votre club (prenom.nom@athlete.club).</span>
+          <span id="aide-identifiant" class="aide-login">Votre email, ou l'identifiant qui vous a été donné (prenom.nom).</span>
         </div>
         <div class="field">
           <label for="login-mdp">Mot de passe</label>
@@ -53,7 +53,7 @@
           <i class="ti ti-user-plus"></i> Créer un compte
         </button>
         <p class="aide-login aide-oubli">
-          Mot de passe oublié ? Demandez à l'administrateur de votre club de le réinitialiser.
+          Mot de passe oublié ? Demandez à votre préparateur ou à l'administrateur de votre club de le réinitialiser.
         </p>
         <button type="submit" class="btn btn-primary btn-login" :disabled="loading">
           <span v-if="loading">Connexion...</span>

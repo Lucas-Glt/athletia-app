@@ -92,6 +92,7 @@
 
     <ProfilModal v-if="profilOuvert" @fermer="profilOuvert = false" @modifie="rafraichirUtilisateur" />
     <ConsentementModal v-if="accordRequis" @deconnexion="deconnexion" />
+    <BienvenueModal v-else-if="bienvenueRequise" @ferme="bienvenueFermee = true" @profil="ouvrirProfil" />
 
     <!-- Modale changement de mot de passe -->
     <div v-if="modalePassword" class="modal-overlay" @click.self="fermerModalePassword">
@@ -138,6 +139,7 @@ import { useRouter } from 'vue-router'
 import { useApi, urlApi } from '../services/api'
 import ProfilModal from './ProfilModal.vue'
 import ConsentementModal from './ConsentementModal.vue'
+import BienvenueModal from './BienvenueModal.vue'
 import { promptInstallation as installPrompt } from '../services/installationPwa'
 import { erreurMotDePasse } from '../utils/motDePasse'
 
@@ -152,7 +154,7 @@ const installationIgnoree = () => {
 }
 
 export default {
-  components: { ProfilModal, ConsentementModal },
+  components: { ProfilModal, ConsentementModal, BienvenueModal },
   props: {
     title: { type: String, required: true }
   },
@@ -235,6 +237,10 @@ export default {
     // une fois. null explicite seulement (un compte gardé en mémoire avant
     // cette version n'a pas le champ : on attend le compte relu ci-dessous).
     const accordRequis = computed(() => authStore.user?.consentement_le === null)
+    // Message de bienvenue, une fois par compte, après l'accord (même règle du
+    // null explicite).
+    const bienvenueFermee = ref(false)
+    const bienvenueRequise = computed(() => !bienvenueFermee.value && authStore.user?.bienvenue_vue_le === null)
     onMounted(rafraichirUtilisateur)
 
     const deconnexion = () => {
@@ -323,7 +329,7 @@ export default {
 
     return {
       authStore, themeStore, roleLabel, brandLetter, brandColor, initiales, urlApi,
-      profilOuvert, ouvrirProfil, rafraichirUtilisateur, accordRequis,
+      profilOuvert, ouvrirProfil, rafraichirUtilisateur, accordRequis, bienvenueFermee, bienvenueRequise,
       menuOuvert, toggleMenu, avatarRef, deconnexion,
       modalePassword, ouvrirModalePassword, fermerModalePassword,
       form, changerPassword, loadingPassword, passwordError, passwordSuccess,
