@@ -60,7 +60,9 @@
           <span v-else>Se connecter</span>
         </button>
       </form>
+      <button type="button" class="lien-politique" @click="politiqueOuverte = true">Politique de confidentialité</button>
     </div>
+    <PolitiqueConfidentialite v-if="politiqueOuverte" @fermer="politiqueOuverte = false" />
 
     <!-- Mot du prépa et notes de mise à jour (contenu : src/data/notesMaj.js) -->
     <aside class="maj-card" aria-labelledby="maj-titre">
@@ -108,6 +110,7 @@ import { useAuthStore } from '../stores/auth'
 import { lireCorps, messageErreur, requeteReseau, CLE_SESSION_EXPIREE } from '../services/api'
 import { MOT_DU_PREPA, SIGNATURE_MOT, NOTES_MAJ } from '../data/notesMaj'
 import InscriptionForm from '../components/InscriptionForm.vue'
+import PolitiqueConfidentialite from '../components/PolitiqueConfidentialite.vue'
 
 const ROUTES_PAR_ROLE = {
   athlete: '/athlete',
@@ -118,7 +121,7 @@ const ROUTES_PAR_ROLE = {
 }
 
 export default {
-  components: { InscriptionForm },
+  components: { InscriptionForm, PolitiqueConfidentialite },
   setup() {
     const email = ref('')
     const password = ref('')
@@ -202,10 +205,11 @@ export default {
     }
 
     const [derniereNote, ...notesPrecedentes] = NOTES_MAJ
+    const politiqueOuverte = ref(false)
 
     return {
       email, password, error, loading, handleLogin, sessionExpiree, modeInscription, surInscription,
-      MOT_DU_PREPA, SIGNATURE_MOT, derniereNote, notesPrecedentes
+      politiqueOuverte, MOT_DU_PREPA, SIGNATURE_MOT, derniereNote, notesPrecedentes
     }
   }
 }
@@ -248,6 +252,17 @@ export default {
 .login-form { display: flex; flex-direction: column; gap: var(--spacing-lg); }
 .aide-login { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
 .aide-oubli { margin: 0; text-align: center; }
+.lien-politique {
+  align-self: center;
+  margin-top: calc(-1 * var(--spacing-md));
+  background: none;
+  border: none;
+  padding: var(--spacing-xs);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  text-decoration: underline;
+  cursor: pointer;
+}
 .btn-creer-compte { width: 100%; }
 .info-session {
   display: flex;

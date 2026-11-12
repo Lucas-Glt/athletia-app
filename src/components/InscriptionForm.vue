@@ -72,6 +72,22 @@
       </span>
     </div>
 
+    <!-- Champ piège : invisible et hors du parcours clavier, seul un robot le
+         remplit (le serveur refuse alors l'inscription). -->
+    <div class="piege" aria-hidden="true">
+      <label for="insc-site">Site web</label>
+      <input id="insc-site" v-model="form.site_web" name="site_web" tabindex="-1" autocomplete="off" />
+    </div>
+
+    <label class="consentement">
+      <input v-model="form.consentement" type="checkbox" />
+      <span>
+        J'accepte la
+        <button type="button" class="lien" @click="politiqueOuverte = true">politique de confidentialité</button>,
+        y compris le traitement de mes données de santé (forme, blessures, poids, alimentation) pour mon suivi sportif.
+      </span>
+    </label>
+
     <p v-if="erreur" class="error" role="alert">{{ erreur }}</p>
 
     <button type="submit" class="btn btn-primary btn-plein" :disabled="envoi">
@@ -79,12 +95,14 @@
     </button>
     <button type="button" class="btn btn-ghost btn-plein" @click="$emit('annuler')">J'ai déjà un compte</button>
   </form>
+  <PolitiqueConfidentialite v-if="politiqueOuverte" @fermer="politiqueOuverte = false" />
 </template>
 
 <script>
 import { ref } from 'vue'
 import { lireCorps, messageErreur, requeteReseau } from '../services/api'
 import { erreurMotDePasse } from '../utils/motDePasse'
+import PolitiqueConfidentialite from './PolitiqueConfidentialite.vue'
 
 const SEXES = [
   { valeur: 'homme', label: 'Homme' },
@@ -94,15 +112,17 @@ const SEXES = [
 const pad2 = (n) => String(n).padStart(2, '0')
 
 export default {
+  components: { PolitiqueConfidentialite },
   emits: ['inscrit', 'annuler'],
   setup(_, { emit }) {
     const form = ref({
       role: 'athlete', prenom: '', nom_de_famille: '', email: '', password: '',
-      date_naissance: '', telephone: '', sexe: null, code: ''
+      date_naissance: '', telephone: '', sexe: null, code: '', consentement: false, site_web: ''
     })
     const confirmation = ref('')
     const erreur = ref('')
     const envoi = ref(false)
+    const politiqueOuverte = ref(false)
     const now = new Date()
     const aujourdhui = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`
 
@@ -110,6 +130,9 @@ export default {
       erreur.value = erreurMotDePasse(form.value.password)
       if (!erreur.value && form.value.password !== confirmation.value) {
         erreur.value = 'Les mots de passe ne correspondent pas'
+      }
+      if (!erreur.value && !form.value.consentement) {
+        erreur.value = 'Acceptez la politique de confidentialité pour créer votre compte'
       }
       if (erreur.value) return
       envoi.value = true
@@ -136,7 +159,7 @@ export default {
       }
     }
 
-    return { SEXES, form, confirmation, erreur, envoi, aujourdhui, inscrire }
+    return { SEXES, form, confirmation, erreur, envoi, politiqueOuverte, aujourdhui, inscrire }
   }
 }
 </script>
@@ -163,4 +186,8 @@ export default {
 }
 .choix.actif { border-color: var(--color-primary); background: var(--color-primary-light); color: var(--color-primary-text); font-weight: 600; }
 .btn-plein { width: 100%; }
+.piege { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
+.consentement { display: flex; gap: var(--spacing-sm); align-items: flex-start; font-size: var(--font-size-sm); line-height: 1.4; cursor: pointer; }
+.consentement input { flex-shrink: 0; width: 20px; height: 20px; margin: 1px 0 0; accent-color: var(--color-primary); }
+.lien { background: none; border: none; padding: 0; font: inherit; color: var(--color-primary-text); text-decoration: underline; cursor: pointer; }
 </style>

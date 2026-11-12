@@ -95,6 +95,7 @@
             </div>
           </form>
         </div>
+        <button type="button" class="lien-politique" @click="politiqueOuverte = true">Politique de confidentialité</button>
       </div>
 
       <div class="modal-footer">
@@ -104,12 +105,14 @@
         </button>
       </div>
     </div>
+    <PolitiqueConfidentialite v-if="politiqueOuverte" @fermer="politiqueOuverte = false" />
   </div>
 </template>
 
 <script>
 import { ref, computed, onMounted } from 'vue'
 import { useApi, urlApi } from '../services/api'
+import PolitiqueConfidentialite from './PolitiqueConfidentialite.vue'
 
 const SEXES = [
   { valeur: 'homme', label: 'Homme' },
@@ -146,6 +149,7 @@ const preparerPhoto = (fichier) => new Promise((resolve, reject) => {
 const pad2 = (n) => String(n).padStart(2, '0')
 
 export default {
+  components: { PolitiqueConfidentialite },
   emits: ['fermer', 'modifie'],
   setup(_, { emit }) {
     const api = useApi()
@@ -158,6 +162,7 @@ export default {
     const erreur = ref('')
     const succes = ref('')
     const code = ref('')
+    const politiqueOuverte = ref(false)
     const now = new Date()
     const aujourdhui = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`
 
@@ -265,7 +270,7 @@ export default {
 
     return {
       SEXES, urlApi, profil, form, chargement, envoi, envoiPhoto, envoiCode, erreur, succes, code, aujourdhui,
-      initiales, peutSaisirCode, libelleCode, enregistrer, choisirPhoto, retirerPhoto, saisirCode
+      initiales, peutSaisirCode, libelleCode, enregistrer, choisirPhoto, retirerPhoto, saisirCode, politiqueOuverte
     }
   }
 }
@@ -294,6 +299,7 @@ export default {
 .deux-colonnes { display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-md); }
 @media (max-width: 480px) { .deux-colonnes { grid-template-columns: 1fr; } }
 .aide { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+.lien-politique { align-self: flex-start; background: none; border: none; padding: 0; font-size: var(--font-size-xs); color: var(--color-text-secondary); text-decoration: underline; cursor: pointer; }
 .field textarea {
   padding: var(--spacing-sm) var(--spacing-md);
   border: 1px solid var(--color-border);
