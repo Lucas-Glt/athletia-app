@@ -259,6 +259,11 @@
   gap: var(--spacing-lg);
   overflow-y: auto;
 }
+/* Case d'accord (politique de confidentialité) et bouton qui se lit comme un lien */
+.case-accord { display: flex; gap: var(--spacing-sm); align-items: flex-start; font-size: var(--font-size-sm); line-height: 1.4; cursor: pointer; }
+.case-accord input { flex-shrink: 0; width: 20px; height: 20px; margin: 1px 0 0; accent-color: var(--color-primary); }
+.lien { background: none; border: none; padding: 0; font: inherit; color: var(--color-primary-text); text-decoration: underline; cursor: pointer; }
+
 .modal-footer {
   padding: var(--spacing-lg) var(--spacing-xl);
   border-top: 1px solid var(--color-border);

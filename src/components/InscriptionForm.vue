@@ -79,7 +79,7 @@
       <input id="insc-site" v-model="form.site_web" name="site_web" tabindex="-1" autocomplete="off" />
     </div>
 
-    <label class="consentement">
+    <label class="case-accord">
       <input v-model="form.consentement" type="checkbox" />
       <span>
         J'accepte la
@@ -187,7 +187,4 @@ export default {
 .choix.actif { border-color: var(--color-primary); background: var(--color-primary-light); color: var(--color-primary-text); font-weight: 600; }
 .btn-plein { width: 100%; }
 .piege { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
-.consentement { display: flex; gap: var(--spacing-sm); align-items: flex-start; font-size: var(--font-size-sm); line-height: 1.4; cursor: pointer; }
-.consentement input { flex-shrink: 0; width: 20px; height: 20px; margin: 1px 0 0; accent-color: var(--color-primary); }
-.lien { background: none; border: none; padding: 0; font: inherit; color: var(--color-primary-text); text-decoration: underline; cursor: pointer; }
 </style>

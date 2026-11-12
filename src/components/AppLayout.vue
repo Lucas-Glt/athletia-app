@@ -91,6 +91,7 @@
     </nav>
 
     <ProfilModal v-if="profilOuvert" @fermer="profilOuvert = false" @modifie="rafraichirUtilisateur" />
+    <ConsentementModal v-if="accordRequis" @deconnexion="deconnexion" />
 
     <!-- Modale changement de mot de passe -->
     <div v-if="modalePassword" class="modal-overlay" @click.self="fermerModalePassword">
@@ -136,6 +137,7 @@ import { useThemeStore } from '../stores/theme'
 import { useRouter } from 'vue-router'
 import { useApi, urlApi } from '../services/api'
 import ProfilModal from './ProfilModal.vue'
+import ConsentementModal from './ConsentementModal.vue'
 import { promptInstallation as installPrompt } from '../services/installationPwa'
 import { erreurMotDePasse } from '../utils/motDePasse'
 
@@ -150,7 +152,7 @@ const installationIgnoree = () => {
 }
 
 export default {
-  components: { ProfilModal },
+  components: { ProfilModal, ConsentementModal },
   props: {
     title: { type: String, required: true }
   },
@@ -228,6 +230,12 @@ export default {
         console.error('Erreur rechargement du compte:', e)
       }
     }
+
+    // Comptes créés par un club avant la case d'inscription : accord demandé
+    // une fois. null explicite seulement (un compte gardé en mémoire avant
+    // cette version n'a pas le champ : on attend le compte relu ci-dessous).
+    const accordRequis = computed(() => authStore.user?.consentement_le === null)
+    onMounted(rafraichirUtilisateur)
 
     const deconnexion = () => {
       authStore.logout()
@@ -315,7 +323,7 @@ export default {
 
     return {
       authStore, themeStore, roleLabel, brandLetter, brandColor, initiales, urlApi,
-      profilOuvert, ouvrirProfil, rafraichirUtilisateur,
+      profilOuvert, ouvrirProfil, rafraichirUtilisateur, accordRequis,
       menuOuvert, toggleMenu, avatarRef, deconnexion,
       modalePassword, ouvrirModalePassword, fermerModalePassword,
       form, changerPassword, loadingPassword, passwordError, passwordSuccess,

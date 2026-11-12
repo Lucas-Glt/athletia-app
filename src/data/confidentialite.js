@@ -6,7 +6,7 @@
 export const MISE_A_JOUR = '12 novembre 2026'
 
 const RESPONSABLE = 'Lucas Gilet'
-const CONTACT = 'athletia@espacenum.fr'
+export const CONTACT = 'athletia@espacenum.fr'
 
 // Chaque section : titre + paragraphes et/ou liste à puces.
 export const SECTIONS = [
