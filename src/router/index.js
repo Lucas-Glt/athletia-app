@@ -10,6 +10,17 @@ const router = createRouter({
       name: 'login',
       component: LoginView
     },
+    // Liens reçus par email : ouverts sans être connecté.
+    {
+      path: '/confirmer-email',
+      name: 'confirmer-email',
+      component: () => import('../views/LienEmailView.vue')
+    },
+    {
+      path: '/nouveau-mot-de-passe',
+      name: 'nouveau-mot-de-passe',
+      component: () => import('../views/LienEmailView.vue')
+    },
     {
       path: '/athlete',
       name: 'athlete',
@@ -45,7 +56,7 @@ const ROUTE_PAR_ROLE = {
 }
 
 router.beforeEach((to) => {
-  if (to.name === 'login') return true
+  if (['login', 'confirmer-email', 'nouveau-mot-de-passe'].includes(to.name)) return true
   const auth = useAuthStore()
   const routeDuRole = auth.isAuthenticated ? ROUTE_PAR_ROLE[auth.role] : null
   if (!routeDuRole) return { name: 'login' }

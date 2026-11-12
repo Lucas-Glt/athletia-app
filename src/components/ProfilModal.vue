@@ -42,7 +42,18 @@
         <div class="field">
           <label for="profil-email">Email</label>
           <input id="profil-email" v-model="form.email" type="email" autocomplete="email" />
-          <span class="aide">C'est aussi votre identifiant de connexion.</span>
+          <span v-if="profil.identifiant_court" class="aide">
+            Vous vous connectez avec <b>{{ profil.identifiant_court }}</b>. Remplacez cette adresse par votre email :
+            il deviendra votre identifiant et vous permettra de récupérer votre mot de passe.
+          </span>
+          <template v-else>
+            <span class="aide">C'est aussi votre identifiant de connexion.</span>
+            <span v-if="emailsActifs && profil.email_verifie" class="etat-email ok"><i class="ti ti-circle-check"></i> Adresse confirmée</span>
+            <span v-else-if="emailsActifs" class="etat-email">
+              <i class="ti ti-alert-circle"></i> Adresse non confirmée : elle doit l'être pour récupérer votre mot de passe.
+              <button type="button" class="lien" :disabled="envoiLien" @click="envoyerLien">Envoyer le lien de confirmation</button>
+            </span>
+          </template>
         </div>
 
         <div class="deux-colonnes">
@@ -163,6 +174,8 @@ export default {
     const succes = ref('')
     const code = ref('')
     const politiqueOuverte = ref(false)
+    const emailsActifs = ref(false)
+    const envoiLien = ref(false)
     const now = new Date()
     const aujourdhui = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`
 
@@ -189,6 +202,7 @@ export default {
     }
 
     onMounted(async () => {
+      api.get('/auth/options').then(o => { emailsActifs.value = o.emails_actifs === true }).catch(() => {})
       try {
         profil.value = await api.get('/users/me/profil')
         remplirFormulaire(profil.value)
@@ -244,7 +258,15 @@ export default {
       const email = form.value.email.trim()
       if (email && email.toLowerCase() !== profil.value.email.toLowerCase()) corps.email = email
       appliquer(await api.patch('/users/me/profil', corps))
-      succes.value = corps.email ? 'Profil enregistré. Connectez-vous désormais avec votre nouvel email.' : 'Profil enregistré.'
+      succes.value = !corps.email
+        ? 'Profil enregistré.'
+        : emailsActifs.value
+          ? 'Profil enregistré. Connectez-vous désormais avec votre nouvel email : un lien pour le confirmer vient de vous y être envoyé.'
+          : 'Profil enregistré. Connectez-vous désormais avec votre nouvel email.'
+    })
+
+    const envoyerLien = () => executer(envoiLien, async () => {
+      succes.value = (await api.post('/users/me/verification-email')).message
     })
 
     const choisirPhoto = (event) => {
@@ -270,7 +292,8 @@ export default {
 
     return {
       SEXES, urlApi, profil, form, chargement, envoi, envoiPhoto, envoiCode, erreur, succes, code, aujourdhui,
-      initiales, peutSaisirCode, libelleCode, enregistrer, choisirPhoto, retirerPhoto, saisirCode, politiqueOuverte
+      initiales, peutSaisirCode, libelleCode, enregistrer, choisirPhoto, retirerPhoto, saisirCode, politiqueOuverte,
+      emailsActifs, envoiLien, envoyerLien
     }
   }
 }
@@ -299,6 +322,9 @@ export default {
 .deux-colonnes { display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-md); }
 @media (max-width: 480px) { .deux-colonnes { grid-template-columns: 1fr; } }
 .aide { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+.etat-email { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+.etat-email.ok { color: var(--color-valid-text-strong); }
+.etat-email .lien { font-size: inherit; display: block; margin-top: 2px; }
 .lien-politique { align-self: flex-start; background: none; border: none; padding: 0; font-size: var(--font-size-xs); color: var(--color-text-secondary); text-decoration: underline; cursor: pointer; }
 .field textarea {
   padding: var(--spacing-sm) var(--spacing-md);

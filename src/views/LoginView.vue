@@ -7,6 +7,25 @@
       </div>
       <InscriptionForm v-if="modeInscription" @inscrit="surInscription" @annuler="modeInscription = false" />
 
+      <!-- Mot de passe oublié : lien envoyé à l'adresse confirmée du compte
+           (seulement si l'envoi d'emails est configuré sur le serveur). -->
+      <form v-else-if="modeOubli" @submit.prevent="demanderLien" class="login-form">
+        <p class="aide-login">Saisissez l'email de votre compte : vous recevrez un lien pour choisir un nouveau mot de passe.</p>
+        <div class="field">
+          <label for="oubli-email">Email</label>
+          <input id="oubli-email" v-model="emailOubli" type="email" autocomplete="email" autocapitalize="none" required />
+        </div>
+        <p v-if="messageOubli" class="info-session" role="status"><i class="ti ti-mail"></i> {{ messageOubli }}</p>
+        <p v-if="error" class="error">{{ error }}</p>
+        <button type="submit" class="btn btn-primary btn-login" :disabled="loading">
+          {{ loading ? 'Envoi…' : 'Recevoir le lien' }}
+        </button>
+        <button type="button" class="btn btn-ghost btn-creer-compte" @click="fermerOubli">Retour à la connexion</button>
+        <p class="aide-login aide-oubli">
+          Vous vous connectez avec un identifiant prenom.nom, ou votre email n'est pas confirmé ? Demandez à votre préparateur ou à l'administrateur de votre club.
+        </p>
+      </form>
+
       <form v-else @submit.prevent="handleLogin" class="login-form">
         <p v-if="sessionExpiree" class="info-session">
           <i class="ti ti-clock"></i> Votre session a expiré : reconnectez-vous.
@@ -52,7 +71,8 @@
         <button type="button" class="btn btn-ghost btn-creer-compte" @click="modeInscription = true">
           <i class="ti ti-user-plus"></i> Créer un compte
         </button>
-        <p class="aide-login aide-oubli">
+        <button v-if="emailsActifs" type="button" class="lien aide-login aide-oubli" @click="ouvrirOubli">Mot de passe oublié ?</button>
+        <p v-else class="aide-login aide-oubli">
           Mot de passe oublié ? Demandez à votre préparateur ou à l'administrateur de votre club de le réinitialiser.
         </p>
         <button type="submit" class="btn btn-primary btn-login" :disabled="loading">
@@ -104,7 +124,7 @@
 </template>
 
 <script>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { lireCorps, messageErreur, requeteReseau, CLE_SESSION_EXPIREE } from '../services/api'
@@ -160,6 +180,45 @@ export default {
     // Jeton obtenu (connexion ou inscription) : compte chargé, puis tableau
     // de bord du rôle.
     const modeInscription = ref(false)
+
+    // Mot de passe oublié : proposé seulement si le serveur envoie des emails.
+    const emailsActifs = ref(false)
+    onMounted(async () => {
+      try {
+        emailsActifs.value = (await requete('/auth/options')).emails_actifs === true
+      } catch {
+        emailsActifs.value = false
+      }
+    })
+    const modeOubli = ref(false)
+    const emailOubli = ref('')
+    const messageOubli = ref('')
+    const ouvrirOubli = () => {
+      error.value = ''
+      messageOubli.value = ''
+      emailOubli.value = email.value.includes('@') ? email.value.trim() : ''
+      modeOubli.value = true
+    }
+    const fermerOubli = () => {
+      error.value = ''
+      modeOubli.value = false
+    }
+    const demanderLien = async () => {
+      error.value = ''
+      messageOubli.value = ''
+      loading.value = true
+      try {
+        messageOubli.value = (await requete('/auth/mot-de-passe-oublie', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: emailOubli.value.trim() })
+        })).message
+      } catch (e) {
+        error.value = e.message
+      } finally {
+        loading.value = false
+      }
+    }
     const finaliserConnexion = async (accessToken) => {
       // Rôle lu sur /users/me plutôt qu'en décodant le JWT à la main.
       const user = await requete('/users/me', {
@@ -209,7 +268,8 @@ export default {
 
     return {
       email, password, error, loading, handleLogin, sessionExpiree, modeInscription, surInscription,
-      politiqueOuverte, MOT_DU_PREPA, SIGNATURE_MOT, derniereNote, notesPrecedentes
+      politiqueOuverte, emailsActifs, modeOubli, emailOubli, messageOubli, ouvrirOubli, fermerOubli, demanderLien,
+      MOT_DU_PREPA, SIGNATURE_MOT, derniereNote, notesPrecedentes
     }
   }
 }
