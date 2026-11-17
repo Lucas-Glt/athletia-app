@@ -3,7 +3,7 @@
 //
 // Changer MISE_A_JOUR à chaque modification du texte.
 
-export const MISE_A_JOUR = '12 novembre 2026'
+export const MISE_A_JOUR = '17 novembre 2026'
 
 const RESPONSABLE = 'Lucas Gilet'
 export const CONTACT = 'athletia@espacenum.fr'
@@ -59,6 +59,7 @@ export const SECTIONS = [
     titre: 'Où elles sont stockées',
     paragraphes: [
       `Sur un serveur loué chez OVHcloud, en France, hébergeur de l'application. Les échanges entre votre téléphone et le serveur sont chiffrés (HTTPS).`,
+      'Les emails de l\'application (bienvenue, confirmation de votre adresse, mot de passe oublié) sont envoyés par Brevo, prestataire français d\'envoi d\'emails dont les serveurs sont en Europe. Brevo reçoit uniquement votre adresse email et le contenu de ces messages, et ne peut pas s\'en servir pour autre chose.',
       'Votre navigateur garde votre session de connexion et vos préférences d\'affichage (thème, affichage des séances). Il n\'y a ni cookie publicitaire, ni outil de mesure d\'audience.'
     ]
   },
