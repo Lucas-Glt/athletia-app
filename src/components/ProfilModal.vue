@@ -51,7 +51,9 @@
             <span v-if="emailsActifs && profil.email_verifie" class="etat-email ok"><i class="ti ti-circle-check"></i> Adresse confirmée</span>
             <span v-else-if="emailsActifs" class="etat-email">
               <i class="ti ti-alert-circle"></i> Adresse non confirmée : elle doit l'être pour récupérer votre mot de passe.
-              <button type="button" class="lien" :disabled="envoiLien" @click="envoyerLien">Envoyer le lien de confirmation</button>
+              <button type="button" class="lien" :disabled="envoiLien" @click="envoyerLien">
+                {{ envoiLien ? 'Envoi…' : 'Envoyer le lien de confirmation' }}
+              </button>
             </span>
           </template>
         </div>
@@ -123,6 +125,7 @@
 <script>
 import { ref, computed, onMounted } from 'vue'
 import { useApi, urlApi } from '../services/api'
+import { afficherToast } from '../composables/useToast'
 import PolitiqueConfidentialite from './PolitiqueConfidentialite.vue'
 
 const SEXES = [
@@ -265,9 +268,18 @@ export default {
           : 'Profil enregistré. Connectez-vous désormais avec votre nouvel email.'
     })
 
-    const envoyerLien = () => executer(envoiLien, async () => {
-      succes.value = (await api.post('/users/me/verification-email')).message
-    })
+    // Réponse en toast en haut de l'écran : le message général du profil est
+    // plus bas, hors de l'écran sur téléphone.
+    const envoyerLien = async () => {
+      envoiLien.value = true
+      try {
+        afficherToast((await api.post('/users/me/verification-email')).message, 'succes', 8000)
+      } catch (e) {
+        afficherToast(e.message || 'Une erreur est survenue', 'erreur', 8000)
+      } finally {
+        envoiLien.value = false
+      }
+    }
 
     const choisirPhoto = (event) => {
       const fichier = event.target.files?.[0]
