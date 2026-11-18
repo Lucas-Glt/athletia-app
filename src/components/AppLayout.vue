@@ -2,7 +2,7 @@
   <div class="app">
     <header class="app-header">
       <div class="brand">
-        <div class="brand-icon" :style="{ background: brandColor }">{{ brandLetter }}</div>
+        <img src="/logo.svg" alt="" class="brand-icon" width="38" height="38">
         <div class="brand-text">
           <h1>Athletia</h1>
           <span>{{ roleLabel }}</span>
@@ -184,18 +184,6 @@ export default {
       return labels[authStore.role] || ''
     })
 
-    const brandLetter = computed(() => {
-      if (authStore.role === 'prepa' || authStore.role === 'super_prepa') return 'P'
-      if (authStore.role === 'admin' || authStore.role === 'super_admin') return 'A'
-      return 'A'
-    })
-
-    const brandColor = computed(() => {
-      if (authStore.role === 'prepa' || authStore.role === 'super_prepa') return 'linear-gradient(135deg, #7F77DD, #534AB7)'
-      if (authStore.role === 'super_admin') return 'linear-gradient(135deg, #534AB7, #17153A)'
-      if (authStore.role === 'admin') return 'linear-gradient(135deg, #dc2626, #b91c1c)'
-      return 'linear-gradient(135deg, #16a34a, #15803d)'
-    })
 
     const initiales = computed(() => {
       const nom = authStore.user?.nom || ''
@@ -328,7 +316,7 @@ export default {
     }
 
     return {
-      authStore, themeStore, roleLabel, brandLetter, brandColor, initiales, urlApi,
+      authStore, themeStore, roleLabel, initiales, urlApi,
       profilOuvert, ouvrirProfil, rafraichirUtilisateur, accordRequis, bienvenueFermee, bienvenueRequise,
       menuOuvert, toggleMenu, avatarRef, deconnexion,
       modalePassword, ouvrirModalePassword, fermerModalePassword,
@@ -368,11 +356,12 @@ export default {
 
 .brand { display: flex; align-items: center; gap: var(--spacing-md); flex-shrink: 0; }
 .brand-icon {
-  width: 38px; height: 38px; border-radius: var(--radius-md);
-  color: #fff; font-size: var(--font-size-lg); font-weight: 700;
-  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  display: block; width: 38px; height: 38px; flex-shrink: 0;
+  border-radius: var(--radius-md); /* ≈ arrondi de la tuile du logo */
   box-shadow: 0 2px 8px -2px rgba(31, 25, 84, 0.35);
 }
+/* Tuile marine sur en-tête sombre : un liseré pour la détacher. */
+[data-theme='dark'] .brand-icon { box-shadow: 0 0 0 1px rgba(194, 188, 255, 0.22); }
 .brand-text h1 { font-size: var(--font-size-lg); font-weight: 700; color: var(--color-text); letter-spacing: -0.3px; margin: 0; line-height: 1.2; }
 .brand-text span { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
 
@@ -503,7 +492,7 @@ export default {
   }
   .brand-text span { display: none; }
   .brand-text h1 { font-size: var(--font-size-base); }
-  .brand-icon { width: var(--avatar-md); height: var(--avatar-md); font-size: var(--font-size-base); border-radius: var(--radius-md); }
+  .brand-icon { width: var(--avatar-md); height: var(--avatar-md); border-radius: 7px; }
 
   /* La nav du header part dans la barre du bas ; les actions vivent dans le contenu */
   .header-nav { display: none; }

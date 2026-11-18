@@ -2,6 +2,7 @@
   <div class="login-container">
     <div class="login-card">
       <div class="login-brand">
+        <img src="/logo.svg" alt="" class="login-logo" width="64" height="64">
         <h1>Athletia</h1>
         <span>Plateforme de suivi sportif</span>
       </div>
@@ -301,6 +302,14 @@ export default {
   gap: var(--spacing-2xl);
 }
 .login-brand { text-align: center; }
+.login-logo {
+  display: block;
+  margin: 0 auto var(--spacing-md);
+  border-radius: 14px; /* = rx 22 % de la tuile */
+  filter: drop-shadow(0 6px 14px rgba(12, 10, 34, 0.28));
+}
+/* Tuile marine sur carte sombre : un liseré pour la détacher. */
+[data-theme='dark'] .login-logo { box-shadow: 0 0 0 1px rgba(194, 188, 255, 0.22); }
 .login-brand h1 {
   font-size: var(--font-size-2xl);
   font-weight: 700;

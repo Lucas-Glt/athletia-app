@@ -10,7 +10,7 @@ export default defineConfig({
     vueDevTools(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico'],
+      includeAssets: ['favicon.ico', 'logo.svg', 'apple-touch-icon.png'],
       manifest: {
         name: 'Athletia',
         short_name: 'Athletia',
@@ -33,10 +33,12 @@ export default defineConfig({
             type: 'image/png'
           },
           {
-            src: 'pwa-512x512.png',
+            // Fond plein et A dans le cercle central de 80 % : Android
+            // recadre cette icône selon la forme du lanceur.
+            src: 'pwa-maskable-512x512.png',
             sizes: '512x512',
             type: 'image/png',
-            purpose: 'any maskable'
+            purpose: 'maskable'
           }
         ]
       },
