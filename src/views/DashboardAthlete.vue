@@ -570,19 +570,24 @@
               </template>
 
               <template v-else>
+              <!-- Une ligne par série : à gauche le numéro et le repos, puis
+                   ce qui est prévu (les mêmes valeurs qu'en grisé dans les
+                   cases) et le N-1 ; au milieu les deux cases ; à droite le
+                   bouton. Quatre séries tiennent dans l'écran sans défiler. -->
               <div
                 v-for="serieIdx in nbSeriesGroupe(groupe)"
                 :key="serieIdx"
                 class="serie-card"
-                :class="{ done: isGroupeDone(groupe, serieIdx - 1) }"
+                :class="{ done: isGroupeDone(groupe, serieIdx - 1), 'est-superset': groupe.exercices.length > 1 }"
               >
-                <div class="serie-head">
-                  <span class="serie-label">Série {{ serieIdx }}</span>
+                <div class="serie-num">
+                  <span class="serie-label">S{{ serieIdx }}</span>
                   <span class="serie-repos" v-if="reposSerie(groupe, serieIdx - 1)">
-                    <i class="ti ti-clock"></i> {{ reposSerie(groupe, serieIdx - 1) }}
+                    <i class="ti ti-clock"></i>{{ reposSerie(groupe, serieIdx - 1) }}
                   </span>
                 </div>
 
+                <div class="serie-corps">
                 <!-- template v-for + v-if interne (et non v-if sur le v-for,
                      que Vue 3 évalue en premier) : un exercice rattaché à un
                      superset déjà chiffré n'a pas toutes les séries du groupe.
@@ -592,52 +597,11 @@
                      pour que les lettres A/B ne se décalent pas. -->
                 <template v-for="(exo, eidx) in groupe.exercices" :key="exo.id">
                 <div class="serie-exo" v-if="exo.series[serieIdx - 1]">
-                  <div class="serie-exo-head" v-if="groupe.exercices.length > 1">
-                    <span class="exo-letter-mini">{{ letterFor(eidx) }}</span>
-                    <span class="serie-exo-nom">{{ exo.nom }}</span>
-                  </div>
-
-                  <!-- Prescrit : gros, lisible à 1 m -->
-                  <div class="prescrit-bloc">
-                    <template v-if="seanceActive.type_seance === 'musculation' || !seanceActive.type_seance">
-                      <span class="prescrit-item" v-if="exo.series[serieIdx-1]?.nb_reps">
-                        <span class="prescrit-val">{{ exo.series[serieIdx-1].nb_reps }}</span>
-                        <span class="prescrit-label">reps</span>
-                      </span>
-                      <span class="prescrit-item" v-if="exo.series[serieIdx-1]?.poids_cible">
-                        <span class="prescrit-val">{{ exo.series[serieIdx-1].poids_cible }}</span>
-                        <span class="prescrit-label">charge</span>
-                      </span>
-                      <span class="prescrit-item" v-if="exo.series[serieIdx-1]?.rm">
-                        <span class="prescrit-val">{{ exo.series[serieIdx-1].rm }}</span>
-                        <span class="prescrit-label">%RM</span>
-                      </span>
-                      <span class="prescrit-item" v-if="exo.series[serieIdx-1]?.tempo">
-                        <span class="prescrit-val">{{ exo.series[serieIdx-1].tempo }}</span>
-                        <span class="prescrit-label">tempo</span>
-                      </span>
-                    </template>
-                    <template v-else-if="seanceActive.type_seance === 'natation' || seanceActive.type_seance === 'athletisme'">
-                      <span class="prescrit-item" v-if="exo.series[serieIdx-1]?.metres">
-                        <span class="prescrit-val">{{ exo.series[serieIdx-1].metres }}</span>
-                        <span class="prescrit-label">mètres</span>
-                      </span>
-                      <span class="prescrit-item" v-if="exo.series[serieIdx-1]?.intensite">
-                        <span class="prescrit-val">{{ exo.series[serieIdx-1].intensite }}</span>
-                        <span class="prescrit-label">intensité</span>
-                      </span>
-                    </template>
-                    <template v-else-if="seanceActive.type_seance === 'pliometrie'">
-                      <span class="prescrit-item" v-if="exo.series[serieIdx-1]?.bonds">
-                        <span class="prescrit-val">{{ exo.series[serieIdx-1].bonds }}</span>
-                        <span class="prescrit-label">bonds</span>
-                      </span>
-                      <span class="prescrit-item" v-if="exo.series[serieIdx-1]?.intensite">
-                        <span class="prescrit-val">{{ exo.series[serieIdx-1].intensite }}</span>
-                        <span class="prescrit-label">intensité</span>
-                      </span>
-                    </template>
-                  </div>
+                  <div class="serie-exo-infos">
+                  <span class="serie-prevu">
+                    <span class="exo-letter-mini" v-if="groupe.exercices.length > 1">{{ letterFor(eidx) }}</span>
+                    {{ valeursSerie(exo, serieIdx - 1) || '—' }}
+                  </span>
 
                   <!-- N-1 : dernière performance connue sur cette série, visible
                        dès la saisie sans avoir à swiper vers l'historique. -->
@@ -662,6 +626,8 @@
                       </template>
                     </div>
                   </template>
+
+                  </div>
 
                   <!-- Réalisé : 2 champs, clavier numérique quand la donnée l'est.
                        Swipe droit dans le panneau → dernière performance à la place. -->
@@ -736,19 +702,6 @@
                   <div class="historique-inline" v-else>
                     <template v-for="entree in [historiqueSeriePourExo(exo, serieIdx)]" :key="entree?.log?.id ?? 'vide'">
                       <template v-if="entree">
-                        <div class="historique-inline-head">
-                          <span class="historique-inline-date">
-                            <i class="ti ti-lock" v-if="!estEnEdition(entree.log)"></i>
-                            {{ formatDateCourt(entree.date) }}
-                          </span>
-                          <span
-                            class="historique-inline-etat"
-                            :class="{ 'etat-non-fait': !entree.log.fait }"
-                            v-if="!estEnEdition(entree.log)"
-                          >
-                            {{ entree.log.fait ? 'Fait' : 'Non fait' }}
-                          </span>
-                        </div>
                         <div class="realise-inputs">
                           <input
                             class="log-input"
@@ -764,22 +717,24 @@
                           />
                         </div>
                       </template>
-                      <span v-else class="historique-inline-vide">Pas d'historique pour cet exercice</span>
+                      <span v-else class="historique-inline-vide">Pas d'historique</span>
                     </template>
                   </div>
                 </div>
                 </template>
-
-                <div class="serie-actions" v-if="saisieVue === 'saisie' || historiqueGroupeExiste(groupe, serieIdx)">
-                  <button
-                    class="btn-serie"
-                    :class="etatBoutonSerie(groupe, serieIdx).classe"
-                    @click="toggleSerie(groupe, serieIdx)"
-                  >
-                    <i :class="'ti ' + etatBoutonSerie(groupe, serieIdx).icone"></i>
-                    {{ etatBoutonSerie(groupe, serieIdx).label }}
-                  </button>
                 </div>
+
+                <button
+                  v-if="saisieVue === 'saisie' || historiqueGroupeExiste(groupe, serieIdx)"
+                  type="button"
+                  class="btn-serie"
+                  :class="etatBoutonSerie(groupe, serieIdx).classe"
+                  :aria-label="`Série ${serieIdx} : ${etatBoutonSerie(groupe, serieIdx).label}`"
+                  :title="etatBoutonSerie(groupe, serieIdx).label"
+                  @click="toggleSerie(groupe, serieIdx)"
+                >
+                  <i :class="'ti ' + etatBoutonSerie(groupe, serieIdx).icone"></i>
+                </button>
               </div>
               </template>
               </div>
@@ -1875,7 +1830,7 @@ export default {
       }
       return isGroupeDone(groupe, serieIdx - 1)
         ? { classe: 'btn-done', icone: 'ti-check', label: 'Fait' }
-        : { classe: 'btn-todo', icone: 'ti-circle', label: 'Valider la série' }
+        : { classe: 'btn-todo', icone: 'ti-check', label: 'Valider la série' }
     }
 
     const toggleSerie = (groupe, serieIdx) => {
@@ -3315,17 +3270,96 @@ export default {
 }
 
 /* --- Cartes série --- */
+/* --- Cartes série : une ligne par série ---
+   Numéro + repos | prévu + N-1 | deux cases | bouton rond. Le prévu reste
+   lisible sans être géant : les cases le répètent en grisé, et quatre séries
+   doivent tenir dans l'écran sans défiler. */
 .serie-card {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-sm) var(--spacing-sm) var(--spacing-md);
   background: var(--color-bg-secondary);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  padding: var(--spacing-lg);
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-md);
   transition: background var(--transition-base), border-color var(--transition-base);
 }
 .serie-card.done { background: var(--color-valid-bg-soft); border-color: var(--color-valid-border); }
+
+.serie-num { width: 40px; flex-shrink: 0; display: flex; flex-direction: column; gap: 2px; }
+.serie-label { font-size: var(--font-size-base); font-weight: 800; color: var(--color-superset-text); line-height: 1.1; }
+.serie-repos {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+/* Superset : le numéro et le repos passent sur une ligne d'en-tête. En
+   colonne à gauche, ils laissaient si peu de place au prévu (avec la lettre
+   A/B en plus) que « 10 reps · 16 » se cassait en deux lignes. */
+.serie-card.est-superset { flex-wrap: wrap; row-gap: 4px; }
+.serie-card.est-superset .serie-num { width: 100%; flex-direction: row; align-items: baseline; gap: var(--spacing-sm); }
+
+.serie-corps { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.serie-exo { display: flex; align-items: center; gap: var(--spacing-sm); }
+.serie-exo + .serie-exo { padding-top: 6px; border-top: 1px dashed var(--color-border); }
+.serie-exo-infos { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+/* Du texte en ligne : en flex, la lettre A/B d'un superset partait seule sur
+   sa ligne dès que le prévu ne tenait pas à côté. */
+.serie-prevu {
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  color: var(--color-text);
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+}
+.serie-prevu .exo-letter-mini { display: inline-block; margin-right: 6px; vertical-align: 1px; }
+.n1-bloc { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px; }
+
+.realise-inputs { display: flex; gap: 6px; flex-shrink: 0; }
+.realise-inputs > .log-input-wrap, .realise-inputs > .log-input { flex: 0 0 64px; width: 64px; }
+/* 16 px : en dessous, l'iPhone zoome sur le champ au toucher */
+.log-input {
+  height: 44px;
+  padding: 0 4px;
+  font-size: var(--font-size-base);
+  font-weight: 700;
+  width: 100%;
+  min-width: 0;
+  border: 1.5px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast), background var(--transition-fast);
+}
+
+/* Le prévu en grisé clair : il ne doit pas se confondre avec une valeur
+   tapée (c'est pourtant lui qui part si on valide sans rien saisir). */
+.log-input::placeholder { color: var(--color-text-muted); font-weight: 500; opacity: 1; }
+
+/* Bouton rond : coche grise à valider, verte une fois faite */
+.btn-serie {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: var(--radius-full);
+  border: 1.5px solid var(--color-border-strong);
+  background: var(--color-bg);
+  color: var(--color-text-muted);
+  font-size: 20px;
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
+}
+.btn-serie:active { transform: scale(0.92); }
 
 /* --- Réaction du prépa sur une série, dans l'historique --- */
 .histo-reaction {
@@ -3341,24 +3375,7 @@ export default {
 .histo-reaction small { font-size: 10px; font-weight: 700; color: var(--color-primary-text); text-transform: uppercase; letter-spacing: 0.3px; }
 
 
-.serie-head { display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-sm); }
-.serie-label { font-size: var(--font-size-base); font-weight: 700; color: var(--color-superset-text); }
-.serie-repos {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: var(--font-size-sm);
-  font-weight: 600;
-  color: var(--color-primary-text);
-  background: var(--color-primary-light);
-  padding: 3px 10px;
-  border-radius: var(--radius-full);
-}
 
-.serie-exo { display: flex; flex-direction: column; gap: var(--spacing-sm); }
-.serie-exo + .serie-exo { padding-top: var(--spacing-md); border-top: 1px dashed var(--color-border); }
-.serie-exo-head { display: flex; align-items: center; gap: var(--spacing-sm); }
-.serie-exo-nom { font-size: var(--font-size-sm); font-weight: 600; color: var(--color-text-body); }
 .exo-letter-mini {
   font-size: var(--font-size-xs);
   font-weight: 700;
@@ -3369,32 +3386,7 @@ export default {
   flex-shrink: 0;
 }
 
-/* Prescrit : LA valeur à viser — le plus gros texte de la carte, c'est ce
-   qu'on doit pouvoir lire à bout de bras avant de poser la barre. Tout le
-   reste (N-1, saisie) se repère par contraste en dessous. */
-.prescrit-bloc { display: flex; flex-wrap: wrap; gap: var(--spacing-xl); align-items: baseline; }
-.prescrit-item { display: inline-flex; align-items: baseline; gap: 6px; }
-.prescrit-val { font-size: var(--font-size-2xl); font-weight: 800; color: var(--color-text); line-height: 1; letter-spacing: -0.5px; }
-.prescrit-label {
-  font-size: var(--font-size-xs);
-  color: var(--color-text-secondary);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-}
 
-/* N-1 : dernière performance connue — simple repère de mémoire, délibérément
-   discret pour ne jamais rivaliser avec le prescrit ou la saisie. */
-.n1-bloc {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  background: var(--color-bg-tertiary);
-  border-radius: var(--radius-md);
-  width: fit-content;
-}
 .n1-tag {
   font-size: 10px;
   font-weight: 700;
@@ -3405,54 +3397,9 @@ export default {
 .n1-unit { font-size: 10px; font-weight: 500; margin-left: 2px; }
 .n1-val.n1-nf { color: var(--color-danger-text); }
 
-/* Réalisé */
-.realise-inputs { display: flex; gap: var(--spacing-sm); }
 .historique-inline { display: flex; flex-direction: column; gap: 6px; }
-.historique-inline-date {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: var(--font-size-xs);
-  font-weight: 600;
-  color: var(--color-text-secondary);
-  flex-shrink: 0;
-  text-transform: capitalize;
-}
 .historique-inline-vide { font-size: var(--font-size-xs); color: var(--color-text-muted); font-style: italic; }
-.historique-inline-head { display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-sm); }
-.historique-inline-etat {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: var(--font-size-xs);
-  font-weight: 600;
-  padding: 3px 10px;
-  border-radius: var(--radius-full);
-  border: 1px solid var(--color-valid-border);
-  background: var(--color-valid-bg);
-  color: var(--color-valid-text-strong);
-}
-.historique-inline-etat.etat-non-fait {
-  background: var(--color-bg-tertiary);
-  border-color: var(--color-border);
-  color: var(--color-text-secondary);
-}
 .log-input-wrap { position: relative; flex: 1; min-width: 0; }
-/* La saisie réalisée est l'élément le plus actionnable de la carte : aussi
-   grande que le prescrit, pour qu'elle ne se perde pas au milieu du reste. */
-.log-input {
-  height: var(--input-h);
-  padding: 0 var(--spacing-sm);
-  font-size: var(--font-size-lg);
-  font-weight: 700;
-  width: 100%;
-  min-width: 0;
-  border: 1.5px solid var(--color-border-strong);
-  border-radius: var(--radius-md);
-  background: var(--color-bg);
-  text-align: center;
-  transition: border-color var(--transition-fast), box-shadow var(--transition-fast), background var(--transition-fast);
-}
 .log-input:focus { outline: none; border-color: var(--color-primary); box-shadow: var(--shadow-focus); }
 .log-input-diff {
   position: absolute;
@@ -3482,33 +3429,10 @@ export default {
   border-color: var(--color-valid-border);
 }
 
-/* Bouton valider série — même cible tactile que tout le reste de l'app
-   (--tap-min), et le vert "fait" rejoint celui des pastilles de progression
-   et du fond de carte, au lieu d'un violet qui se confondait avec "actif". */
-.btn-serie {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-height: var(--tap-min);
-  padding: 0 var(--spacing-md);
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  font-size: var(--font-size-sm);
-  font-weight: 600;
-  border: 1.5px solid var(--color-border-strong);
-  background: var(--color-bg);
-  color: var(--color-text-body);
-  width: 100%;
-  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
-}
-.btn-serie:active { transform: scale(0.97); }
 .btn-todo:hover { color: var(--color-primary-dark); border-color: var(--color-primary); }
 .btn-done { background: var(--color-valid-text); color: #fff; border-color: var(--color-valid-text); }
 .btn-done:hover { background: var(--color-valid-text-strong); border-color: var(--color-valid-text-strong); }
 
-.serie-actions { display: flex; gap: var(--spacing-sm); }
-.serie-actions .btn-serie { flex: 1; }
 
 /* Suppression de la séance d'historique entière, à côté de sa date */
 .btn-supprimer-seance-historique {
