@@ -200,4 +200,9 @@ export default {
 @media (prefers-reduced-motion: reduce) {
   .cal-case.statut-reussi { animation: none; }
 }
+/* Ordinateur : carrées, les cases dépassaient 65 px et le mois débordait
+   sous le bas de l'écran. Même hauteur que le calendrier des pesées. */
+@media (min-width: 769px) {
+  .cal-case { aspect-ratio: auto; width: 100%; height: 48px; }
+}
 </style>

@@ -10,8 +10,19 @@
       <div class="nav-item" :class="{ active: onglet === 'performances' }" @click="onglet = 'performances'">
         <i class="ti ti-trophy"></i> Perfs
       </div>
-      <div class="nav-item" :class="{ active: ongletsSuivi.includes(onglet) }" @click="menuSuiviOuvert = true">
+      <div class="nav-item nav-mobile" :class="{ active: ongletsSuivi.includes(onglet) }" @click="menuSuiviOuvert = true">
         <i class="ti ti-activity"></i> Suivi
+      </div>
+      <!-- Sur ordinateur, la barre du haut a la place : Poids, Diète et
+           Blessures y sont directement, sans passer par le menu Suivi. -->
+      <div
+        v-for="item in ITEMS_SUIVI"
+        :key="item.cle"
+        class="nav-item nav-ordi"
+        :class="{ active: onglet === item.cle }"
+        @click="choisirSuivi(item.cle)"
+      >
+        <i class="ti" :class="item.icone"></i> {{ item.label }}
       </div>
     </template>
 
@@ -3548,6 +3559,12 @@ export default {
   flex-direction: column;
   gap: var(--spacing-sm);
 }
+/* Ordinateur (fenêtre redimensionnée, le menu ne s'ouvre plus que là) :
+   fenêtre centrée plutôt qu'un volet collé en bas et coupé par l'écran. */
+@media (min-width: 769px) {
+  .suivi-overlay { align-items: center; }
+  .suivi-sheet { border-radius: var(--radius-xl); padding-bottom: var(--spacing-xl); }
+}
 .suivi-head {
   display: flex;
   align-items: center;
@@ -3697,7 +3714,9 @@ export default {
 
 @media (min-width: 769px) {
   .saisie-overlay { align-items: center; padding: var(--spacing-2xl); }
-  .saisie-sheet { border-radius: var(--radius-xl); max-height: 85vh; }
+  /* 560 px : les deux champs de saisie remplissent la carte au lieu d'en
+     occuper la moitié gauche */
+  .saisie-sheet { border-radius: var(--radius-xl); max-height: 85vh; max-width: 560px; }
 }
 
 /* --- Barre de validation collante --- */
@@ -3795,12 +3814,20 @@ export default {
 .performance-date { font-size: var(--font-size-xs); color: var(--color-text-muted); }
 .performance-vide { font-size: var(--font-size-xs); color: var(--color-text-muted); font-style: italic; flex-shrink: 0; }
 
-/* --- Desktop : plus d'air, la feuille reste une colonne --- */
+/* --- Ordinateur : la même colonne de 720 px pour tous les onglets, centrée
+   par le padding (et non un max-width) pour que la barre de défilement reste
+   au bord de la fenêtre au lieu de flotter au milieu de l'écran. --- */
 @media (min-width: 769px) {
-  .screen, .performances-page { padding: var(--spacing-2xl); }
+  .screen, .performances-page {
+    max-width: none;
+    padding: var(--spacing-2xl) max(var(--spacing-2xl), calc((100% - 720px) / 2));
+  }
   .valider-bar { padding: var(--spacing-md) var(--spacing-2xl); }
   .valider-bar, .seance-topbar, .seance-onglets { padding-left: max(var(--spacing-2xl), calc((100% - 720px) / 2)); padding-right: max(var(--spacing-2xl), calc((100% - 720px) / 2)); }
-  .realise-inputs { max-width: 360px; }
+  .nav-item.nav-mobile { display: none; }
+}
+@media (max-width: 768px) {
+  .nav-item.nav-ordi { display: none; }
 }
 
 /* --- Suivi de poids --- */
@@ -3869,4 +3896,15 @@ export default {
 .poids-jour-case:disabled { opacity: 0.35; cursor: not-allowed; }
 .poids-jour-num { font-weight: 600; }
 .poids-jour-val { font-size: 10px; font-weight: 700; color: var(--color-valid-text-strong); }
+
+/* Ordinateur : colonne commune aux onglets, et des cases de calendrier
+   moins hautes — carrées, elles faisaient 95 px et repoussaient la moyenne
+   et la courbe sous le bas de l'écran. */
+@media (min-width: 769px) {
+  .poids-page {
+    max-width: none;
+    padding: var(--spacing-2xl) max(var(--spacing-2xl), calc((100% - 720px) / 2));
+  }
+  .poids-jour-case { aspect-ratio: auto; height: 56px; }
+}
 </style>

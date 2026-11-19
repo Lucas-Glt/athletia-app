@@ -1083,6 +1083,10 @@ export default {
   min-height: 0;
   touch-action: pan-y;
 }
+/* Ordinateur : même colonne centrée que les autres onglets */
+@media (min-width: 769px) {
+  .diete { padding: var(--spacing-2xl) max(var(--spacing-2xl), calc((100% - 720px) / 2)); }
+}
 
 /* --- Sous-onglets Journée / Objectif --- */
 .diete-calendrier {

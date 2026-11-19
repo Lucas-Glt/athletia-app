@@ -3,194 +3,201 @@
     <!-- Niveau, XP et série en cours -->
     <CarteNiveau />
 
-    <!-- Ressenti de séance à compléter -->
-    <div class="stat-card" v-if="ressenti" ref="ressentiEl">
-      <div class="stat-card-titre"><i class="ti ti-mood-smile"></i> Ressenti — {{ ressenti.seance_nom }}</div>
-      <p class="stat-card-sub">Comment as-tu trouvé cette séance ?</p>
+    <!-- Ordinateur : à gauche ce qu'il y a à faire aujourd'hui, à droite
+         où on en est. Téléphone : les colonnes s'effacent (display:
+         contents), l'accueil reste une seule pile. -->
+    <div class="colonne">
+      <!-- Ressenti de séance à compléter -->
+      <div class="stat-card" v-if="ressenti" ref="ressentiEl">
+        <div class="stat-card-titre"><i class="ti ti-mood-smile"></i> Ressenti — {{ ressenti.seance_nom }}</div>
+        <p class="stat-card-sub">Comment as-tu trouvé cette séance ?</p>
 
-      <div class="rpe-picker">
+        <div class="rpe-picker">
+          <button
+            v-for="n in 11"
+            :key="n - 1"
+            class="rpe-btn"
+            :class="{ active: rpeForm === n - 1 }"
+            @click="rpeForm = n - 1"
+          >{{ n - 1 }}</button>
+        </div>
+        <p class="rpe-label" v-if="rpeForm !== null">{{ labelRpe(rpeForm) }}</p>
+
+        <div class="field-inline">
+          <label>Durée de la séance</label>
+          <input v-model.number="dureeForm" type="number" inputmode="numeric" min="1" :max="DUREE_MAX" placeholder="ex : 60" />
+          <span>min</span>
+        </div>
+        <!-- Le ressenti n'est plus modifiable une fois envoyé : la durée en
+             heures rend une faute de frappe (600 pour 60) visible avant. -->
+        <p class="duree-heures" v-if="dureeForm > 0">soit {{ dureeEnHeures }}</p>
+
         <button
-          v-for="n in 11"
-          :key="n - 1"
-          class="rpe-btn"
-          :class="{ active: rpeForm === n - 1 }"
-          @click="rpeForm = n - 1"
-        >{{ n - 1 }}</button>
+          class="btn btn-primary btn-envoyer"
+          :disabled="rpeForm === null || !dureeForm"
+          @click="envoyerRessenti"
+        >
+          <i class="ti ti-check"></i> Enregistrer
+        </button>
+        <p v-if="erreurRessenti" class="stat-card-erreur">{{ erreurRessenti }}</p>
+        <p class="stat-card-note">
+          À compléter dans les 24 h qui suivent la séance. Une fois enregistré, le ressenti n'est plus modifiable.
+        </p>
       </div>
-      <p class="rpe-label" v-if="rpeForm !== null">{{ labelRpe(rpeForm) }}</p>
 
-      <div class="field-inline">
-        <label>Durée de la séance</label>
-        <input v-model.number="dureeForm" type="number" inputmode="numeric" min="1" :max="DUREE_MAX" placeholder="ex : 60" />
-        <span>min</span>
+      <!-- Wellness du jour -->
+      <div class="stat-card" ref="wellnessEl">
+        <template v-if="wellnessFait">
+          <div class="wellness-fait">
+            <i class="ti ti-circle-check-filled"></i>
+            <span>Wellness du jour envoyé. À demain !</span>
+          </div>
+        </template>
+        <template v-else>
+          <div class="stat-card-titre"><i class="ti ti-heart-rate-monitor"></i> Wellness du jour</div>
+          <p class="stat-card-sub">5 questions, moins de 30 secondes.</p>
+
+          <div class="wellness-item">
+            <div class="wellness-item-head">
+              <span>Temps de sommeil</span>
+              <span class="wellness-echelle">la nuit dernière</span>
+            </div>
+            <div class="sommeil-stepper">
+              <button
+                class="sommeil-btn"
+                :disabled="wellnessForm.heures_sommeil !== null && wellnessForm.heures_sommeil <= SOMMEIL_MIN"
+                @click="ajusterSommeil(-1)"
+                aria-label="Moins 15 minutes"
+              ><i class="ti ti-minus"></i></button>
+              <span class="sommeil-valeur" :class="{ vide: wellnessForm.heures_sommeil === null }">
+                {{ wellnessForm.heures_sommeil === null ? '— h' : formatHeures(wellnessForm.heures_sommeil) }}
+              </span>
+              <button
+                class="sommeil-btn"
+                :disabled="wellnessForm.heures_sommeil !== null && wellnessForm.heures_sommeil >= SOMMEIL_MAX"
+                @click="ajusterSommeil(1)"
+                aria-label="Plus 15 minutes"
+              ><i class="ti ti-plus"></i></button>
+            </div>
+          </div>
+
+          <div class="wellness-item" v-for="item in itemsWellness" :key="item.champ">
+            <div class="wellness-item-head">
+              <span>{{ item.label }}</span>
+              <span class="wellness-echelle">1 = très bon · 7 = très mauvais</span>
+            </div>
+            <div class="wellness-picker">
+              <button
+                v-for="n in 7"
+                :key="n"
+                class="wellness-btn"
+                :class="{ active: wellnessForm[item.champ] === n }"
+                @click="wellnessForm[item.champ] = n"
+              >{{ n }}</button>
+            </div>
+          </div>
+
+          <button class="btn btn-primary btn-envoyer" :disabled="!wellnessComplet" @click="envoyerWellness">
+            <i class="ti ti-check"></i> Envoyer
+          </button>
+          <!-- Bouton grisé sans explication : on dit ce qui manque (souvent le
+               temps de sommeil, à régler avec + / −). -->
+          <p v-if="wellnessManquants" class="wellness-manque">Il manque : {{ wellnessManquants }}</p>
+          <p v-if="erreurWellness" class="stat-card-erreur">{{ erreurWellness }}</p>
+        </template>
       </div>
-      <!-- Le ressenti n'est plus modifiable une fois envoyé : la durée en
-           heures rend une faute de frappe (600 pour 60) visible avant. -->
-      <p class="duree-heures" v-if="dureeForm > 0">soit {{ dureeEnHeures }}</p>
-
-      <button
-        class="btn btn-primary btn-envoyer"
-        :disabled="rpeForm === null || !dureeForm"
-        @click="envoyerRessenti"
-      >
-        <i class="ti ti-check"></i> Enregistrer
-      </button>
-      <p v-if="erreurRessenti" class="stat-card-erreur">{{ erreurRessenti }}</p>
-      <p class="stat-card-note">
-        À compléter dans les 24 h qui suivent la séance. Une fois enregistré, le ressenti n'est plus modifiable.
-      </p>
     </div>
 
-    <!-- Wellness du jour -->
-    <div class="stat-card" ref="wellnessEl">
-      <template v-if="wellnessFait">
-        <div class="wellness-fait">
-          <i class="ti ti-circle-check-filled"></i>
-          <span>Wellness du jour envoyé. À demain !</span>
+    <div class="colonne">
+      <!-- En bref : trois chiffres, aucune interprétation. Le détail vit dans
+           les onglets dédiés (courbe de poids dans Suivi, progression dans Perfs). -->
+      <div class="en-bref" v-if="stats">
+        <div class="bref-tuile">
+          <span class="bref-valeur">{{ seancesSemaine }}</span>
+          <span class="bref-label">séance{{ seancesSemaine > 1 ? 's' : '' }} cette semaine</span>
         </div>
-      </template>
-      <template v-else>
-        <div class="stat-card-titre"><i class="ti ti-heart-rate-monitor"></i> Wellness du jour</div>
-        <p class="stat-card-sub">5 questions, moins de 30 secondes.</p>
+        <div class="bref-tuile">
+          <span class="bref-valeur">{{ stats.nb_seances_completees }}</span>
+          <span class="bref-label">au total</span>
+        </div>
+        <button v-if="dernierPoids" type="button" class="bref-tuile bref-cliquable" @click="$emit('voir-poids')">
+          <span class="bref-valeur">
+            {{ dernierPoids }}<small> kg</small>
+            <i v-if="tendancePoids" class="ti bref-tendance" :class="tendancePoids"></i>
+          </span>
+          <span class="bref-label">poids <i class="ti ti-chevron-right"></i></span>
+        </button>
+      </div>
 
-        <div class="wellness-item">
-          <div class="wellness-item-head">
-            <span>Temps de sommeil</span>
-            <span class="wellness-echelle">la nuit dernière</span>
-          </div>
-          <div class="sommeil-stepper">
+      <div class="stat-card" v-if="stats">
+        <div class="stat-card-titre">
+          <i class="ti ti-calendar-stats"></i> Régularité
+          <div class="bascule" role="group" aria-label="Régularité affichée">
             <button
-              class="sommeil-btn"
-              :disabled="wellnessForm.heures_sommeil !== null && wellnessForm.heures_sommeil <= SOMMEIL_MIN"
-              @click="ajusterSommeil(-1)"
-              aria-label="Moins 15 minutes"
-            ><i class="ti ti-minus"></i></button>
-            <span class="sommeil-valeur" :class="{ vide: wellnessForm.heures_sommeil === null }">
-              {{ wellnessForm.heures_sommeil === null ? '— h' : formatHeures(wellnessForm.heures_sommeil) }}
+              type="button"
+              :class="{ active: vueRegularite === 'seances' }"
+              :aria-pressed="vueRegularite === 'seances'"
+              @click="choisirVueRegularite('seances')"
+            >Séances</button>
+            <button
+              type="button"
+              :class="{ active: vueRegularite === 'diete' }"
+              :aria-pressed="vueRegularite === 'diete'"
+              @click="choisirVueRegularite('diete')"
+            >Diète</button>
+          </div>
+        </div>
+        <!-- DIÈTE : calendrier de la réussite calorique, mois par mois -->
+        <CalendrierDiete v-if="vueRegularite === 'diete'" />
+
+        <template v-else>
+        <div class="regularite-grille">
+          <button
+            v-for="j in derniersJours"
+            :key="j.date"
+            type="button"
+            class="regularite-case"
+            :class="{ 'est-aujourdhui': j.estAujourdhui, 'est-ouvert': jourOuvert === j.date }"
+            :style="styleJour(j)"
+            :title="j.date"
+            :disabled="j.seances.length === 0"
+            @click="basculerJour(j)"
+          ></button>
+        </div>
+
+        <!-- Jour cliqué : quelles séances ont été complétées ce jour-là, avec le
+             renvoi vers leurs résultats (onglet Séances, historique de la séance
+             positionné sur cette date). -->
+        <div class="jour-detail" v-if="jourDetail">
+          <div class="jour-detail-date">{{ formatJourLong(jourDetail.date) }}</div>
+          <div class="jour-detail-ligne" v-for="s in jourDetail.seances" :key="s.seance_id">
+            <span class="jour-detail-nom">
+              <span class="jour-detail-puce" :style="{ background: couleurType(s.type_seance) }"></span>
+              {{ s.nom }}
             </span>
             <button
-              class="sommeil-btn"
-              :disabled="wellnessForm.heures_sommeil !== null && wellnessForm.heures_sommeil >= SOMMEIL_MAX"
-              @click="ajusterSommeil(1)"
-              aria-label="Plus 15 minutes"
-            ><i class="ti ti-plus"></i></button>
+              class="btn-resultats"
+              @click="$emit('voir-seance', { seanceId: s.seance_id, programmeId: s.programme_id, date: jourDetail.date })"
+            >
+              Aller voir les résultats <i class="ti ti-arrow-right"></i>
+            </button>
           </div>
         </div>
 
-        <div class="wellness-item" v-for="item in itemsWellness" :key="item.champ">
-          <div class="wellness-item-head">
-            <span>{{ item.label }}</span>
-            <span class="wellness-echelle">1 = très bon · 7 = très mauvais</span>
-          </div>
-          <div class="wellness-picker">
-            <button
-              v-for="n in 7"
-              :key="n"
-              class="wellness-btn"
-              :class="{ active: wellnessForm[item.champ] === n }"
-              @click="wellnessForm[item.champ] = n"
-            >{{ n }}</button>
-          </div>
-        </div>
-
-        <button class="btn btn-primary btn-envoyer" :disabled="!wellnessComplet" @click="envoyerWellness">
-          <i class="ti ti-check"></i> Envoyer
-        </button>
-        <!-- Bouton grisé sans explication : on dit ce qui manque (souvent le
-             temps de sommeil, à régler avec + / −). -->
-        <p v-if="wellnessManquants" class="wellness-manque">Il manque : {{ wellnessManquants }}</p>
-        <p v-if="erreurWellness" class="stat-card-erreur">{{ erreurWellness }}</p>
-      </template>
-    </div>
-
-    <!-- En bref : trois chiffres, aucune interprétation. Le détail vit dans
-         les onglets dédiés (courbe de poids dans Suivi, progression dans Perfs). -->
-    <div class="en-bref" v-if="stats">
-      <div class="bref-tuile">
-        <span class="bref-valeur">{{ seancesSemaine }}</span>
-        <span class="bref-label">séance{{ seancesSemaine > 1 ? 's' : '' }} cette semaine</span>
-      </div>
-      <div class="bref-tuile">
-        <span class="bref-valeur">{{ stats.nb_seances_completees }}</span>
-        <span class="bref-label">au total</span>
-      </div>
-      <button v-if="dernierPoids" type="button" class="bref-tuile bref-cliquable" @click="$emit('voir-poids')">
-        <span class="bref-valeur">
-          {{ dernierPoids }}<small> kg</small>
-          <i v-if="tendancePoids" class="ti bref-tendance" :class="tendancePoids"></i>
-        </span>
-        <span class="bref-label">poids <i class="ti ti-chevron-right"></i></span>
-      </button>
-    </div>
-
-    <div class="stat-card" v-if="stats">
-      <div class="stat-card-titre">
-        <i class="ti ti-calendar-stats"></i> Régularité
-        <div class="bascule" role="group" aria-label="Régularité affichée">
-          <button
-            type="button"
-            :class="{ active: vueRegularite === 'seances' }"
-            :aria-pressed="vueRegularite === 'seances'"
-            @click="choisirVueRegularite('seances')"
-          >Séances</button>
-          <button
-            type="button"
-            :class="{ active: vueRegularite === 'diete' }"
-            :aria-pressed="vueRegularite === 'diete'"
-            @click="choisirVueRegularite('diete')"
-          >Diète</button>
-        </div>
-      </div>
-      <!-- DIÈTE : calendrier de la réussite calorique, mois par mois -->
-      <CalendrierDiete v-if="vueRegularite === 'diete'" />
-
-      <template v-else>
-      <div class="regularite-grille">
-        <button
-          v-for="j in derniersJours"
-          :key="j.date"
-          type="button"
-          class="regularite-case"
-          :class="{ 'est-aujourdhui': j.estAujourdhui, 'est-ouvert': jourOuvert === j.date }"
-          :style="styleJour(j)"
-          :title="j.date"
-          :disabled="j.seances.length === 0"
-          @click="basculerJour(j)"
-        ></button>
-      </div>
-
-      <!-- Jour cliqué : quelles séances ont été complétées ce jour-là, avec le
-           renvoi vers leurs résultats (onglet Séances, historique de la séance
-           positionné sur cette date). -->
-      <div class="jour-detail" v-if="jourDetail">
-        <div class="jour-detail-date">{{ formatJourLong(jourDetail.date) }}</div>
-        <div class="jour-detail-ligne" v-for="s in jourDetail.seances" :key="s.seance_id">
-          <span class="jour-detail-nom">
-            <span class="jour-detail-puce" :style="{ background: couleurType(s.type_seance) }"></span>
-            {{ s.nom }}
+        <!-- Légende = répartition : une pastille par type, avec son total -->
+        <div class="regularite-legende" v-if="stats.repartition_types.length > 0">
+          <span v-for="r in stats.repartition_types" :key="r.type_seance" class="legende-item">
+            <span class="legende-puce" :style="{ background: couleurType(r.type_seance) }"></span>
+            {{ labelType(r.type_seance) }} <strong>{{ r.nb_seances }}</strong>
           </span>
-          <button
-            class="btn-resultats"
-            @click="$emit('voir-seance', { seanceId: s.seance_id, programmeId: s.programme_id, date: jourDetail.date })"
-          >
-            Aller voir les résultats <i class="ti ti-arrow-right"></i>
-          </button>
         </div>
+        <p class="stat-card-note">35 derniers jours. Touche un jour coloré pour revoir ta séance.</p>
+        </template>
       </div>
 
-      <!-- Légende = répartition : une pastille par type, avec son total -->
-      <div class="regularite-legende" v-if="stats.repartition_types.length > 0">
-        <span v-for="r in stats.repartition_types" :key="r.type_seance" class="legende-item">
-          <span class="legende-puce" :style="{ background: couleurType(r.type_seance) }"></span>
-          {{ labelType(r.type_seance) }} <strong>{{ r.nb_seances }}</strong>
-        </span>
+      <div class="empty" v-if="stats && stats.nb_seances_completees === 0">
+        Valide ta première séance pour commencer à voir tes stats ici.
       </div>
-      <p class="stat-card-note">35 derniers jours. Touche un jour coloré pour revoir ta séance.</p>
-      </template>
-    </div>
-
-    <div class="empty" v-if="stats && stats.nb_seances_completees === 0">
-      Valide ta première séance pour commencer à voir tes stats ici.
     </div>
   </div>
 </template>
@@ -505,6 +512,32 @@ export default {
   overflow-y: auto;
   min-height: 0;
   touch-action: pan-y;
+}
+.colonne { display: contents; }
+
+/* Ordinateur : la page ne s'étire plus sur tout l'écran (boutons du
+   wellness de 190 px, cases de régularité géantes). Une colonne centrée
+   jusqu'à 1023 px, deux au-delà. Le padding (et non un max-width) centre le
+   contenu en gardant la barre de défilement au bord de la fenêtre. */
+@media (min-width: 769px) {
+  .mes-stats { padding: var(--spacing-2xl) max(var(--spacing-2xl), calc((100% - 720px) / 2)); }
+}
+@media (min-width: 1024px) {
+  .mes-stats {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-content: start;
+    align-items: start;
+    gap: var(--spacing-xl);
+    padding: var(--spacing-2xl) max(var(--spacing-2xl), calc((100% - 1080px) / 2));
+  }
+  .mes-stats > .carte-niveau { grid-column: 1 / -1; }
+  .colonne { display: flex; flex-direction: column; gap: var(--spacing-lg); min-width: 0; }
+}
+@media (min-width: 769px) {
+  /* Carrées, les cases de régularité dépassaient 65 px : de gros pavés de
+     couleur. Une bande plus basse suffit à lire la semaine. */
+  .regularite-case { aspect-ratio: auto; width: 100%; height: 40px; }
 }
 
 .stat-card {
