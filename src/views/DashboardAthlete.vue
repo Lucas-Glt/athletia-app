@@ -3322,6 +3322,12 @@ export default {
 
 .realise-inputs { display: flex; gap: 6px; flex-shrink: 0; }
 .realise-inputs > .log-input-wrap, .realise-inputs > .log-input { flex: 0 0 64px; width: 64px; }
+/* iPhone SE / mini (375 px) : « 12 reps · 20 » se cassait en deux lignes.
+   Cases et colonne du numéro un peu plus étroites sur ces écrans. */
+@media (max-width: 380px) {
+  .realise-inputs > .log-input-wrap, .realise-inputs > .log-input { flex-basis: 56px; width: 56px; }
+  .serie-num { width: 34px; }
+}
 /* Graisse moyenne : en gras, les chiffres faisaient grossiers. 14 px sur
    ordinateur ; sur écran tactile, base.css remonte tous les champs à 16 px
    (en dessous, l'iPhone zoome sur le champ au toucher). */
