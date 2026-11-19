@@ -16,14 +16,6 @@ export const SIGNATURE_MOT = 'À vos barres…'
 
 export const NOTES_MAJ = [
   {
-    date: '19 novembre 2026',
-    titre: 'Une seule vue pour ta séance',
-    points: [
-      'Ta séance s\'affiche en liste : coche chaque exercice fait, il est enregistré avec les valeurs prévues par ton prépa.',
-      'Envie de noter tes vraies charges ? Touche le crayon à côté de l\'exercice : photos, dernière perf et saisie série par série sont là.'
-    ]
-  },
-  {
     date: '8 novembre 2026',
     titre: 'La vue simple',
     points: [
