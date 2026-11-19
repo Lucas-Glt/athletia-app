@@ -3343,7 +3343,9 @@ export default {
 
 /* Le prévu en grisé clair : il ne doit pas se confondre avec une valeur
    tapée (c'est pourtant lui qui part si on valide sans rien saisir). */
-.log-input::placeholder { color: var(--color-text-muted); font-weight: 400; opacity: 1; }
+/* Exemple plus petit que la saisie : 12 px même sur téléphone. Le zoom de
+   l'iPhone ne dépend que de la police du champ (16 px), pas de celle-ci. */
+.log-input::placeholder { color: var(--color-text-muted); font-size: var(--font-size-xs); font-weight: 400; opacity: 1; }
 
 /* Bouton rond : coche grise à valider, verte une fois faite */
 .btn-serie {
