@@ -1546,6 +1546,30 @@ export default {
 .input-inline:focus { outline: none; border-color: var(--color-primary); }
 
 /* --- Mobile : liste → détail, un seul écran à la fois --- */
+/* Ordinateur : Programmes s'étalait sur tout l'écran (liste collée au bord
+   gauche, détail de 1100 px aux chevrons perdus à droite) alors qu'Athlètes,
+   Tests et l'Atelier tiennent dans 1080 px. Liste et détail rentrent dans la
+   même largeur, la liste devient une carte, et les sous-onglets s'alignent
+   sur ce contenu. */
+@media (min-width: 769px) {
+  .sous-onglets {
+    padding-left: max(var(--spacing-lg), calc((100% - 1080px) / 2));
+    padding-right: max(var(--spacing-lg), calc((100% - 1080px) / 2));
+  }
+  .content-body {
+    gap: var(--spacing-xl);
+    padding: var(--spacing-xl) max(var(--spacing-xl), calc((100% - 1080px) / 2)) 0;
+  }
+  .panel-list {
+    width: 260px;
+    align-self: flex-start;
+    max-height: calc(100% - var(--spacing-xl));
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-card);
+  }
+  .panel-detail { padding: 0 0 var(--spacing-2xl); }
+}
 @media (max-width: 768px) {
   .panel-list {
     width: 100%;

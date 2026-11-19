@@ -675,6 +675,23 @@ strong.is-optionnel { color: var(--color-text-secondary); }
 
 .actions { display: flex; gap: var(--spacing-sm); justify-content: space-between; margin-top: 4px; flex-wrap: wrap; }
 
+/* Ordinateur : même largeur de 1080 px que les autres onglets du prépa ; la
+   création (deux champs) devient une carte centrée au lieu d'un petit bloc
+   collé en haut à gauche d'un écran vide. */
+@media (min-width: 769px) {
+  .form-wrapper { padding: var(--spacing-2xl) max(var(--spacing-2xl), calc((100% - 1080px) / 2)); }
+  .etape-creation {
+    align-self: center;
+    width: 100%;
+    max-width: 560px;
+    margin-top: var(--spacing-2xl);
+    padding: var(--spacing-2xl);
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-card);
+  }
+}
 @media (max-width: 768px) {
   .form-wrapper { padding: var(--spacing-md) var(--spacing-lg); }
   .exo-fields.grid-muscu { grid-template-columns: repeat(2, 1fr); }
