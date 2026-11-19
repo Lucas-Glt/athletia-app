@@ -267,236 +267,71 @@
           </div>
 
           <div class="screen feuille" v-if="vueSeance === 'seance'">
-            <!-- Nouvelle feuille réservée au compte test le temps de la
-                 valider (cf. saisieUnifiee) ; les autres athlètes gardent
-                 le choix « Saisie détaillée / Vue simple ». -->
-            <template v-if="saisieUnifiee">
-              <!-- Une seule vue : une case par exercice, cochée = fait aux
-                   valeurs prévues par le prépa. Le crayon (ou le nom) ouvre le
-                   panneau de saisie du groupe : photos, N-1, valeurs réelles
-                   série par série. Case et panneau lisent et écrivent les mêmes
-                   séries (cf. etatExo / basculerExo). -->
-              <p class="seance-aide">
-                <i class="ti ti-info-circle"></i>
-                <span>Coche chaque exercice fait : les valeurs prévues sont enregistrées. Touche <i class="ti ti-pencil"></i> pour noter tes séries en détail.</span>
-              </p>
-              <div
-                v-for="groupe in grouperExercices(seanceActive.exercices)"
-                :key="groupe.key"
-                class="exo-bloc"
-                :class="{ 'is-superset': groupe.exercices.length > 1, 'is-complete': isGroupeComplete(groupe) }"
-              >
-                <div class="exo-bloc-exos">
-                  <span v-if="groupe.exercices.length > 1" class="type-groupe-badge">
-                    <i class="ti ti-link"></i> {{ labelTypeGroupe(typeGroupe(groupe)) }}
-                  </span>
-                  <div v-for="(exo, eidx) in groupe.exercices" :key="exo.id" class="exo-ligne">
-                    <!-- Alias de etatExo(exo). Clé stable (le nombre de séries) :
-                         la case n'est pas recréée à chaque tap, le focus reste. -->
-                    <template v-for="etat in [etatExo(exo)]" :key="etat.total">
-                      <button
-                        type="button"
-                        class="exo-case"
-                        :class="{ 'est-fait': etat.complet, 'est-partiel': !etat.complet && etat.faites > 0 }"
-                        role="checkbox"
-                        :aria-checked="etat.complet ? 'true' : etat.faites > 0 ? 'mixed' : 'false'"
-                        :aria-label="`${exo.nom} fait`"
-                        :disabled="etat.total === 0"
-                        @click="basculerExo(exo)"
-                      >
-                        <span class="exo-case-boite">
-                          <i v-if="etat.complet" class="ti ti-check"></i>
-                          <template v-else-if="etat.faites > 0">{{ etat.faites }}/{{ etat.total }}</template>
-                        </span>
-                      </button>
-                    </template>
-                    <button type="button" class="exo-infos" @click="ouvrirSaisie(groupe)">
-                      <span class="exo-ligne-nom">
-                        <span class="exo-letter-mini" v-if="groupe.exercices.length > 1">{{ letterFor(eidx) }}</span>
-                        {{ exo.nom }}
-                        <span v-if="exo.optionnel" class="optionnel-badge">optionnelle</span>
-                      </span>
-                      <span v-if="exo.series.length === 0" class="exo-ligne-prescrit is-vide">Aucune série définie</span>
-                      <span v-else-if="resumeExo(exo).uniforme" class="exo-ligne-prescrit">{{ resumeExo(exo).texte }}</span>
-                      <span v-else class="exo-ligne-prescrit">
-                        <span v-for="(s, i) in exo.series" :key="s.id">S{{ i + 1 }} {{ valeursSerie(exo, i) || '—' }}</span>
+            <!-- Une seule vue : une case par exercice, cochée = fait aux
+                 valeurs prévues par le prépa. Le crayon (ou le nom) ouvre le
+                 panneau de saisie du groupe : photos, N-1, valeurs réelles
+                 série par série. Case et panneau lisent et écrivent les mêmes
+                 séries (cf. etatExo / basculerExo). -->
+            <p class="seance-aide">
+              <i class="ti ti-info-circle"></i>
+              <span>Coche chaque exercice fait : les valeurs prévues sont enregistrées. Touche <i class="ti ti-pencil"></i> pour noter tes séries en détail.</span>
+            </p>
+            <div
+              v-for="groupe in grouperExercices(seanceActive.exercices)"
+              :key="groupe.key"
+              class="exo-bloc"
+              :class="{ 'is-superset': groupe.exercices.length > 1, 'is-complete': isGroupeComplete(groupe) }"
+            >
+              <div class="exo-bloc-exos">
+                <span v-if="groupe.exercices.length > 1" class="type-groupe-badge">
+                  <i class="ti ti-link"></i> {{ labelTypeGroupe(typeGroupe(groupe)) }}
+                </span>
+                <div v-for="(exo, eidx) in groupe.exercices" :key="exo.id" class="exo-ligne">
+                  <!-- Alias de etatExo(exo). Clé stable (le nombre de séries) :
+                       la case n'est pas recréée à chaque tap, le focus reste. -->
+                  <template v-for="etat in [etatExo(exo)]" :key="etat.total">
+                    <button
+                      type="button"
+                      class="exo-case"
+                      :class="{ 'est-fait': etat.complet, 'est-partiel': !etat.complet && etat.faites > 0 }"
+                      role="checkbox"
+                      :aria-checked="etat.complet ? 'true' : etat.faites > 0 ? 'mixed' : 'false'"
+                      :aria-label="`${exo.nom} fait`"
+                      :disabled="etat.total === 0"
+                      @click="basculerExo(exo)"
+                    >
+                      <span class="exo-case-boite">
+                        <i v-if="etat.complet" class="ti ti-check"></i>
+                        <template v-else-if="etat.faites > 0">{{ etat.faites }}/{{ etat.total }}</template>
                       </span>
                     </button>
-                  </div>
-                  <span v-if="reposSerie(groupe, 0)" class="exo-bloc-repos">
-                    <i class="ti ti-clock"></i> repos {{ reposSerie(groupe, 0) }}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  class="btn-detailler"
-                  :aria-label="`Saisir en détail : ${groupe.exercices.map(e => e.nom).join(', ')}`"
-                  @click="ouvrirSaisie(groupe)"
-                >
-                  <i class="ti ti-pencil"></i>
-                </button>
-              </div>
-            </template>
-            <template v-else>
-              <!-- Deux façons de remplir la séance, au choix de l'athlète -->
-              <div class="mode-saisie" role="group" aria-label="Façon de remplir la séance">
-                <button
-                  type="button"
-                  class="mode-saisie-option"
-                  :class="{ active: modeSeance === 'detaillee' }"
-                  :aria-pressed="modeSeance === 'detaillee'"
-                  @click="choisirModeSeance('detaillee')"
-                >
-                  <i class="ti ti-pencil"></i> Saisie détaillée
-                </button>
-                <button
-                  type="button"
-                  class="mode-saisie-option"
-                  :class="{ active: modeSeance === 'simple' }"
-                  :aria-pressed="modeSeance === 'simple'"
-                  @click="choisirModeSeance('simple')"
-                >
-                  <i class="ti ti-list-check"></i> Vue simple
-                </button>
-              </div>
-
-              <!-- VUE SIMPLE : le prescrit en un coup d'œil, l'athlète coche ce
-                   qu'il a fait sans rien saisir (cf. validerSeanceSimple). -->
-              <template v-if="modeSeance === 'simple'">
-                <p class="simple-intro">
-                  <i class="ti ti-info-circle"></i>
-                  Coche ce que tu as fait : les valeurs prévues par ton prépa sont enregistrées, sans rien saisir.
-                </p>
-                <div
-                  v-for="groupe in grouperExercices(seanceActive.exercices)"
-                  :key="'simple-' + groupe.key"
-                  class="simple-groupe"
-                  :class="{ 'is-superset': groupe.exercices.length > 1 }"
-                >
-                  <span v-if="groupe.exercices.length > 1" class="type-groupe-badge">
-                    <i class="ti ti-link"></i> {{ labelTypeGroupe(typeGroupe(groupe)) }}
-                  </span>
-                  <label
-                    v-for="exo in groupe.exercices"
-                    :key="exo.id"
-                    class="simple-exo"
-                    :class="{ 'est-coche': estExoCoche(exo) }"
-                  >
-                    <input type="checkbox" class="simple-case" :checked="estExoCoche(exo)" @change="basculerExoSimple(exo)" />
-                    <span class="simple-exo-info">
-                      <span class="simple-exo-nom">
-                        {{ exo.nom }}
-                        <span v-if="exo.optionnel" class="optionnel-badge">optionnelle</span>
-                      </span>
-                      <span v-if="resumeExo(exo).uniforme" class="simple-exo-prescrit">{{ resumeExo(exo).texte }}</span>
-                      <span v-else class="simple-exo-prescrit">
-                        <span v-for="(s, i) in exo.series" :key="s.id" class="simple-serie">S{{ i + 1 }} {{ valeursSerie(exo, i) || '—' }}</span>
-                      </span>
-                    </span>
-                  </label>
-                  <span v-if="reposSerie(groupe, 0)" class="simple-repos">
-                    <i class="ti ti-clock"></i> repos {{ reposSerie(groupe, 0) }}
-                  </span>
-                </div>
-              </template>
-
-              <template v-else>
-              <div
-                v-for="groupe in grouperExercices(seanceActive.exercices)"
-                :key="groupe.key"
-                class="exo-item"
-              >
-                <span class="exo-num">{{ groupe.ordre }}</span>
-                <div
-                  class="exo-group"
-                  :class="{ 'is-superset': groupe.exercices.length > 1, 'is-complete': isGroupeComplete(groupe) }"
-                  @click="ouvrirSaisie(groupe)"
-                >
-                  <div class="exo-group-head">
-                    <div class="exo-noms-list">
-                      <span
-                        v-for="(exo, eidx) in groupe.exercices"
-                        :key="exo.id"
-                        class="exo-nom-inline"
-                        :class="{ 'is-optionnel': exo.optionnel }"
-                      >
-                        <ExerciceImage :src="exo.image_url" :src2="exo.image_url_2" :nom="exo.nom" size="md" />
-                        <span class="exo-letter" v-if="groupe.exercices.length > 1">{{ letterFor(eidx) }}</span>
-                        {{ exo.nom }}
-                        <span v-if="exo.optionnel" class="optionnel-badge">optionnelle</span>
-                      </span>
-                    </div>
-                    <i v-if="isGroupeComplete(groupe)" class="ti ti-circle-check-filled groupe-check"></i>
-                  </div>
-
-                  <span v-if="groupe.exercices.length > 1" class="type-groupe-badge">
-                    <i class="ti ti-link"></i> {{ labelTypeGroupe(typeGroupe(groupe)) }}
-                  </span>
-
-                  <div v-if="nbSeriesGroupe(groupe) === 0" class="empty-series">
-                    Aucune série définie.
-                  </div>
-
-                  <!-- Résumé compact : tout le prescrit lisible, la saisie s'ouvre à la demande -->
-                  <template v-else>
-                    <!-- Complexe : déroulé série par série (A S1, B S1, puis
-                         A S2…) — on enchaîne tous les exercices avant de passer
-                         à la série suivante, l'affichage doit le montrer. -->
-                    <div v-if="estComplexe(groupe)" class="resume-series-list">
-                      <div
-                        v-for="serieIdx in nbSeriesGroupe(groupe)"
-                        :key="'c' + serieIdx"
-                        class="resume-ligne resume-ligne-complexe"
-                      >
-                        <span class="resume-s">S{{ serieIdx }}</span>
-                        <div class="resume-complexe-exos">
-                          <div v-for="(exo, eidx) in groupe.exercices" :key="exo.id" class="resume-complexe-exo">
-                            <span class="exo-letter-mini">{{ letterFor(eidx) }}</span>
-                            <span>{{ valeursSerie(exo, serieIdx - 1) || '—' }}</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <template v-else>
-                      <div class="resume-exo" v-for="(exo, eidx) in groupe.exercices" :key="'r' + exo.id">
-                        <span class="exo-letter-mini" v-if="groupe.exercices.length > 1">{{ letterFor(eidx) }}</span>
-                        <span v-if="resumeExo(exo).uniforme" class="resume-texte">{{ resumeExo(exo).texte }}</span>
-                        <div v-else class="resume-series-list">
-                          <div v-for="(s, i) in exo.series" :key="s.id" class="resume-ligne">
-                            <span class="resume-s">S{{ i + 1 }}</span>
-                            <span>{{ valeursSerie(exo, i) || '—' }}</span>
-                          </div>
-                        </div>
-                      </div>
-                    </template>
-
-                    <div class="exo-group-foot">
-                      <span class="serie-repos" v-if="reposSerie(groupe, 0)">
-                        <i class="ti ti-clock"></i> {{ reposSerie(groupe, 0) }}
-                      </span>
-                      <div class="series-dots">
-                        <span
-                          v-for="i in nbSeriesGroupe(groupe)"
-                          :key="i"
-                          class="serie-dot"
-                          :class="{ done: isGroupeDone(groupe, i - 1) }"
-                        ></span>
-                      </div>
-                      <button
-                        class="btn btn-sm btn-saisir"
-                        :class="{ 'btn-primary': !isGroupeComplete(groupe) }"
-                        @click="ouvrirSaisie(groupe)"
-                      >
-                        <i class="ti ti-pencil"></i>
-                        Saisir
-                      </button>
-                    </div>
                   </template>
+                  <button type="button" class="exo-infos" @click="ouvrirSaisie(groupe)">
+                    <span class="exo-ligne-nom">
+                      <span class="exo-letter-mini" v-if="groupe.exercices.length > 1">{{ letterFor(eidx) }}</span>
+                      {{ exo.nom }}
+                      <span v-if="exo.optionnel" class="optionnel-badge">optionnelle</span>
+                    </span>
+                    <span v-if="exo.series.length === 0" class="exo-ligne-prescrit is-vide">Aucune série définie</span>
+                    <span v-else-if="resumeExo(exo).uniforme" class="exo-ligne-prescrit">{{ resumeExo(exo).texte }}</span>
+                    <span v-else class="exo-ligne-prescrit">
+                      <span v-for="(s, i) in exo.series" :key="s.id">S{{ i + 1 }} {{ valeursSerie(exo, i) || '—' }}</span>
+                    </span>
+                  </button>
                 </div>
+                <span v-if="reposSerie(groupe, 0)" class="exo-bloc-repos">
+                  <i class="ti ti-clock"></i> repos {{ reposSerie(groupe, 0) }}
+                </span>
               </div>
-              </template>
-            </template>
+              <button
+                type="button"
+                class="btn-detailler"
+                :aria-label="`Saisir en détail : ${groupe.exercices.map(e => e.nom).join(', ')}`"
+                @click="ouvrirSaisie(groupe)"
+              >
+                <i class="ti ti-pencil"></i>
+              </button>
+            </div>
           </div>
 
           <!-- ONGLET HISTORIQUE : une tentative passée de CETTE séance à la
@@ -951,49 +786,21 @@
                de progression). Masquée sur l'historique et les courbes, qui ne
                sont que de la consultation. -->
           <div class="valider-bar" v-if="vueSeance === 'seance'">
-            <template v-if="saisieUnifiee">
-              <div class="valider-progress">
-                <div class="valider-progress-track">
-                  <div
-                    class="valider-progress-fill"
-                    :class="{ 'est-complete': progressionSeance.total && progressionSeance.done === progressionSeance.total }"
-                    :style="{ width: progressionSeance.total ? (progressionSeance.done / progressionSeance.total * 100) + '%' : '0%' }"
-                  ></div>
-                </div>
-                <span class="valider-progress-label">
-                  {{ progressionSeance.done }}/{{ progressionSeance.total }} exercice{{ progressionSeance.total > 1 ? 's' : '' }}
-                </span>
+            <div class="valider-progress">
+              <div class="valider-progress-track">
+                <div
+                  class="valider-progress-fill"
+                  :class="{ 'est-complete': progressionSeance.total && progressionSeance.done === progressionSeance.total }"
+                  :style="{ width: progressionSeance.total ? (progressionSeance.done / progressionSeance.total * 100) + '%' : '0%' }"
+                ></div>
               </div>
-              <button class="btn btn-primary btn-valider" @click="validerSeance">
-                <i class="ti ti-check"></i> Valider la séance
-              </button>
-            </template>
-            <template v-else>
-              <div class="valider-progress" v-if="modeSeance === 'simple'">
-                <span class="valider-simple-compte">
-                  {{ nbExosCoches }}/{{ seanceActive.exercices.length }} exercice{{ seanceActive.exercices.length > 1 ? 's' : '' }} coché{{ nbExosCoches > 1 ? 's' : '' }}
-                </span>
-                <span class="valider-progress-label">Valeurs prévues enregistrées</span>
-              </div>
-              <div class="valider-progress" v-else>
-                <div class="valider-progress-track">
-                  <div
-                    class="valider-progress-fill"
-                    :class="{ 'est-complete': progressionSeries.total && progressionSeries.done === progressionSeries.total }"
-                    :style="{ width: progressionSeries.total ? (progressionSeries.done / progressionSeries.total * 100) + '%' : '0%' }"
-                  ></div>
-                </div>
-                <span class="valider-progress-label">
-                  {{ progressionSeries.done }}/{{ progressionSeries.total }} séries
-                </span>
-              </div>
-              <button v-if="modeSeance === 'simple'" class="btn btn-primary btn-valider" @click="validerSeanceSimple">
-                <i class="ti ti-check"></i> J'ai fait ma séance
-              </button>
-              <button v-else class="btn btn-primary btn-valider" @click="validerSeance">
-                <i class="ti ti-check"></i> Valider la séance
-              </button>
-            </template>
+              <span class="valider-progress-label">
+                {{ progressionSeance.done }}/{{ progressionSeance.total }} exercice{{ progressionSeance.total > 1 ? 's' : '' }}
+              </span>
+            </div>
+            <button class="btn btn-primary btn-valider" @click="validerSeance">
+              <i class="ti ti-check"></i> Valider la séance
+            </button>
             <p class="valider-erreur" v-if="erreurValidation">
               <i class="ti ti-alert-triangle"></i> {{ erreurValidation }}
             </p>
@@ -1168,7 +975,7 @@ import PopupBanniere from '../components/athlete/PopupBanniere.vue'
 import PlanningCalendrier from '../components/athlete/PlanningCalendrier.vue'
 import PlanningHebdoModal from '../components/athlete/PlanningHebdoModal.vue'
 import ExerciceImage from '../components/ExerciceImage.vue'
-import { typeGroupe, labelTypeGroupe, estComplexe } from '../data/typesGroupe'
+import { typeGroupe, labelTypeGroupe } from '../data/typesGroupe'
 import { cleOccurrence, jourDeLaDate } from '../data/joursSemaine'
 import { parseValeurSerie, inputmodeSaisie } from '../utils/valeurSerie'
 import { formatJourRelatif } from '../data/activite'
@@ -1284,24 +1091,8 @@ const champsRealises = (type) => CHAMPS_REALISES[type] || CHAMPS_REALISES.muscul
 const CLE_BROUILLON = 'athletia:seance-en-cours'
 // Programme épinglé par l'athlète : celui qui s'ouvre au lancement.
 const CLE_EPINGLE = 'athletia:programme-epingle'
-// Façon de remplir une séance, au choix de l'athlète et retenue sur
-// l'appareil : 'detaillee' (série par série, valeurs réalisées) ou 'simple'
-// (vue condensée : il coche les exercices faits, les valeurs prescrites sont
-// enregistrées telles quelles). Détaillée par défaut : rien ne change pour
-// qui saisit déjà ses séries.
-const CLE_MODE_SEANCE = 'athletia:mode-seance'
-// Compte test qui voit la nouvelle feuille de séance (une case par
-// exercice, ✎ pour le détail) avant qu'elle remplace ce choix pour tous.
-const EMAIL_TEST_SAISIE_UNIFIEE = 'lucas.gilet@espacenum.fr'
 // Récap de la semaine déjà vu : lundi (ISO) de la semaine où il l'a été.
 const CLE_RECAP_VU = 'athletia:recap-vu'
-const lireModeSeance = () => {
-  try {
-    return localStorage.getItem(CLE_MODE_SEANCE) === 'simple' ? 'simple' : 'detaillee'
-  } catch {
-    return 'detaillee'
-  }
-}
 // Au-delà, une séance interrompue n'a plus de sens à reprendre : le brouillon
 // est ignoré puis effacé plutôt que de proposer une reprise vieille d'une semaine.
 const DUREE_BROUILLON_MS = 48 * 60 * 60 * 1000
@@ -2516,9 +2307,7 @@ export default {
           .some(i => exosDeLaSerie(groupe, i).some(exo => getLogs(exo.id, i).fait))
       )
       if (!uneSerieFaite) {
-        erreurValidation.value = saisieUnifiee.value || modeSeance.value === 'simple'
-          ? 'Coche au moins un exercice fait avant de valider la séance.'
-          : 'Aucune série validée : valide au moins une série avant de valider la séance.'
+        erreurValidation.value = 'Coche au moins un exercice fait avant de valider la séance.'
         return
       }
       let echecs = 0
@@ -2660,64 +2449,6 @@ export default {
         await ouvrirDepuisRegularite({ seanceId: derniere.seance_id, programmeId: derniere.programme_id, date: derniere.date })
       }
     }
-
-    // --- Vue simple de la séance ---
-    const modeSeance = ref(lireModeSeance())
-    const choisirModeSeance = (mode) => {
-      modeSeance.value = mode
-      try {
-        localStorage.setItem(CLE_MODE_SEANCE, mode)
-      } catch {
-        // préférence non retenue (navigation privée) : valable le temps de la page
-      }
-    }
-
-    // Exercices que l'athlète a décochés. Repart de zéro à chaque nouvelle
-    // séance ouverte : tout est coché, sauf les exercices optionnels — les
-    // compter faits d'office enregistrerait du travail jamais fait.
-    const exosDecoches = ref(new Set())
-    const exosDecochesSeanceId = ref(null)
-    watch(() => seanceActive.value?.id, (id) => {
-      if (!id || id === exosDecochesSeanceId.value) return
-      exosDecochesSeanceId.value = id
-      exosDecoches.value = new Set((seanceActive.value.exercices || []).filter(e => e.optionnel).map(e => e.id))
-    })
-    const estExoCoche = (exo) => !exosDecoches.value.has(exo.id)
-    const basculerExoSimple = (exo) => {
-      const decoches = new Set(exosDecoches.value)
-      if (decoches.has(exo.id)) decoches.delete(exo.id)
-      else decoches.add(exo.id)
-      exosDecoches.value = decoches
-    }
-    const nbExosCoches = computed(() => (seanceActive.value?.exercices || []).filter(estExoCoche).length)
-
-    // Même enregistrement qu'en saisie détaillée, sans rien taper : chaque
-    // série d'un exercice coché part « faite » avec les valeurs prescrites
-    // (comme une série cochée sans saisie, cf. toggleGroupeDone), celles d'un
-    // exercice décoché partent « non faites ». La séance compte donc comme
-    // validée, et le prépa voit dans l'historique ce qui a vraiment été fait.
-    const validerSeanceSimple = async () => {
-      grouperExercices(seanceActive.value.exercices).forEach(groupe => {
-        for (let i = 0; i < nbSeriesGroupe(groupe); i++) {
-          exosDeLaSerie(groupe, i).forEach(exo => {
-            const log = getLogs(exo.id, i)
-            const fait = estExoCoche(exo)
-            if (fait) {
-              if (!log.reps_realisees) log.reps_realisees = valeurParDefaut(exo, i, 'reps_realisees')
-              if (!log.poids_realise) log.poids_realise = valeurParDefaut(exo, i, 'poids_realise')
-            }
-            log.fait = fait
-          })
-        }
-      })
-      await validerSeance()
-      // Validée (la feuille s'est refermée) : la prochaine ouverture de cette
-      // séance repartira de tout coché.
-      if (!seanceActive.value) exosDecochesSeanceId.value = null
-    }
-
-    // Nouvelle feuille (ci-dessous) : compte test uniquement pour l'instant.
-    const saisieUnifiee = computed(() => (authStore.user?.email || '').toLowerCase() === EMAIL_TEST_SAISIE_UNIFIEE)
 
     // --- Case d'un exercice dans la feuille de séance ---
     // Pas d'état à elle : elle lit et écrit les séries de l'exercice, comme
@@ -2998,22 +2729,6 @@ export default {
       return { done: exos.filter(e => etatExo(e).complet).length, total: exos.length }
     })
 
-    // Progression de la séance en cours (présentation uniquement) :
-    // alimente la barre collante « x/y séries — Valider la séance »
-    const progressionSeries = computed(() => {
-      if (!seanceActive.value) return { done: 0, total: 0 }
-      let done = 0
-      let total = 0
-      grouperExercices(seanceActive.value.exercices).forEach(groupe => {
-        const nb = nbSeriesGroupe(groupe)
-        total += nb
-        for (let i = 0; i < nb; i++) {
-          if (isGroupeDone(groupe, i)) done++
-        }
-      })
-      return { done, total }
-    })
-
     return {
       programmes, programmeActif, seances, seanceActive, logs, historique,
       loadingSeances, onglet,
@@ -3025,9 +2740,7 @@ export default {
       estEnEdition,
       etatBoutonSerie, toggleSerie, historiqueGroupeExiste, supprimerSeanceHistorique,
       selectProgramme, demarrerSeance, validerSeance,
-      etatExo, basculerExo, saisieUnifiee,
-      modeSeance, choisirModeSeance, estExoCoche, basculerExoSimple, nbExosCoches, validerSeanceSimple,
-      progressionSeries, estComplexe,
+      etatExo, basculerExo,
       recapPropose, recapOuvert, ouvrirRecap, marquerRecapVu,
       banniereReaction, voirReaction, marquerReactionsVues,
       programmesAffiches, programmeEpingleId, estEpingle, basculerEpingleProgramme,
@@ -3589,209 +3302,6 @@ export default {
   border-radius: var(--radius-full);
   box-shadow: 0 0 0 3px var(--color-bg-app);
 }
-
-/* ===== Ancienne feuille de séance (détaillée / simple) : tous les comptes
-   sauf le compte test. À retirer quand la nouvelle est généralisée. ===== */
-/* --- Façon de remplir la séance : détaillée / simple --- */
-.mode-saisie {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 4px;
-  padding: 4px;
-  border-radius: var(--radius-lg);
-  background: var(--color-bg-tertiary);
-  flex-shrink: 0;
-}
-.mode-saisie-option {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-height: 40px;
-  border: none;
-  border-radius: var(--radius-md);
-  background: transparent;
-  font-family: inherit;
-  font-size: var(--font-size-sm);
-  font-weight: 600;
-  color: var(--color-text-secondary);
-  cursor: pointer;
-  transition: background var(--transition-fast), color var(--transition-fast), box-shadow var(--transition-fast);
-}
-.mode-saisie-option.active { background: var(--color-bg); color: var(--color-primary-dark); box-shadow: var(--shadow-sm); }
-
-/* --- Vue simple : le prescrit condensé, une case par exercice --- */
-.simple-intro {
-  margin: 0;
-  display: flex;
-  align-items: flex-start;
-  gap: var(--spacing-sm);
-  font-size: var(--font-size-sm);
-  color: var(--color-text-secondary);
-  line-height: 1.5;
-}
-.simple-intro .ti { flex-shrink: 0; font-size: var(--font-size-lg); color: var(--color-primary); }
-.simple-groupe { display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }
-.simple-groupe.is-superset {
-  padding: var(--spacing-sm);
-  border-radius: var(--radius-lg);
-  background: var(--color-superset-bg);
-  border: 1px solid var(--color-superset-border);
-}
-.simple-exo {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-md);
-  padding: var(--spacing-md) var(--spacing-lg);
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-card);
-  cursor: pointer;
-  transition: border-color var(--transition-fast), opacity var(--transition-fast), box-shadow var(--transition-fast);
-}
-.simple-exo.est-coche { border-color: var(--color-valid-border); }
-/* Décoché : l'exercice recule, il partira « non fait » */
-.simple-exo:not(.est-coche) { opacity: 0.6; box-shadow: none; }
-.simple-case { width: 24px; height: 24px; flex-shrink: 0; accent-color: var(--color-valid-text); cursor: pointer; }
-.simple-exo-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.simple-exo-nom {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-  font-size: var(--font-size-base);
-  font-weight: 600;
-  color: var(--color-text);
-}
-.simple-exo-prescrit {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2px 10px;
-  font-size: var(--font-size-sm);
-  font-weight: 500;
-  color: var(--color-primary-dark);
-}
-.simple-repos {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding-left: var(--spacing-xs);
-  font-size: var(--font-size-xs);
-  color: var(--color-text-muted);
-}
-.valider-simple-compte { font-size: var(--font-size-sm); font-weight: 700; color: var(--color-text); }
-
-.exo-group {
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  padding: var(--spacing-lg);
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-md);
-  flex-shrink: 0;
-  cursor: pointer;
-  box-shadow: var(--shadow-card);
-  transition: box-shadow var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
-}
-.exo-group:hover { box-shadow: var(--shadow-card-hover); }
-.exo-group:active { transform: scale(0.99); }
-.exo-group.is-superset { border-color: var(--color-superset-border); border-left: 4px solid var(--color-primary); }
-.exo-group.is-complete { border-color: var(--color-valid-border); background: var(--color-valid-bg-soft); }
-
-.exo-item { display: flex; align-items: center; gap: var(--spacing-sm); }
-.exo-item .exo-group { flex: 1; min-width: 0; }
-
-.exo-group-head { display: flex; align-items: flex-start; gap: var(--spacing-md); }
-.exo-group-head .exo-noms-list { flex: 1; }
-.groupe-check {
-  color: var(--color-valid-text);
-  font-size: 24px;
-  flex-shrink: 0;
-  animation: pop-in var(--transition-base);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .groupe-check { animation: none; }
-}
-
-.exo-noms-list { display: flex; flex-direction: column; gap: var(--spacing-sm); }
-.exo-nom-inline {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  font-size: var(--font-size-sm);
-  font-weight: 600;
-  color: var(--color-text);
-}
-.exo-nom-inline.is-optionnel { color: var(--color-text-secondary); }
-
-.exo-letter {
-  width: 26px;
-  height: 26px;
-  background: var(--color-primary-light);
-  color: var(--color-superset-text);
-  font-size: var(--font-size-sm);
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-.exo-letter { border-radius: var(--radius-sm); background: var(--color-primary); color: var(--color-on-primary); }
-
-.empty-series { font-size: var(--font-size-sm); color: var(--color-text-muted); font-style: italic; }
-
-/* --- Vue d'ensemble compacte --- */
-.resume-exo { display: flex; align-items: baseline; gap: var(--spacing-sm); }
-.resume-texte {
-  font-size: var(--font-size-xs);
-  font-weight: 500;
-  color: var(--color-text-body);
-  font-variant-numeric: tabular-nums;
-}
-.resume-series-list { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
-.resume-ligne {
-  display: flex;
-  gap: var(--spacing-sm);
-  font-size: var(--font-size-xs);
-  color: var(--color-text-body);
-  align-items: baseline;
-}
-.resume-s { font-size: var(--font-size-xs); font-weight: 700; color: var(--color-superset-text); min-width: 24px; }
-
-/* Complexe : une ligne par série, tous les exercices du groupe dedans */
-.resume-ligne-complexe { align-items: flex-start; }
-.resume-ligne-complexe + .resume-ligne-complexe { padding-top: 4px; border-top: 1px dashed var(--color-superset-border); }
-.resume-complexe-exos { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
-.resume-complexe-exo { display: flex; align-items: center; gap: var(--spacing-sm); }
-
-.exo-group-foot {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-md);
-  padding-top: var(--spacing-sm);
-  border-top: 1px solid var(--color-border);
-}
-.series-dots { display: flex; gap: 5px; flex: 1; flex-wrap: wrap; align-items: center; }
-.serie-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--color-bg-tertiary);
-  border: 1px solid var(--color-border-strong);
-  transition: background var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
-}
-.serie-dot.done { background: var(--color-valid-text); border-color: var(--color-valid-text); transform: scale(1.15); }
-.btn-saisir {
-  flex-shrink: 0;
-  min-height: 30px;
-  height: 30px;
-  padding: 0 var(--spacing-sm);
-  font-size: var(--font-size-xs);
-}
-/* ===== Fin de l'ancienne feuille ===== */
 
 /* --- Cartes série --- */
 .serie-card {
