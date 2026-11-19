@@ -3322,12 +3322,15 @@ export default {
 
 .realise-inputs { display: flex; gap: 6px; flex-shrink: 0; }
 .realise-inputs > .log-input-wrap, .realise-inputs > .log-input { flex: 0 0 64px; width: 64px; }
-/* 16 px : en dessous, l'iPhone zoome sur le champ au toucher */
+/* Graisse moyenne : en gras, les chiffres faisaient grossiers. 14 px sur
+   ordinateur ; sur écran tactile, base.css remonte tous les champs à 16 px
+   (en dessous, l'iPhone zoome sur le champ au toucher). */
 .log-input {
   height: 44px;
   padding: 0 4px;
-  font-size: var(--font-size-base);
-  font-weight: 700;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--color-text-body);
   width: 100%;
   min-width: 0;
   border: 1.5px solid var(--color-border-strong);
@@ -3340,7 +3343,7 @@ export default {
 
 /* Le prévu en grisé clair : il ne doit pas se confondre avec une valeur
    tapée (c'est pourtant lui qui part si on valide sans rien saisir). */
-.log-input::placeholder { color: var(--color-text-muted); font-weight: 500; opacity: 1; }
+.log-input::placeholder { color: var(--color-text-muted); font-weight: 400; opacity: 1; }
 
 /* Bouton rond : coche grise à valider, verte une fois faite */
 .btn-serie {
