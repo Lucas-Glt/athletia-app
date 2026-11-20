@@ -41,7 +41,7 @@
       <!-- ONGLET PROGRAMMES : les programmes existants, et l'Atelier pour en
            construire autrement (prototype). Les sous-onglets disparaissent
            pendant la création classique, pour ne pas en sortir par erreur. -->
-      <div v-if="onglet === 'programmes'" class="onglet-wrapper onglet-programmes">
+      <div v-if="onglet === 'programmes'" v-entree-onglet="sensOnglet" class="onglet-wrapper onglet-programmes">
         <nav v-if="vue === 'liste'" class="sous-onglets" aria-label="Programmes">
           <button
             type="button"
@@ -67,7 +67,7 @@
 
         <div v-else class="content-body" :class="{ 'detail-ouvert': mobileDetail }">
           <!-- Liste des programmes : colonne desktop, écran plein mobile -->
-          <div class="panel-list">
+          <div v-cascade v-defilement-fluide class="panel-list">
             <div class="panel-list-entete">
               <span class="section-title">Mes programmes</span>
               <span class="panel-list-compte" v-if="programmes.length > 0">{{ programmes.length }}</span>
@@ -98,7 +98,7 @@
           </div>
 
           <!-- Panel detail -->
-          <div class="panel-detail" v-if="programmeActif">
+          <div class="panel-detail" v-if="programmeActif" v-defilement-fluide>
             <button class="btn btn-sm btn-ghost retour-mobile" @click="mobileDetail = false">
               <i class="ti ti-arrow-left"></i> Programmes
             </button>
@@ -477,6 +477,7 @@
       <!-- ONGLET ATHLETES -->
       <AthletesPanel
         v-if="onglet === 'athletes'"
+        v-entree-onglet="sensOnglet"
         :monCercle="monCercle"
         :groupes="groupes"
         :programmes="programmes"
@@ -488,6 +489,7 @@
       <!-- ONGLET TESTS -->
       <TestsPanel
         v-if="onglet === 'tests'"
+        v-entree-onglet="sensOnglet"
         :monCercle="monCercle"
         :actif="onglet === 'tests'"
       />
@@ -560,6 +562,12 @@ export default {
     // un formulaire, un glissé pour sélectionner du texte ne doit pas changer
     // d'onglet.
     const ONGLETS_PREPA = ['athletes', 'programmes', 'tests']
+    // Sens d'arrivée du nouvel onglet (cf. v-entree-onglet), fixé avant le
+    // rendu pour que le panneau monté le lise déjà.
+    const sensOnglet = ref(0)
+    watch(onglet, (nouveau, ancien) => {
+      sensOnglet.value = Math.sign(ONGLETS_PREPA.indexOf(nouveau) - ONGLETS_PREPA.indexOf(ancien)) || 1
+    }, { flush: 'sync' })
     const tabSwipeState = { startX: 0, startY: 0, pointerId: null }
     const onTabSwipeStart = (e) => {
       if (e.pointerType === 'mouse' && e.button !== 0) return
@@ -982,6 +990,7 @@ export default {
       seanceEnEdition.value = null
     })
     return {
+      sensOnglet,
       programmes, programmeActif, seances, monCercle, groupes,
       loadingSeances, modalAssigner, vue, onglet, vueLabel,
       onTabSwipeStart, onTabSwipeEnd, onTabSwipeCancel,

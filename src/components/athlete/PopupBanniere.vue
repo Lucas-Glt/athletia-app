@@ -10,7 +10,8 @@
   >
     <div class="popup-carte">
       <div class="popup-contenu">
-        <i class="ti popup-icone" :class="icone"></i>
+        <span v-if="emoji" class="popup-icone popup-emoji" aria-hidden="true">{{ emoji }}</span>
+        <i v-else class="ti popup-icone" :class="icone"></i>
         <div>
           <div class="popup-titre">{{ titre }}</div>
           <div class="popup-sub" v-if="sousTitre">{{ sousTitre }}</div>
@@ -29,6 +30,8 @@ export default {
   emits: ['oui', 'non'],
   props: {
     icone: { type: String, default: 'ti-message-circle' },
+    // Emoji affiché à la place de l'icône (réaction du prépa)
+    emoji: { type: String, default: '' },
     titre: { type: String, required: true },
     sousTitre: { type: String, default: '' },
     texteOui: { type: String, default: 'Oui' },
@@ -44,6 +47,7 @@ export default {
 .popup-wrap { position: fixed; z-index: 150; }
 .popup-contenu { display: flex; align-items: center; gap: var(--spacing-md); }
 .popup-icone { font-size: 24px; color: var(--color-primary); flex-shrink: 0; }
+.popup-emoji { line-height: 1; }
 .popup-titre { font-size: var(--font-size-sm); font-weight: 600; color: var(--color-text); }
 .popup-sub { font-size: var(--font-size-xs); color: var(--color-text-secondary); margin-top: 2px; }
 .popup-actions { display: flex; gap: var(--spacing-sm); flex-shrink: 0; }

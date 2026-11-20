@@ -14,12 +14,12 @@
 
     <template v-else>
       <div class="gacwr-plot">
-        <svg class="gacwr-svg" viewBox="0 0 300 110" preserveAspectRatio="none">
+        <svg v-trace="ligne" class="gacwr-svg" viewBox="0 0 300 110" preserveAspectRatio="none">
           <rect x="0" :y="yPour(plafond)" width="300" :height="yPour(0.8) - yPour(plafond)" class="bande sous_charge" />
           <rect x="0" :y="yPour(1.3)" width="300" :height="yPour(0.8) - yPour(1.3)" class="bande optimale" />
           <rect x="0" :y="yPour(1.5)" width="300" :height="yPour(1.3) - yPour(1.5)" class="bande vigilance" />
           <rect x="0" y="0" width="300" :height="yPour(1.5)" class="bande surcharge" />
-          <polyline class="ligne-acwr" :points="ligne" />
+          <polyline class="ligne-acwr" :points="ligne" data-trace />
         </svg>
       </div>
       <div class="gacwr-axe-x">

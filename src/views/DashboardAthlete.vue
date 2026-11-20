@@ -54,6 +54,7 @@
     <PopupBanniere
       v-else-if="banniereReaction"
       icone="ti-message-heart"
+      :emoji="banniereReaction.emoji"
       :titre="banniereReaction.titre"
       :sous-titre="banniereReaction.sousTitre"
       texte-oui="Voir"
@@ -84,6 +85,13 @@
 
     <!-- XP gagnée, confettis, passage de niveau -->
     <CelebrationXp />
+    <!-- Réaction du prépa qui arrive : l'emoji surgit puis se pose dans la bannière -->
+    <ReactionArrivee
+      v-if="arriveeReaction"
+      :key="arriveeReaction.id"
+      :emojis="arriveeReaction.emojis"
+      @fini="arriveeReaction = null"
+    />
     <RecapSemaineModal v-if="recapOuvert" @fermer="recapOuvert = false" />
 
     <!-- Feuille "Suivi" : regroupe Poids / Diète / Blessures, trois usages
@@ -129,7 +137,7 @@
     >
       <!-- Réservé à l'onglet Séances : les autres (Accueil, Poids) restent
            utilisables sans programme assigné -->
-      <div class="empty-state" v-if="programmes.length === 0 && onglet === 'programme'">
+      <div class="empty-state" v-if="programmes.length === 0 && onglet === 'programme'" v-entree-onglet="sensOnglet">
         <i class="ti ti-calendar-off empty-icon"></i>
         <p>Aucun programme assigné pour le moment.</p>
         <span>Contactez votre préparateur physique.</span>
@@ -138,6 +146,7 @@
       <!-- ONGLET PROGRAMME -->
       <div
         v-if="onglet === 'programme' && programmes.length > 0"
+        v-entree-onglet="sensOnglet"
         class="content-body"
         @click.capture="swipeVueSeance.filtrerClic"
         @pointerdown="swipeVueSeance.start"
@@ -147,7 +156,7 @@
       >
         <!-- ÉCRAN 1 : liste des séances (une par créneau, semaine courante) -->
         <template v-if="!seanceActive">
-          <div class="screen">
+          <div class="screen" v-cascade="programmeActif?.id">
             <!-- Sélecteur de programme, seulement s'il y a un choix à faire :
                  tous les programmes visibles d'un coup, en colonnes de même
                  largeur (les noms sont longs et débordaient d'une seule ligne),
@@ -277,7 +286,7 @@
             </button>
           </div>
 
-          <div class="screen feuille" v-if="vueSeance === 'seance'">
+          <div class="screen feuille" v-if="vueSeance === 'seance'" v-cascade>
             <!-- Une seule vue : une case par exercice, cochée = fait aux
                  valeurs prévues par le prépa. Le crayon (ou le nom) ouvre le
                  panneau de saisie du groupe : photos, N-1, valeurs réelles
@@ -309,10 +318,12 @@
                       :aria-checked="etat.complet ? 'true' : etat.faites > 0 ? 'mixed' : 'false'"
                       :aria-label="`${exo.nom} fait`"
                       :disabled="etat.total === 0"
-                      @click="basculerExo(exo)"
+                      @click="basculerExo(exo, $event)"
                     >
                       <span class="exo-case-boite">
-                        <i v-if="etat.complet" class="ti ti-check"></i>
+                        <!-- Coche dessinée (et non icône de police) : elle se
+                             trace quand on vient de cocher (cf. feterSerie) -->
+                        <svg v-if="etat.complet" class="coche" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
                         <template v-else-if="etat.faites > 0">{{ etat.faites }}/{{ etat.total }}</template>
                       </span>
                     </button>
@@ -348,7 +359,7 @@
           <!-- ONGLET HISTORIQUE : une tentative passée de CETTE séance à la
                fois, choisie dans la roulette de dates, avec l'écart coloré de
                chaque série par rapport à la fois précédente. -->
-          <div class="screen" v-else-if="vueSeance === 'historique'">
+          <div class="screen" v-else-if="vueSeance === 'historique'" v-cascade="tentativeAffichee?.cle">
             <div v-if="!tentativeAffichee" class="empty">
               Cette séance n'a pas encore été enregistrée.
             </div>
@@ -731,9 +742,10 @@
                   :class="etatBoutonSerie(groupe, serieIdx).classe"
                   :aria-label="`Série ${serieIdx} : ${etatBoutonSerie(groupe, serieIdx).label}`"
                   :title="etatBoutonSerie(groupe, serieIdx).label"
-                  @click="toggleSerie(groupe, serieIdx)"
+                  @click="toggleSerie(groupe, serieIdx, $event)"
                 >
-                  <i :class="'ti ' + etatBoutonSerie(groupe, serieIdx).icone"></i>
+                  <svg v-if="etatBoutonSerie(groupe, serieIdx).icone === 'ti-check'" class="coche" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+                  <i v-else :class="'ti ' + etatBoutonSerie(groupe, serieIdx).icone"></i>
                 </button>
               </div>
               </template>
@@ -775,7 +787,7 @@
       </div>
 
       <!-- ONGLET PERFORMANCES -->
-      <div v-if="onglet === 'performances'" class="performances-page">
+      <div v-if="onglet === 'performances'" v-entree-onglet="sensOnglet" v-cascade class="performances-page">
         <ProgressionExercice :performances="performances" />
         <div class="section-title">Meilleures performances</div>
         <div v-if="performances.length === 0" class="empty">
@@ -799,7 +811,7 @@
           </div>
           <div class="performance-valeur" v-if="perf.meilleure_valeur !== null">
             <div class="performance-valeur-main">
-              <span class="performance-val">{{ perf.meilleure_valeur }}</span>
+              <span class="performance-val" v-compteur="perf.meilleure_valeur"></span>
               <span class="performance-unite">{{ perf.unite }}</span>
             </div>
             <div class="performance-valeur-sub">
@@ -812,7 +824,7 @@
       </div>
 
       <!-- ONGLET POIDS -->
-      <div v-if="onglet === 'poids'" class="poids-page">
+      <div v-if="onglet === 'poids'" v-entree-onglet="sensOnglet" class="poids-page">
         <div class="info-note">
           <i class="ti ti-info-circle"></i>
           Conseil : pesez-vous le matin, à jeun, pour un suivi fiable.
@@ -854,7 +866,7 @@
           <span class="poids-moyenne-label">Poids moyen :</span>
           <template v-if="moyennePoidsMois">
             <span class="poids-moyenne-val">
-              {{ moyennePoidsMois.valeur }}<span class="poids-moyenne-unite">kg</span>
+              <span v-compteur="moyennePoidsMois.valeur"></span><span class="poids-moyenne-unite">kg</span>
             </span>
             <span class="poids-moyenne-sub">
               {{ moyennePoidsMois.nb }} pesée{{ moyennePoidsMois.nb > 1 ? 's' : '' }} en {{ labelMois.toLowerCase() }}
@@ -902,14 +914,15 @@
       </div>
 
       <!-- ONGLET DIÈTE -->
-      <DietePanel v-if="onglet === 'diete'" />
+      <DietePanel v-if="onglet === 'diete'" v-entree-onglet="sensOnglet" />
 
       <!-- ONGLET BLESSURES -->
-      <BlessuresPanel v-if="onglet === 'blessures'" />
+      <BlessuresPanel v-if="onglet === 'blessures'" v-entree-onglet="sensOnglet" />
 
       <!-- ONGLET MES STATS -->
       <MesStats
         v-if="onglet === 'mes-stats'"
+        v-entree-onglet="sensOnglet"
         :focus-ressenti="focusRessenti"
         :focus-wellness="focusWellness"
         @focus-consomme="onFocusConsomme"
@@ -923,7 +936,7 @@
 </template>
 
 <script>
-import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { useApi } from '../services/api'
 // utilisé uniquement pour cloisonner le brouillon de saisie par athlète
 // (téléphone partagé, changement de compte)
@@ -938,6 +951,9 @@ import { useProgressionStore } from '../stores/progression'
 import BlessuresPanel from '../components/athlete/BlessuresPanel.vue'
 import DietePanel from '../components/athlete/DietePanel.vue'
 import PopupBanniere from '../components/athlete/PopupBanniere.vue'
+import ReactionArrivee from '../components/athlete/ReactionArrivee.vue'
+import { feterSerie, origineDe } from '../animations/mouvement'
+import { prechargerConfettis } from '../animations/confettis'
 import PlanningCalendrier from '../components/athlete/PlanningCalendrier.vue'
 import PlanningHebdoModal from '../components/athlete/PlanningHebdoModal.vue'
 import ExerciceImage from '../components/ExerciceImage.vue'
@@ -1066,7 +1082,7 @@ const DUREE_BROUILLON_MS = 48 * 60 * 60 * 1000
 export default {
   components: {
     AppLayout, CourbeProgression, MesStats, ProgressionExercice, CelebrationXp, RecapSemaineModal, BlessuresPanel, DietePanel, PopupBanniere,
-    PlanningCalendrier, PlanningHebdoModal, ExerciceImage
+    PlanningCalendrier, PlanningHebdoModal, ExerciceImage, ReactionArrivee
   },
   setup() {
     const programmes = ref([])
@@ -1833,9 +1849,14 @@ export default {
         : { classe: 'btn-todo', icone: 'ti-check', label: 'Valider la série' }
     }
 
-    const toggleSerie = (groupe, serieIdx) => {
+    const toggleSerie = (groupe, serieIdx, evt) => {
       if (saisieVue.value === 'historique') { toggleGroupeHistoriqueEdition(groupe, serieIdx); return }
+      const etaitFaite = isGroupeDone(groupe, serieIdx - 1)
+      // L'état « fait » change avant le premier await de toggleGroupeDone :
+      // il se relit juste après l'appel.
       toggleGroupeDone(groupe, serieIdx - 1)
+      const bouton = evt?.currentTarget
+      if (bouton && !etaitFaite && isGroupeDone(groupe, serieIdx - 1)) nextTick(() => feterSerie(bouton))
     }
 
     // Seule suppression possible dans l'historique : la séance entière (tous
@@ -2265,6 +2286,9 @@ export default {
       // (aucun remplissage automatique) : le bouton fige ce qui a été fait,
       // il ne complète pas ce qui ne l'a pas été.
       const groupes = grouperExercices(seanceActive.value.exercices)
+      // Les confettis partiront du bouton touché (pris maintenant : la feuille
+      // et sa barre de validation se referment avant la fête)
+      const origineFete = origineDe(document.querySelector('.btn-valider'))
       // Une séance sans aucune série faite n'est pas une séance faite : elle
       // était pourtant comptée (XP, régularité, semaine suivante débloquée),
       // au premier appui distrait sur le bouton.
@@ -2313,7 +2337,7 @@ export default {
       debutSaisie.value = null
       seanceActive.value = null
       // Séance faite : confettis et XP gagnée
-      progression.feter()
+      progression.feter(origineFete)
       progression.actualiser('Séance validée')
       // Le calendrier de la semaine type colore les séances faites à partir de
       // l'historique : sans ce rafraîchissement, celle qu'on vient de valider
@@ -2391,10 +2415,19 @@ export default {
       const derniere = liste[0]
       const ou = `${derniere.exercice} · ${derniere.seance}`
       if (liste.length === 1) {
-        return { titre: `Ton prépa a réagi ${derniere.reaction} à ta série`, sousTitre: `${ou}, ${formatJourRelatif(derniere.date)}` }
+        return { titre: `Ton prépa a réagi ${derniere.reaction} à ta série`, sousTitre: `${ou}, ${formatJourRelatif(derniere.date)}`, emoji: derniere.reaction }
       }
       const emojis = [...new Set(liste.map(r => r.reaction))].slice(0, 3).join(' ')
-      return { titre: `Ton prépa a réagi à ${liste.length} de tes séries ${emojis}`, sousTitre: `Dernière : ${ou}` }
+      return { titre: `Ton prépa a réagi à ${liste.length} de tes séries ${emojis}`, sousTitre: `Dernière : ${ou}`, emoji: derniere.reaction }
+    })
+    // L'emoji surgit quand la bannière apparaît vraiment : les bannières
+    // passent une à une (reprise de séance et ressenti d'abord).
+    const arriveeReaction = ref(null)
+    const reactionVisible = computed(() => !brouillonPropose.value && !popupRessenti.value && !!banniereReaction.value)
+    watch(reactionVisible, (visible) => {
+      if (!visible) return
+      const emojis = [...new Set(reactionsNouvelles.value.map(r => r.reaction))].slice(0, 3)
+      nextTick(() => { arriveeReaction.value = { id: Date.now(), emojis } })
     })
     // Seules les réactions montrées passent en vues (cf. POST /logs/reactions/vues)
     const marquerReactionsVues = async () => {
@@ -2435,12 +2468,15 @@ export default {
     // validée dans le panneau. Un second tap pendant l'envoi est ignoré
     // (cf. seriesEnEnvoi).
     const exosEnEnvoi = new Set()
-    const basculerExo = async (exo) => {
+    const basculerExo = async (exo, evt) => {
       if (exo.series.length === 0 || exosEnEnvoi.has(exo.id)) return
       exosEnEnvoi.add(exo.id)
+      const caseExo = evt?.currentTarget
       try {
         const fait = !etatExo(exo).complet
         exo.series.forEach((_, i) => marquerSerie(exo, i, fait))
+        // Exercice tout juste coché : la coche se trace, la case rebondit
+        if (fait && caseExo) nextTick(() => feterSerie(caseExo))
         await Promise.all(exo.series.map((_, i) => sauvegarderLog(exo, i)))
       } finally {
         exosEnEnvoi.delete(exo.id)
@@ -2652,7 +2688,12 @@ export default {
       if (v === 'performances') fetchPerformances()
       if (v === 'poids') chargerPoids()
     })
-    watch(seanceActive, (s) => { if (!s) fermerSaisie() })
+    watch(seanceActive, (s) => {
+      if (!s) fermerSaisie()
+      // Séance ouverte : la fête de fin de séance est probable, ses confettis
+      // se téléchargent pendant l'effort plutôt qu'au moment de valider.
+      else prechargerConfettis()
+    })
 
     // Swipe horizontal entre onglets (Accueil <-> Séances <-> Performances <->
     // Poids <-> Diète <-> Blessures), sur tout le contenu du dashboard. Le
@@ -2660,6 +2701,13 @@ export default {
     // leur propre swipe et stoppent la propagation, donc aucun ne marche sur
     // les pieds de l'autre.
     const ONGLETS = ['mes-stats', 'programme', 'performances', 'poids', 'diete', 'blessures']
+    // Sens d'arrivée du nouvel onglet (cf. v-entree-onglet) : depuis la droite
+    // quand on avance dans cet ordre, depuis la gauche sinon. Mis à jour avant
+    // le rendu (flush 'sync') pour que le panneau monté le lise déjà.
+    const sensOnglet = ref(0)
+    watch(onglet, (nouveau, ancien) => {
+      sensOnglet.value = Math.sign(ONGLETS.indexOf(nouveau) - ONGLETS.indexOf(ancien)) || 1
+    }, { flush: 'sync' })
     const swipeOnglets = creerSwipeHorizontal((sens) => {
       const cible = ONGLETS[ONGLETS.indexOf(onglet.value) + sens]
       if (cible) onglet.value = cible
@@ -2708,7 +2756,7 @@ export default {
       selectProgramme, demarrerSeance, validerSeance,
       etatExo, basculerExo,
       recapPropose, recapOuvert, ouvrirRecap, marquerRecapVu,
-      banniereReaction, voirReaction, marquerReactionsVues,
+      banniereReaction, voirReaction, marquerReactionsVues, arriveeReaction, sensOnglet,
       programmesAffiches, programmeEpingleId, estEpingle, basculerEpingleProgramme,
       isGroupeComplete,
       progressionSeance,
@@ -3172,15 +3220,16 @@ export default {
   color: var(--color-on-primary);
   font-size: 18px;
 }
-.exo-case.est-fait .ti-check { animation: pop-in var(--transition-base); }
-
-@keyframes pop-in {
-  0% { transform: scale(0.4); opacity: 0; }
-  60% { transform: scale(1.15); opacity: 1; }
-  100% { transform: scale(1); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .exo-case.est-fait .ti-check { animation: none; }
+/* Coche dessinée (case d'exercice, bouton de série) : taille de la police
+   du bouton qui la porte */
+.coche {
+  width: 1em;
+  height: 1em;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .exo-infos {
@@ -3285,6 +3334,17 @@ export default {
   transition: background var(--transition-base), border-color var(--transition-base);
 }
 .serie-card.done { background: var(--color-valid-bg-soft); border-color: var(--color-valid-border); }
+/* Série tout juste validée : une onde verte part de la carte (cf. feterSerie) */
+.serie-card.vient-detre-faite,
+.exo-bloc.vient-detre-faite { animation: serie-faite 0.75s ease-out; }
+@keyframes serie-faite {
+  0% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.55); }
+  100% { box-shadow: 0 0 0 14px rgba(74, 222, 128, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .serie-card.vient-detre-faite,
+  .exo-bloc.vient-detre-faite { animation: none; }
+}
 
 .serie-num { width: 40px; flex-shrink: 0; display: flex; flex-direction: column; gap: 2px; }
 .serie-label { font-size: var(--font-size-base); font-weight: 800; color: var(--color-superset-text); line-height: 1.1; }
@@ -3691,9 +3751,14 @@ export default {
   height: 100%;
   background: var(--gradient-primary-hover);
   border-radius: var(--radius-full);
-  transition: width var(--transition-base), background var(--transition-base);
+  /* Courbe qui dépasse légèrement puis revient : la barre « rebondit » à
+     chaque série validée */
+  transition: width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1), background var(--transition-base), box-shadow var(--transition-base);
 }
-.valider-progress-fill.est-complete { background: var(--color-valid-text); }
+.valider-progress-fill.est-complete { background: var(--color-valid-text); box-shadow: 0 0 10px rgba(74, 222, 128, 0.6); }
+@media (prefers-reduced-motion: reduce) {
+  .valider-progress-fill { transition: none; }
+}
 .valider-progress-label { font-size: var(--font-size-xs); font-weight: 600; color: var(--color-text-secondary); }
 .btn-valider { flex-shrink: 0; min-height: var(--input-h); }
 

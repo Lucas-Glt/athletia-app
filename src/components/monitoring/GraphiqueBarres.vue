@@ -2,11 +2,12 @@
   <div class="gbarres">
     <div class="gbarres-label" v-if="label">{{ label }}</div>
     <div v-if="barres.length === 0" class="gbarres-vide">Pas encore de données.</div>
-    <div class="gbarres-liste" v-else>
+    <!-- v-trace : les barres poussent depuis la gauche -->
+    <div class="gbarres-liste" v-else v-trace="barres.map(b => b.valeur).join()">
       <div class="gbarre-row" v-for="b in barres" :key="b.cle">
         <span class="gbarre-nom">{{ b.nom }}</span>
         <div class="gbarre-track">
-          <div class="gbarre-fill" :style="{ width: (max ? (b.valeur / max * 100) : 0) + '%' }"></div>
+          <div class="gbarre-fill" data-barre :style="{ width: (max ? (b.valeur / max * 100) : 0) + '%' }"></div>
         </div>
         <span class="gbarre-valeur">{{ b.valeur }}{{ unite }}</span>
       </div>
@@ -39,6 +40,6 @@ export default {
 .gbarre-row { display: flex; align-items: center; gap: var(--spacing-sm); }
 .gbarre-nom { width: 90px; flex-shrink: 0; font-size: var(--font-size-sm); font-weight: 500; }
 .gbarre-track { flex: 1; height: 10px; border-radius: var(--radius-full); background: var(--color-bg-tertiary); overflow: hidden; }
-.gbarre-fill { height: 100%; background: var(--color-primary); border-radius: var(--radius-full); transition: width 0.3s; }
+.gbarre-fill { height: 100%; background: var(--color-primary); border-radius: var(--radius-full); transition: width 0.3s; transform-origin: left center; }
 .gbarre-valeur { width: 40px; flex-shrink: 0; text-align: right; font-size: var(--font-size-sm); font-weight: 600; color: var(--color-text-secondary); }
 </style>

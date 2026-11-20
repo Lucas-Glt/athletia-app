@@ -1,5 +1,5 @@
 <template>
-  <div class="fiche-athlete" @pointerdown="onSwipeStart" @pointerup="onSwipeEnd" @pointercancel="onSwipeCancel">
+  <div v-defilement-fluide class="fiche-athlete" @pointerdown="onSwipeStart" @pointerup="onSwipeEnd" @pointercancel="onSwipeCancel">
     <div class="fiche-topbar">
       <button class="btn btn-sm btn-ghost retour-fiche" @click="$emit('fermer')">
         <i class="ti ti-arrow-left"></i> Athlètes
@@ -273,11 +273,11 @@
         <template v-else>
           <div class="histo-resume">
             <div class="histo-stat">
-              <span class="histo-stat-valeur">{{ resumeHistorique.nbSessions }}</span>
+              <span class="histo-stat-valeur" v-compteur="resumeHistorique.nbSessions"></span>
               <span class="histo-stat-label">séances réalisées</span>
             </div>
             <div class="histo-stat">
-              <span class="histo-stat-valeur" :class="classeTaux(resumeHistorique.taux)">{{ resumeHistorique.taux }}%</span>
+              <span class="histo-stat-valeur" :class="classeTaux(resumeHistorique.taux)"><span v-compteur="resumeHistorique.taux"></span>%</span>
               <span class="histo-stat-label">séries réalisées ({{ resumeHistorique.faites }}/{{ resumeHistorique.total }})</span>
             </div>
             <div class="histo-stat">
@@ -434,7 +434,7 @@
       <template v-else>
         <div class="histo-resume">
           <div class="histo-stat">
-            <span class="histo-stat-valeur">{{ resumePoids.dernier }} kg</span>
+            <span class="histo-stat-valeur"><span v-compteur="resumePoids.dernier"></span> kg</span>
             <span class="histo-stat-label">dernière pesée — {{ formatDateCourte(resumePoids.dateDernier) }}</span>
           </div>
           <div class="histo-stat">
@@ -442,7 +442,7 @@
             <span class="histo-stat-label">sur 30 jours</span>
           </div>
           <div class="histo-stat">
-            <span class="histo-stat-valeur">{{ resumePoids.nbMois }}</span>
+            <span class="histo-stat-valeur" v-compteur="resumePoids.nbMois"></span>
             <span class="histo-stat-label">pesées sur {{ labelMois.toLowerCase() }}</span>
           </div>
         </div>
@@ -500,11 +500,11 @@
       <template v-else>
         <div class="histo-resume">
           <div class="histo-stat">
-            <span class="histo-stat-valeur" :class="{ 'variation-hausse': blessuresEnCours.length > 0 }">{{ blessuresEnCours.length }}</span>
+            <span class="histo-stat-valeur" :class="{ 'variation-hausse': blessuresEnCours.length > 0 }" v-compteur="blessuresEnCours.length"></span>
             <span class="histo-stat-label">en cours</span>
           </div>
           <div class="histo-stat">
-            <span class="histo-stat-valeur">{{ blessuresGueries.length }}</span>
+            <span class="histo-stat-valeur" v-compteur="blessuresGueries.length"></span>
             <span class="histo-stat-label">guérie(s)</span>
           </div>
         </div>

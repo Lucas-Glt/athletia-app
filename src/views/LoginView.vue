@@ -1,8 +1,10 @@
 <template>
   <div class="login-container">
+    <!-- Nuit néon animée derrière les cartes (WebGL, en pause hors écran) -->
+    <FondNeon class="login-fond" />
     <div class="login-card">
       <div class="login-brand">
-        <img src="/logo.svg" alt="" class="login-logo" width="64" height="64">
+        <LogoAnime class="login-logo" :taille="64" :delai="delaiLogo" />
         <h1>Athletia</h1>
         <span>Plateforme de suivi sportif</span>
       </div>
@@ -132,6 +134,9 @@ import { lireCorps, messageErreur, requeteReseau, CLE_SESSION_EXPIREE } from '..
 import { MOT_DU_PREPA, SIGNATURE_MOT, NOTES_MAJ } from '../data/notesMaj'
 import InscriptionForm from '../components/InscriptionForm.vue'
 import PolitiqueConfidentialite from '../components/PolitiqueConfidentialite.vue'
+import FondNeon from '../components/FondNeon.vue'
+import LogoAnime from '../components/LogoAnime.vue'
+import { DUREE_SPLASH_MS } from '../animations/mouvement'
 
 const ROUTES_PAR_ROLE = {
   athlete: '/athlete',
@@ -142,7 +147,7 @@ const ROUTES_PAR_ROLE = {
 }
 
 export default {
-  components: { InscriptionForm, PolitiqueConfidentialite },
+  components: { InscriptionForm, PolitiqueConfidentialite, FondNeon, LogoAnime },
   setup() {
     const email = ref('')
     const password = ref('')
@@ -266,11 +271,16 @@ export default {
 
     const [derniereNote, ...notesPrecedentes] = NOTES_MAJ
     const politiqueOuverte = ref(false)
+    // À l'ouverture de l'appli, le logo de l'écran de chargement s'assemble
+    // d'abord : celui de la carte prend le relais quand il s'efface.
+    const delaiLogo = document.getElementById('splash')
+      ? Math.max(150, DUREE_SPLASH_MS + 150 - performance.now())
+      : 150
 
     return {
       email, password, error, loading, handleLogin, sessionExpiree, modeInscription, surInscription,
       politiqueOuverte, emailsActifs, modeOubli, emailOubli, messageOubli, ouvrirOubli, fermerOubli, demanderLien,
-      MOT_DU_PREPA, SIGNATURE_MOT, derniereNote, notesPrecedentes
+      MOT_DU_PREPA, SIGNATURE_MOT, derniereNote, notesPrecedentes, delaiLogo
     }
   }
 }
@@ -280,6 +290,8 @@ export default {
 /* Connexion et mot du prépa côte à côte sur grand écran ; sur mobile, la
    connexion d'abord, le mot du prépa en dessous. */
 .login-container {
+  position: relative;
+  isolation: isolate;
   min-height: 100vh;
   min-height: 100dvh;
   display: flex;
@@ -287,29 +299,27 @@ export default {
   align-items: center;
   justify-content: center;
   gap: var(--spacing-xl);
-  background: var(--color-bg-app);
+  background: #0C0A22;
   padding: var(--spacing-xl);
 }
+/* Fixé à l'écran : la page défile (mot du prépa sous la connexion sur
+   mobile), le fond reste derrière. */
+.login-fond { position: fixed; z-index: -1; }
+/* Cartes posées sur la nuit : ombre profonde et liseré lavande */
+.login-container { --shadow-sur-neon: 0 24px 60px -18px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(194, 188, 255, 0.14); }
 .login-card {
   background: var(--color-bg);
   border-radius: var(--radius-xl);
   padding: var(--spacing-3xl) var(--spacing-2xl);
   width: 100%;
   max-width: 400px;
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--shadow-sur-neon);
   display: flex;
   flex-direction: column;
   gap: var(--spacing-2xl);
 }
 .login-brand { text-align: center; }
-.login-logo {
-  display: block;
-  margin: 0 auto var(--spacing-md);
-  border-radius: 14px; /* = rx 22 % de la tuile */
-  filter: drop-shadow(0 6px 14px rgba(12, 10, 34, 0.28));
-}
-/* Tuile marine sur carte sombre : un liseré pour la détacher. */
-[data-theme='dark'] .login-logo { box-shadow: 0 0 0 1px rgba(194, 188, 255, 0.22); }
+.login-logo { margin: 0 auto var(--spacing-md); }
 .login-brand h1 {
   font-size: var(--font-size-2xl);
   font-weight: 700;
@@ -360,7 +370,7 @@ export default {
   padding: var(--spacing-2xl);
   background: var(--color-bg);
   border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--shadow-sur-neon);
 }
 .maj-entete { display: flex; align-items: center; gap: var(--spacing-md); }
 .maj-entete h2 { margin: 0; font-size: var(--font-size-lg); font-weight: 700; letter-spacing: -0.3px; }

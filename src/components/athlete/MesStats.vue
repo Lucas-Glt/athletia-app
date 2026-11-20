@@ -6,7 +6,7 @@
     <!-- Ordinateur : à gauche ce qu'il y a à faire aujourd'hui, à droite
          où on en est. Téléphone : les colonnes s'effacent (display:
          contents), l'accueil reste une seule pile. -->
-    <div class="colonne">
+    <div v-cascade class="colonne">
       <!-- Ressenti de séance à compléter -->
       <div class="stat-card" v-if="ressenti" ref="ressentiEl">
         <div class="stat-card-titre"><i class="ti ti-mood-smile"></i> Ressenti — {{ ressenti.seance_nom }}</div>
@@ -108,21 +108,21 @@
       </div>
     </div>
 
-    <div class="colonne">
+    <div v-cascade class="colonne">
       <!-- En bref : trois chiffres, aucune interprétation. Le détail vit dans
            les onglets dédiés (courbe de poids dans Suivi, progression dans Perfs). -->
       <div class="en-bref" v-if="stats">
         <div class="bref-tuile">
-          <span class="bref-valeur">{{ seancesSemaine }}</span>
+          <span class="bref-valeur" v-compteur="seancesSemaine"></span>
           <span class="bref-label">séance{{ seancesSemaine > 1 ? 's' : '' }} cette semaine</span>
         </div>
         <div class="bref-tuile">
-          <span class="bref-valeur">{{ stats.nb_seances_completees }}</span>
+          <span class="bref-valeur" v-compteur="stats.nb_seances_completees"></span>
           <span class="bref-label">au total</span>
         </div>
         <button v-if="dernierPoids" type="button" class="bref-tuile bref-cliquable" @click="$emit('voir-poids')">
           <span class="bref-valeur">
-            {{ dernierPoids }}<small> kg</small>
+            <span v-compteur="dernierPoids"></span><small> kg</small>
             <i v-if="tendancePoids" class="ti bref-tendance" :class="tendancePoids"></i>
           </span>
           <span class="bref-label">poids <i class="ti ti-chevron-right"></i></span>

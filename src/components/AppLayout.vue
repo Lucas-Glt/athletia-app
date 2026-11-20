@@ -86,7 +86,9 @@
     </div>
 
     <!-- Barre d'onglets mobile : la navigation sous le pouce, identique pour tous les rôles -->
-    <nav class="bottom-nav">
+    <nav ref="barreBas" class="bottom-nav">
+      <!-- Fond de l'onglet actif : il glisse d'un onglet à l'autre -->
+      <span ref="indicateur" class="nav-indicateur" aria-hidden="true"></span>
       <slot name="nav" />
     </nav>
 
@@ -142,6 +144,8 @@ import ConsentementModal from './ConsentementModal.vue'
 import BienvenueModal from './BienvenueModal.vue'
 import { promptInstallation as installPrompt } from '../services/installationPwa'
 import { erreurMotDePasse } from '../utils/motDePasse'
+import { animate, set, spring } from 'animejs'
+import { mouvementReduit } from '../animations/mouvement'
 
 // Proposition d'installation écartée : date jusqu'à laquelle ne plus la montrer.
 const CLE_INSTALLATION_IGNOREE = 'athletia:installation-ignoree'
@@ -231,6 +235,50 @@ export default {
     const bienvenueRequise = computed(() => !bienvenueFermee.value && authStore.user?.bienvenue_vue_le === null)
     onMounted(rafraichirUtilisateur)
 
+    // --- Indicateur de l'onglet actif (barre du bas, mobile) ---
+    // Les onglets viennent du slot #nav de chaque dashboard : on suit leur
+    // classe « active » plutôt que l'état de chaque dashboard.
+    const barreBas = ref(null)
+    const indicateur = ref(null)
+    let indicateurPlace = false
+    let observateurOnglets = null
+    let observateurTaille = null
+    const placerIndicateur = () => {
+      const barre = barreBas.value
+      const ind = indicateur.value
+      if (!barre || !ind) return
+      const actif = barre.querySelector('.nav-item.active')
+      // Barre masquée (grand écran) ou aucun onglet actif
+      if (!actif || !barre.offsetWidth) {
+        ind.style.opacity = '0'
+        indicateurPlace = false
+        return
+      }
+      ind.style.opacity = '1'
+      const cible = { translateX: actif.offsetLeft, width: actif.offsetWidth }
+      if (!indicateurPlace || mouvementReduit()) {
+        set(ind, cible)
+        indicateurPlace = true
+        return
+      }
+      animate(ind, { ...cible, ease: spring({ bounce: 0.28, duration: 420 }) })
+    }
+    onMounted(() => {
+      observateurOnglets = new MutationObserver(placerIndicateur)
+      observateurOnglets.observe(barreBas.value, { subtree: true, childList: true, attributes: true, attributeFilter: ['class'] })
+      observateurTaille = new ResizeObserver(() => {
+        // Changement de taille : pas de glissade, l'indicateur se recale
+        indicateurPlace = false
+        placerIndicateur()
+      })
+      observateurTaille.observe(barreBas.value)
+      placerIndicateur()
+    })
+    onUnmounted(() => {
+      observateurOnglets?.disconnect()
+      observateurTaille?.disconnect()
+    })
+
     const deconnexion = () => {
       authStore.logout()
       router.push('/')
@@ -316,7 +364,7 @@ export default {
     }
 
     return {
-      authStore, themeStore, roleLabel, initiales, urlApi,
+      authStore, themeStore, roleLabel, initiales, urlApi, barreBas, indicateur,
       profilOuvert, ouvrirProfil, rafraichirUtilisateur, accordRequis, bienvenueFermee, bienvenueRequise,
       menuOuvert, toggleMenu, avatarRef, deconnexion,
       modalePassword, ouvrirModalePassword, fermerModalePassword,
@@ -447,6 +495,8 @@ export default {
   padding-bottom: env(safe-area-inset-bottom);
 }
 
+.nav-indicateur { display: none; }
+
 .install-banner {
   flex-shrink: 0;
   background: var(--color-bg);
@@ -523,9 +573,35 @@ export default {
   @media (max-width: 400px) {
     .bottom-nav :deep(.nav-item) { font-size: 11px; letter-spacing: -0.2px; }
   }
+  /* Le fond de l'onglet actif est l'indicateur qui glisse (cf. placerIndicateur) */
+  .bottom-nav :deep(.nav-item) { position: relative; z-index: 1; }
   .bottom-nav :deep(.nav-item.active) {
-    background: var(--color-primary-light);
+    background: transparent;
     color: var(--color-primary-dark);
+  }
+  .nav-indicateur {
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 0;
+    height: var(--bottom-nav-h);
+    opacity: 0;
+    background: var(--color-primary-light);
+    pointer-events: none;
+    transition: opacity var(--transition-fast);
+  }
+  /* Trait néon en haut de l'onglet actif */
+  .nav-indicateur::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 24%;
+    right: 24%;
+    height: 3px;
+    border-radius: 0 0 3px 3px;
+    background: var(--gradient-neon);
+    box-shadow: var(--glow-neon);
   }
 
   /* Le contenu ne doit jamais passer sous la barre */

@@ -7,8 +7,66 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Athletia</title>
+    <script>
+      // Thème posé avant le premier affichage (même règle que stores/theme.js) :
+      // en mode sombre, la page ne flashe plus en blanc au chargement.
+      try {
+        var t = localStorage.getItem('theme')
+        if (t !== 'dark' && t !== 'light') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+        document.documentElement.setAttribute('data-theme', t)
+      } catch (e) {}
+    </script>
+    <style>
+      /* Écran de chargement : le logo s'assemble pendant que l'appli se
+         télécharge, puis s'efface (cf. main.js). En CSS pur, rien d'autre
+         n'est encore chargé à ce moment-là. */
+      #splash {
+        position: fixed; inset: 0; z-index: 1000;
+        display: flex; align-items: center; justify-content: center;
+        background: #F8F7FF;
+        transition: opacity 0.35s ease, visibility 0.35s;
+      }
+      [data-theme='dark'] #splash { background: #0C0A22; }
+      #splash.fini { opacity: 0; visibility: hidden; }
+      #splash svg { width: 88px; height: 88px; border-radius: 22%; animation: splash-neon 1.2s ease-out 0.8s both; }
+      #splash use { animation: splash-tranche 0.62s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+      #splash .t0 { --depuis: -70px; animation-delay: 0.1s; }
+      #splash .t1 { --depuis: 70px; animation-delay: 0.21s; }
+      #splash .t2 { --depuis: -70px; animation-delay: 0.32s; }
+      @keyframes splash-tranche {
+        from { transform: translateX(var(--depuis)); opacity: 0; }
+        to { transform: none; opacity: 1; }
+      }
+      @keyframes splash-neon {
+        0% { box-shadow: 0 0 0 0 rgba(79, 227, 214, 0); }
+        40% { box-shadow: 0 0 34px 6px rgba(79, 227, 214, 0.5); }
+        100% { box-shadow: 0 0 18px 0 rgba(79, 227, 214, 0.2); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #splash use, #splash svg { animation: none; }
+      }
+    </style>
   </head>
   <body>
+    <!-- Même dessin que public/logo.svg et components/LogoAnime.vue -->
+    <div id="splash" aria-hidden="true">
+      <svg viewBox="0 0 100 100">
+        <defs>
+          <linearGradient id="splash-fond" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1D1846"/><stop offset="1" stop-color="#0C0A22"/></linearGradient>
+          <linearGradient id="splash-encre" gradientUnits="userSpaceOnUse" x1="15" y1="5" x2="85" y2="95"><stop offset="0" stop-color="#C2BCFF"/><stop offset="1" stop-color="#4FE3D6"/></linearGradient>
+          <path id="splash-a" d="M39 10H61L88 90H68L63.5 76H36.5L32 90H12Z M50 34L58 60H42Z" fill-rule="evenodd" fill="url(#splash-encre)"/>
+          <clipPath id="splash-t0"><rect x="-40" y="-10" width="180" height="49"/></clipPath>
+          <clipPath id="splash-t1"><rect x="-40" y="42" width="180" height="23"/></clipPath>
+          <clipPath id="splash-t2"><rect x="-40" y="68" width="180" height="42"/></clipPath>
+        </defs>
+        <rect width="100" height="100" rx="22" fill="url(#splash-fond)"/>
+        <g transform="translate(50 50) scale(0.66) translate(-50 -50) translate(10.6 0) skewX(-12)">
+          <g clip-path="url(#splash-t0)"><use class="t0" href="#splash-a" x="9"/></g>
+          <g clip-path="url(#splash-t1)"><use class="t1" href="#splash-a" x="2"/></g>
+          <g clip-path="url(#splash-t2)"><use class="t2" href="#splash-a" x="-5"/></g>
+        </g>
+      </svg>
+    </div>
     <div id="app"></div>
     <script type="module" src="/src/main.js"></script>
   </body>

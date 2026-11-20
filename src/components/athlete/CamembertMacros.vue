@@ -143,7 +143,14 @@ export default {
   text-align: left;
 }
 
-.camembert-svg { width: 96px; height: 96px; flex-shrink: 0; overflow: visible; }
+.camembert-svg { width: 96px; height: 96px; flex-shrink: 0; overflow: visible; animation: camembert-entree 0.7s var(--ease-standard); }
+/* À l'affichage, le camembert arrive en tournant sur lui-même */
+@keyframes camembert-entree {
+  from { transform: rotate(-120deg) scale(0.6); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .camembert-svg { animation: none; }
+}
 
 /* Liseré de la couleur du fond : un vide de 2 px entre deux parts voisines. */
 .camembert-part {

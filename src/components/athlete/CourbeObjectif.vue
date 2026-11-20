@@ -15,18 +15,20 @@
           <span>{{ fr(bornes.max) }}</span>
           <span>{{ fr(bornes.min) }}</span>
         </div>
-        <svg class="courbe-obj-svg" :viewBox="`0 0 ${L} ${H}`" preserveAspectRatio="none">
+        <svg v-trace="traceReel" class="courbe-obj-svg" :viewBox="`0 0 ${L} ${H}`" preserveAspectRatio="none">
           <!-- Trajectoire visée : en pointillés, elle est une référence, pas
                une mesure. Tracée en premier pour passer sous les pesées. -->
           <polyline
             v-if="traceCible"
             class="courbe-obj-cible"
+            data-point
             :points="traceCible"
             vector-effect="non-scaling-stroke"
           />
           <polyline
             v-if="reel.length > 1"
             class="courbe-obj-reel"
+            data-trace
             :points="traceReel"
             vector-effect="non-scaling-stroke"
           />
@@ -34,6 +36,7 @@
             v-for="(p, i) in coordsReel"
             :key="i"
             class="courbe-obj-point"
+            data-point
             :cx="p.x"
             :cy="p.y"
             r="3.5"

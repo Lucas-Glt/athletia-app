@@ -15,12 +15,14 @@
           <span>{{ formatValeur(maxY) }}</span>
           <span>{{ formatValeur(minY) }}</span>
         </div>
-        <svg class="courbe-svg" viewBox="0 0 300 120" preserveAspectRatio="none">
-          <polyline class="courbe-ligne" :points="lignePoints" />
+        <!-- v-trace : la ligne se dessine, puis les points apparaissent -->
+        <svg v-trace="lignePoints" class="courbe-svg" viewBox="0 0 300 120" preserveAspectRatio="none">
+          <polyline class="courbe-ligne" :points="lignePoints" data-trace />
           <circle
             v-for="(p, i) in coords"
             :key="i"
             class="courbe-point"
+            data-point
             :class="couleurPoint(i)"
             :cx="p.x"
             :cy="p.y"

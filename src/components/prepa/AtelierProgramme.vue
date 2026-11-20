@@ -2,7 +2,7 @@
   <!-- Le swipe d'onglets du dashboard est coupé ici : c'est un formulaire, et
        glisser le doigt pour sélectionner du texte dans un champ ne doit pas
        faire changer d'onglet. -->
-  <div class="atelier" @pointerdown.stop @pointerup.stop @pointercancel.stop>
+  <div v-defilement-fluide class="atelier" @pointerdown.stop @pointerup.stop @pointercancel.stop>
     <div class="atelier-entete">
       <div>
         <h2 class="atelier-titre">Atelier de programme <span class="badge-beta">bêta</span></h2>

@@ -1,5 +1,5 @@
 <template>
-  <div class="tests-panel">
+  <div v-defilement-fluide class="tests-panel">
     <div v-if="erreurTests" class="error" role="alert">{{ erreurTests }}</div>
     <!-- LISTE DES TESTS (une page par test créé) -->
     <template v-if="!testSelectionne">

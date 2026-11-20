@@ -16,9 +16,9 @@
           <span>{{ Math.round(maxY) }}</span>
           <span>{{ Math.round(minY) }}</span>
         </div>
-        <svg class="gdouble-svg" viewBox="0 0 300 120" preserveAspectRatio="none">
-          <polyline class="ligne chronique" :points="ligneChronique" />
-          <polyline class="ligne aigue" :points="ligneAigue" />
+        <svg v-trace="ligneAigue" class="gdouble-svg" viewBox="0 0 300 120" preserveAspectRatio="none">
+          <polyline class="ligne chronique" :points="ligneChronique" data-trace />
+          <polyline class="ligne aigue" :points="ligneAigue" data-trace />
         </svg>
       </div>
       <div class="gdouble-axe-x">

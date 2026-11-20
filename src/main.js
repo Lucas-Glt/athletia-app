@@ -5,6 +5,8 @@ import { useRegisterSW } from 'virtual:pwa-register/vue'
 import App from './App.vue'
 import router from './router'
 import { useThemeStore } from './stores/theme'
+import { installerDirectives } from './animations/directives'
+import { mouvementReduit, DUREE_SPLASH_MS } from './animations/mouvement'
 import './services/installationPwa'
 
 import '@tabler/icons-webfont/dist/tabler-icons.min.css'
@@ -35,7 +37,24 @@ const app = createApp(App)
 
 app.use(createPinia())
 app.use(router)
+installerDirectives(app)
 
 useThemeStore().appliquer()
 
 app.mount('#app')
+
+// Écran de chargement (index.html) : il s'efface une fois la première page
+// prête (les tableaux de bord sont chargés à part, la page resterait blanche
+// entre-temps), en laissant au logo le temps de s'assembler (0,8 s depuis
+// l'ouverture de la page).
+const splash = document.getElementById('splash')
+if (splash) {
+  const effacer = () => {
+    const reste = mouvementReduit() ? 0 : Math.max(0, DUREE_SPLASH_MS - performance.now())
+    setTimeout(() => {
+      splash.classList.add('fini')
+      setTimeout(() => splash.remove(), 400)
+    }, reste)
+  }
+  router.isReady().then(effacer, effacer)
+}

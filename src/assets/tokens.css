@@ -157,6 +157,13 @@ input, select, textarea, button {
   --gradient-primary: linear-gradient(135deg, #8C84E3, #5A51BE);
   --gradient-primary-hover: linear-gradient(135deg, #7F77DD, #534AB7);
 
+  /* --- Néon : l'encre du logo (lavande → cyan), réservée aux moments de
+         progression (jauge d'XP, niveau, indicateur d'onglet). En clair, un
+         cyan plus soutenu pour rester lisible sur fond blanc. --- */
+  --color-accent: #0B8A82;
+  --gradient-neon: linear-gradient(90deg, #7F77DD, #2BB8AE);
+  --glow-neon: 0 0 12px rgba(43, 184, 174, 0.35);
+
   /* --- Mouvement ---
      Une seule courbe, deux durées : évite les transitions "molles" ou
      "sèches" qui ne se ressemblent pas d'un composant à l'autre. */
@@ -183,10 +190,15 @@ input, select, textarea, button {
    MODE SOMBRE
    =========================== */
 
+/* « Nuit néon » : les fonds reprennent le bleu nuit de la tuile du logo
+   (#1D1846 → #0C0A22) au lieu d'un gris neutre, l'accent son cyan. Contrastes
+   vérifiés : texte secondaire 7,3:1 et texte discret 4,2:1 sur les cartes. */
 [data-theme='dark'] {
+  color-scheme: dark;
+
   --color-primary: #9D97E8;
   --color-primary-dark: #7F77DD;
-  --color-primary-light: #2D2B4A;
+  --color-primary-light: #2A2460;
   --color-primary-lighter: #3C3489;
   --color-primary-text: #C4C0F5;
   --color-on-primary: #17153A;
@@ -195,20 +207,30 @@ input, select, textarea, button {
   --gradient-primary-hover: linear-gradient(135deg, #ABA5EC, #8C84E3);
   --shadow-focus: 0 0 0 3px rgba(157, 151, 232, 0.3);
 
-  --color-bg: #111827;
-  --color-bg-app: #0b0f1a;
-  --color-bg-secondary: #1f2937;
-  --color-bg-tertiary: #374151;
+  --color-accent: #4FE3D6;
+  --gradient-neon: linear-gradient(90deg, #C2BCFF, #4FE3D6);
+  --glow-neon: 0 0 14px rgba(79, 227, 214, 0.45);
 
-  --color-border: #374151;
-  --color-border-strong: #4b5563;
+  --color-bg: #17143A;
+  --color-bg-app: #0C0A22;
+  --color-bg-secondary: #211C4A;
+  --color-bg-tertiary: #2C2660;
 
-  --color-bg-hover: #1f2937;
+  --color-border: #2C2660;
+  --color-border-strong: #433B80;
 
-  --color-text: #f9fafb;
-  --color-text-body: #e5e7eb;
-  --color-text-secondary: #9ca3af;
-  --color-text-muted: #6b7280;
+  --color-bg-hover: #211C4A;
+
+  --color-text: #F6F5FF;
+  --color-text-body: #E3E1F7;
+  --color-text-secondary: #A8A3CF;
+  --color-text-muted: #7C77A8;
+
+  /* Ombres : du noir profond, la teinte violette se perdait sur la nuit */
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 20px -6px rgba(0, 0, 0, 0.45);
+  --shadow-card-hover: 0 2px 4px rgba(0, 0, 0, 0.3), 0 12px 28px -6px rgba(0, 0, 0, 0.55);
+  --shadow-dropdown: 0 12px 28px -4px rgba(0, 0, 0, 0.55);
+  --shadow-modal: 0 24px 64px -12px rgba(0, 0, 0, 0.7);
 
   --color-success-bg: #14532d;
   --color-success-text: #86efac;
@@ -235,10 +257,10 @@ input, select, textarea, button {
   --color-valid-border-strong: #22c55e;
 
   --color-superset-border: #534AB7;
-  --color-superset-bg: #2D2B4A;
+  --color-superset-bg: #2A2460;
   --color-superset-text: #C4C0F5;
 
-  --color-avatar-prepa-bg: #2D2B4A;
+  --color-avatar-prepa-bg: #2A2460;
   --color-avatar-prepa-text: #C4C0F5;
   --color-avatar-athlete-bg: #14532d;
   --color-avatar-athlete-text: #86efac;

@@ -1,5 +1,5 @@
 <template>
-  <div class="athletes-panel" :class="{ 'avec-fiche': athleteSelectionne }">
+  <div v-defilement-fluide class="athletes-panel" :class="{ 'avec-fiche': athleteSelectionne }">
     <!-- VUE LISTE -->
     <template v-if="!athleteSelectionne">
       <div class="panel-header">
@@ -64,7 +64,7 @@
             @click="filtrerPar(cle)"
           >
             <span class="kpi-label"><span class="ton-dot"></span>{{ INDICATEURS[cle].label }}</span>
-            <span class="kpi-valeur">{{ compteurs[cle] }}</span>
+            <span class="kpi-valeur" v-compteur="compteurs[cle]"></span>
             <span class="kpi-aide">{{ INDICATEURS[cle].aide }}</span>
           </button>
         </div>
@@ -156,7 +156,7 @@
           <span class="tri-info"><i class="ti ti-sort-descending"></i> Les plus actifs en premier</span>
         </div>
 
-        <div class="athlete-liste">
+        <div v-cascade class="athlete-liste">
           <button
             v-for="a in athletesFiltres"
             :key="a.id"

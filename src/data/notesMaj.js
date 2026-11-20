@@ -16,6 +16,15 @@ export const SIGNATURE_MOT = 'À vos barres…'
 
 export const NOTES_MAJ = [
   {
+    date: '20 novembre 2026',
+    titre: 'Athletia passe en mode néon',
+    points: [
+      'Nouveau look « Nuit néon » : le mode sombre prend les couleurs du logo, et ton niveau s\'affiche en haut de l\'accueil, jauge en direct.',
+      'Chaque passage de niveau se fête, et tes titres deviennent des cartes à collectionner : fais-les pivoter du doigt dans « Mes titres ».',
+      'Le lundi, ton récap de la semaine se regarde comme une story. Et quand ton prépa réagit à une série, tu le vois arriver.'
+    ]
+  },
+  {
     date: '19 novembre 2026',
     titre: 'Une seule vue pour ta séance',
     points: [
