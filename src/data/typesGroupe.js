@@ -23,3 +23,23 @@ export const labelTypeGroupe = (valeur) =>
 // Un groupe d'un seul exercice n'est pas un enchaînement : son type est ignoré.
 export const estComplexe = (groupe) =>
   groupe?.exercices?.length > 1 && typeGroupe(groupe) === 'complexe'
+
+// Exercices rangés dans l'ordre de la séance et rassemblés par groupe
+// (superset, biset…) : [{ key, exercices: [...] }], un exercice seul faisant
+// un groupe d'un.
+export const grouperExercices = (exercices) => {
+  const groupes = []
+  const parNumero = {}
+  ;[...(exercices || [])].sort((a, b) => a.ordre - b.ordre).forEach((exo) => {
+    if (!exo.groupe) {
+      groupes.push({ key: `e${exo.id}`, exercices: [exo] })
+      return
+    }
+    if (!parNumero[exo.groupe]) {
+      parNumero[exo.groupe] = { key: `g${exo.groupe}`, exercices: [] }
+      groupes.push(parNumero[exo.groupe])
+    }
+    parNumero[exo.groupe].exercices.push(exo)
+  })
+  return groupes
+}

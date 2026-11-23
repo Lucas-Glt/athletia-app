@@ -14,7 +14,7 @@ export const SEUIL_INACTIF_JOURS = 7
 // 'YYYY-MM-DD' ou date-heure ISO -> minuit local du même jour calendaire.
 // new Date('2026-11-08') serait minuit UTC, donc la veille au soir dans un
 // fuseau en retard sur UTC : on ne garde que la partie date.
-const jourLocal = (valeur) => {
+export const jourLocal = (valeur) => {
   const [annee, mois, jour] = String(valeur).slice(0, 10).split('-').map(Number)
   return new Date(annee, mois - 1, jour)
 }

@@ -1,14 +1,22 @@
 <template>
   <AppLayout :title="vueLabel">
     <template #nav>
-      <div class="nav-item" :class="{ active: onglet === 'athletes' }" @click="onglet = 'athletes'">
-        <i class="ti ti-users"></i> Athlètes
-      </div>
-      <div class="nav-item" :class="{ active: onglet === 'programmes' }" @click="onglet = 'programmes'">
-        <i class="ti ti-layout-grid"></i> Programmes
-      </div>
-      <div class="nav-item" :class="{ active: onglet === 'tests' }" @click="onglet = 'tests'">
-        <i class="ti ti-clipboard-list"></i> Tests
+      <div
+        v-for="o in ONGLETS"
+        :key="o.cle"
+        class="nav-item"
+        :class="{ active: onglet === o.cle }"
+        @click="allerOnglet(o.cle)"
+      >
+        <span class="nav-icone">
+          <i class="ti" :class="o.icone"></i>
+          <span
+            v-if="o.cle === 'seances' && nouvellesSeances > 0 && onglet !== 'seances'"
+            class="nav-pastille"
+            :aria-label="`${nouvellesSeances} nouvelle${nouvellesSeances > 1 ? 's' : ''} séance${nouvellesSeances > 1 ? 's' : ''}`"
+          >{{ nouvellesSeances > 9 ? '9+' : nouvellesSeances }}</span>
+        </span>
+        {{ o.label }}
       </div>
     </template>
 
@@ -41,7 +49,13 @@
       <!-- ONGLET PROGRAMMES : les programmes existants, et l'Atelier pour en
            construire autrement (prototype). Les sous-onglets disparaissent
            pendant la création classique, pour ne pas en sortir par erreur. -->
-      <div v-if="onglet === 'programmes'" v-entree-onglet="sensOnglet" class="onglet-wrapper onglet-programmes">
+      <div
+        v-if="visites.programmes"
+        :ref="(el) => (panneaux.programmes = el)"
+        class="panneau onglet-wrapper onglet-programmes"
+        :class="{ 'panneau-actif': onglet === 'programmes' }"
+        :inert="onglet !== 'programmes' || null"
+      >
         <nav v-if="vue === 'liste'" class="sous-onglets" aria-label="Programmes">
           <button
             type="button"
@@ -79,7 +93,7 @@
               type="button"
               class="prog-card"
               :class="{ active: programmeActif?.id === p.id }"
-              @click="selectProgramme(p); mobileDetail = true"
+              @click="ouvrirProgramme(p)"
             >
               <span class="prog-card-haut">
                 <span class="prog-name">{{ p.nom }}</span>
@@ -99,7 +113,7 @@
 
           <!-- Panel detail -->
           <div class="panel-detail" v-if="programmeActif" v-defilement-fluide>
-            <button class="btn btn-sm btn-ghost retour-mobile" @click="mobileDetail = false">
+            <button class="btn btn-sm btn-ghost retour-mobile" @click="fermerProgramme">
               <i class="ti ti-arrow-left"></i> Programmes
             </button>
 
@@ -474,24 +488,52 @@
       </div>
       <!-- fin onglet-wrapper programmes -->
 
-      <!-- ONGLET ATHLETES -->
+      <!-- ONGLET ATHLETES : liste, et fiche d'un athlète par-dessus -->
       <AthletesPanel
-        v-if="onglet === 'athletes'"
-        v-entree-onglet="sensOnglet"
+        :ref="(c) => (panneaux.athletes = c?.$el)"
+        class="panneau"
+        :class="{ 'panneau-actif': onglet === 'athletes' }"
+        :inert="onglet !== 'athletes' || null"
         :monCercle="monCercle"
         :groupes="groupes"
         :programmes="programmes"
-        :actif="onglet === 'athletes'"
+        :resumes="resumes"
+        :chargement="chargementResumes"
+        :athleteId="athleteOuvertId"
+        :ficheOnglet="ficheOnglet"
+        @ouvrir-athlete="ouvrirAthlete"
+        @fermer-athlete="fermerAthlete"
+        @changer-onglet-fiche="changerOngletFiche"
         @modifie="onModifie"
         @ouvrir-programme="ouvrirProgrammeDepuisFiche"
       />
 
+      <!-- ONGLET SÉANCES : le flux des séances validées par le cercle -->
+      <SeancesPanel
+        ref="seancesPanel"
+        class="panneau"
+        :class="{ 'panneau-actif': onglet === 'seances' }"
+        :inert="onglet !== 'seances' || null"
+        :monCercle="monCercle"
+        :groupes="groupes"
+        :resumesParId="resumesParId"
+        :actif="onglet === 'seances'"
+        @ouvrir-athlete="(id) => ouvrirAthlete(id, 'seances')"
+        @nouvelles="(n) => (nouvellesSeances = n)"
+      />
+
       <!-- ONGLET TESTS -->
       <TestsPanel
-        v-if="onglet === 'tests'"
-        v-entree-onglet="sensOnglet"
+        v-if="visites.tests"
+        :ref="(c) => (panneaux.tests = c?.$el)"
+        class="panneau"
+        :class="{ 'panneau-actif': onglet === 'tests' }"
+        :inert="onglet !== 'tests' || null"
         :monCercle="monCercle"
         :actif="onglet === 'tests'"
+        :testId="testOuvertId"
+        @ouvrir-test="ouvrirTest"
+        @fermer-test="fermerTest"
       />
 
     </div>
@@ -499,14 +541,17 @@
 </template>
 
 <script>
-import { ref, computed, onMounted, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, reactive, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useApi } from '../services/api'
+import { afficherToast } from '../composables/useToast'
+import { animerEntreeOnglet } from '../animations/directives'
 import AppLayout from '../components/AppLayout.vue'
 import ProgrammeForm from '../components/prepa/ProgrammeForm.vue'
 import AssignerAthleteModal from '../components/prepa/AssignerAthleteModal.vue'
 import AthletesPanel from '../components/prepa/AthletesPanel.vue'
+import SeancesPanel from '../components/prepa/SeancesPanel.vue'
 import TestsPanel from '../components/prepa/TestsPanel.vue'
 import AtelierProgramme from '../components/prepa/AtelierProgramme.vue'
 import ExerciceAutocomplete from '../components/prepa/ExerciceAutocomplete.vue'
@@ -519,8 +564,22 @@ import { useActionUnique } from '../utils/actionUnique'
 // un doigt qui ripe sur un simple appui ne doit jamais changer d'onglet.
 const SEUIL_SWIPE = 80
 
+// Ordre = ordre du swipe et de la barre d'onglets.
+const ONGLETS = [
+  { cle: 'athletes', label: 'Athlètes', icone: 'ti-users' },
+  { cle: 'seances', label: 'Séances', icone: 'ti-activity' },
+  { cle: 'programmes', label: 'Programmes', icone: 'ti-layout-grid' },
+  { cle: 'tests', label: 'Tests', icone: 'ti-clipboard-list' }
+]
+const ONGLETS_PREPA = ONGLETS.map(o => o.cle)
+
+// Résumés du cercle relus au retour sur l'appli s'ils ont plus de 2 minutes.
+const FRAICHEUR_RESUMES_MS = 2 * 60 * 1000
+
+const estMobile = () => window.matchMedia('(max-width: 768px)').matches
+
 export default {
-  components: { AppLayout, ProgrammeForm, AssignerAthleteModal, AthletesPanel, TestsPanel, AtelierProgramme, ExerciceAutocomplete, ExerciceImage },
+  components: { AppLayout, ProgrammeForm, AssignerAthleteModal, AthletesPanel, SeancesPanel, TestsPanel, AtelierProgramme, ExerciceAutocomplete, ExerciceImage },
   setup() {
     const programmes = ref([])
     const programmeActif = ref(null)
@@ -530,7 +589,6 @@ export default {
     const loadingSeances = ref(false)
     const modalAssigner = ref(false)
     const vue = ref('liste')
-    const onglet = ref('athletes')
     const editMode = ref(false)
     const editNom = ref('')
     const editDesc = ref('')
@@ -540,7 +598,7 @@ export default {
     const groupeForms = ref({})
     const seancesOuvertes = ref({})
     const groupesSeriesOuverts = ref({})
-    const mobileDetail = ref(false)
+    const route = useRoute()
     const router = useRouter()
     const authStore = useAuthStore()
     const api = useApi()
@@ -549,28 +607,92 @@ export default {
     const { occupe, erreur: erreurAction, executer, signaler } = useActionUnique()
 
     const jours = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche']
-    const LABELS_ONGLETS = { athletes: 'Athlètes', programmes: 'Programmes', tests: 'Tests' }
-    const vueLabel = computed(() => LABELS_ONGLETS[onglet.value] || 'Programmes')
     // Dans l'onglet Programmes : 'mes-programmes' (liste + détail) ou 'atelier'.
     const sousOngletProgrammes = ref('mes-programmes')
 
-    // Swipe entre les onglets Athlètes/Programmes/Tests, même logique que le
-    // swipe de tabs du dashboard athlète. Sans effet quand la fiche d'un
-    // athlète est ouverte : FicheAthlete.vue stoppe la propagation de ses
-    // propres pointerdown/pointerup, son swipe interne (Aperçu/Programme/
-    // Séances/Poids) est alors prioritaire. L'Atelier la stoppe aussi : c'est
-    // un formulaire, un glissé pour sélectionner du texte ne doit pas changer
-    // d'onglet.
-    const ONGLETS_PREPA = ['athletes', 'programmes', 'tests']
-    // Sens d'arrivée du nouvel onglet (cf. v-entree-onglet), fixé avant le
-    // rendu pour que le panneau monté le lise déjà.
-    const sensOnglet = ref(0)
-    watch(onglet, (nouveau, ancien) => {
-      sensOnglet.value = Math.sign(ONGLETS_PREPA.indexOf(nouveau) - ONGLETS_PREPA.indexOf(ancien)) || 1
-    }, { flush: 'sync' })
+    // --- Navigation : portée par l'adresse de la page ---
+    // ?onglet=seances|programmes|tests (Athlètes sans paramètre), puis l'écran
+    // ouvert dans l'onglet : ?athlete=31&fiche=seances, ?programme=8, ?test=5.
+    // Ouvrir une fiche, un programme (téléphone) ou un test ajoute une page à
+    // l'historique : le bouton retour du téléphone ou du navigateur la referme.
+    // Changer d'onglet remplace la page en cours, sans empiler.
+    const idDansAdresse = (cle) => {
+      const id = Number(route.query[cle])
+      return Number.isInteger(id) && id > 0 ? id : null
+    }
+    const onglet = computed(() => (ONGLETS_PREPA.includes(route.query.onglet) ? route.query.onglet : 'athletes'))
+    const athleteOuvertId = computed(() => (onglet.value === 'athletes' ? idDansAdresse('athlete') : null))
+    const ficheOnglet = computed(() => route.query.fiche || 'apercu')
+    const programmeDansAdresse = computed(() => (onglet.value === 'programmes' ? idDansAdresse('programme') : null))
+    const testOuvertId = computed(() => (onglet.value === 'tests' ? idDansAdresse('test') : null))
+    // Téléphone : la liste des programmes ou le détail, un écran à la fois.
+    const mobileDetail = computed(() => programmeDansAdresse.value !== null)
+    const vueLabel = computed(() => ONGLETS.find(o => o.cle === onglet.value).label)
+
+    const naviguer = (query, remplacer = false) => {
+      const propre = Object.fromEntries(
+        Object.entries(query).filter(([, v]) => v !== null && v !== undefined && v !== '').map(([k, v]) => [k, String(v)])
+      )
+      const actuelle = Object.fromEntries(Object.entries(route.query).map(([k, v]) => [k, String(v)]))
+      if (JSON.stringify(propre) === JSON.stringify(actuelle)) return
+      return remplacer ? router.replace({ query: propre }) : router.push({ query: propre })
+    }
+    // Refermer un écran : retour arrière quand il a été ouvert depuis le
+    // tableau de bord, sinon (lien ouvert tel quel, page rechargée) l'adresse
+    // de l'écran parent remplace la sienne.
+    const revenirOu = (query) => {
+      const precedente = window.history.state?.back
+      if (typeof precedente === 'string' && precedente.startsWith('/prepa')) router.back()
+      else naviguer(query, true)
+    }
+
+    // Chaque onglet retrouve, quand on y revient, l'écran où on l'avait laissé.
+    const etatOnglets = {}
+    const allerOnglet = (cle) => {
+      if (cle === onglet.value) {
+        // Onglet déjà affiché : retour à sa racine (la liste)
+        naviguer(cle === 'athletes' ? {} : { onglet: cle }, true)
+        return
+      }
+      etatOnglets[onglet.value] = { ...route.query }
+      naviguer(etatOnglets[cle] || (cle === 'athletes' ? {} : { onglet: cle }), true)
+    }
+    const ouvrirAthlete = (id, sousOnglet = 'apercu') => {
+      naviguer({ athlete: id, fiche: sousOnglet === 'apercu' ? null : sousOnglet })
+    }
+    const fermerAthlete = () => revenirOu({})
+    const changerOngletFiche = (cle) => {
+      naviguer({ ...route.query, fiche: cle === 'apercu' ? null : cle }, true)
+    }
+    const ouvrirTest = (id) => naviguer({ onglet: 'tests', test: id })
+    const fermerTest = () => revenirOu({ onglet: 'tests' })
+
+    // Panneaux gardés en place une fois ouverts (défilement, filtres et
+    // dépliés conservés) : seul l'onglet affiché est visible et actif.
+    const visites = reactive({ athletes: true, seances: true, programmes: false, tests: false })
+    const panneaux = reactive({ athletes: null, programmes: null, tests: null })
+    const seancesPanel = ref(null)
+    const nouvellesSeances = ref(0)
+    watch(onglet, async (nouveau, ancien) => {
+      visites[nouveau] = true
+      // Le nouvel onglet arrive en glissant du côté où il se trouve.
+      const sens = Math.sign(ONGLETS_PREPA.indexOf(nouveau) - ONGLETS_PREPA.indexOf(ancien))
+      await nextTick()
+      const el = nouveau === 'seances' ? seancesPanel.value?.$el : panneaux[nouveau]
+      animerEntreeOnglet(el, sens)
+    })
+
+    // Swipe entre les onglets, même logique que le swipe de tabs du dashboard
+    // athlète. Sans effet quand la fiche d'un athlète est ouverte :
+    // FicheAthlete.vue stoppe la propagation de ses propres pointerdown/
+    // pointerup, son swipe interne est alors prioritaire. L'Atelier la stoppe
+    // aussi : c'est un formulaire, un glissé pour sélectionner du texte ne doit
+    // pas changer d'onglet.
     const tabSwipeState = { startX: 0, startY: 0, pointerId: null }
     const onTabSwipeStart = (e) => {
-      if (e.pointerType === 'mouse' && e.button !== 0) return
+      // Au doigt seulement : à la souris, un glissé sert à sélectionner du
+      // texte (un email, un tableau), et la barre d'onglets est à portée.
+      if (e.pointerType === 'mouse') return
       // un second doigt ne doit pas redéfinir l'origine du geste en cours
       if (!e.isPrimary) return
       tabSwipeState.startX = e.clientX
@@ -589,8 +711,8 @@ export default {
       const dy = e.clientY - tabSwipeState.startY
       if (Math.abs(dy) > Math.abs(dx) + 10) return
       const idx = ONGLETS_PREPA.indexOf(onglet.value)
-      if (dx <= -SEUIL_SWIPE && idx < ONGLETS_PREPA.length - 1) onglet.value = ONGLETS_PREPA[idx + 1]
-      else if (dx >= SEUIL_SWIPE && idx > 0) onglet.value = ONGLETS_PREPA[idx - 1]
+      if (dx <= -SEUIL_SWIPE && idx < ONGLETS_PREPA.length - 1) allerOnglet(ONGLETS_PREPA[idx + 1])
+      else if (dx >= SEUIL_SWIPE && idx > 0) allerOnglet(ONGLETS_PREPA[idx - 1])
     }
 
     const letterFor = (idx) => String.fromCharCode(65 + idx)
@@ -755,8 +877,41 @@ export default {
 
     const fetchProgrammes = async () => {
       programmes.value = await api.get('/programmes/')
-      if (programmes.value.length > 0 && !programmeActif.value) programmeActif.value = programmes.value[0]
+      const demande = programmes.value.find(p => p.id === programmeDansAdresse.value)
+      if (demande && programmeActif.value?.id !== demande.id) selectProgramme(demande)
+      else if (programmes.value.length > 0 && !programmeActif.value) programmeActif.value = programmes.value[0]
     }
+
+    // --- Résumés du cercle (charge, wellness, titre, dernière séance) :
+    // partagés par la liste des athlètes, leurs fiches et le flux des séances.
+    const resumes = ref([])
+    const chargementResumes = ref(false)
+    let resumesChargesLe = 0
+    const chargerResumes = async () => {
+      chargementResumes.value = true
+      try {
+        resumes.value = await api.get('/monitoring/cercle')
+        resumesChargesLe = Date.now()
+      } catch (e) {
+        afficherToast(e.message || 'Impossible de charger le suivi de vos athlètes', 'erreur')
+      } finally {
+        chargementResumes.value = false
+      }
+    }
+    const resumesParId = computed(() => Object.fromEntries(resumes.value.map(r => [r.athlete_id, r])))
+
+    // Retour sur l'appli (téléphone déverrouillé, autre onglet du navigateur) :
+    // les données de plus de 2 minutes se rafraîchissent, sans écran de chargement.
+    const auRetourSurLAppli = () => {
+      if (document.visibilityState !== 'visible') return
+      if (Date.now() - resumesChargesLe > FRAICHEUR_RESUMES_MS) chargerResumes()
+      seancesPanel.value?.rafraichirSiAncien()
+    }
+    onMounted(() => document.addEventListener('visibilitychange', auRetourSurLAppli))
+    onUnmounted(() => document.removeEventListener('visibilitychange', auRetourSurLAppli))
+    watch(onglet, (o) => {
+      if (o === 'athletes' && Date.now() - resumesChargesLe > FRAICHEUR_RESUMES_MS) chargerResumes()
+    })
 
     const fetchSeances = async (programmeId) => {
       loadingSeances.value = true
@@ -806,15 +961,31 @@ export default {
       if (p) fetchSeances(p.id)
     })
 
-    // Depuis la Fiche Athlète (onglet Athlètes), bouton "Voir / éditer" d'un
-    // programme assigné : bascule vers l'onglet Programmes avec ce
-    // programme déjà sélectionné.
-    const ouvrirProgrammeDepuisFiche = (programme) => {
-      onglet.value = 'programmes'
-      sousOngletProgrammes.value = 'mes-programmes'
+    // Choix d'un programme dans la liste : sur téléphone le détail s'ouvre
+    // comme un écran (le retour arrière le referme), sur ordinateur liste et
+    // détail sont côte à côte, la sélection ne s'empile pas.
+    const ouvrirProgramme = (programme) => {
       selectProgramme(programme)
+      naviguer({ onglet: 'programmes', programme: programme.id }, !estMobile())
+    }
+    const fermerProgramme = () => revenirOu({ onglet: 'programmes' })
+    // Programme désigné par l'adresse (retour arrière, lien, rechargement)
+    watch(programmeDansAdresse, (id, ancien) => {
+      const p = id ? programmes.value.find(x => x.id === id) : null
+      if (p && programmeActif.value?.id !== id) selectProgramme(p)
+      // Détail refermé sur téléphone en cours d'édition : tout est déjà
+      // enregistré, il reste à sortir du mode édition.
+      if (!id && ancien && editMode.value && estMobile()) terminerEditMode()
+    })
+
+    // Depuis la Fiche Athlète, bouton "Voir / éditer" d'un programme
+    // assigné : bascule vers l'onglet Programmes avec ce programme ouvert
+    // (le retour arrière ramène sur la fiche).
+    const ouvrirProgrammeDepuisFiche = (programme) => {
+      sousOngletProgrammes.value = 'mes-programmes'
       vue.value = 'liste'
-      mobileDetail.value = true
+      selectProgramme(programme)
+      naviguer({ onglet: 'programmes', programme: programme.id })
     }
 
     const startEditMode = () => {
@@ -885,6 +1056,7 @@ export default {
         await api.del(`/programmes/${p.id}`)
         programmes.value = programmes.value.filter(x => x.id !== p.id)
         if (programmeActif.value?.id === p.id) { programmeActif.value = programmes.value[0] || null; editMode.value = false }
+        if (programmeDansAdresse.value === p.id) naviguer({ onglet: 'programmes' }, true)
       })
     }
 
@@ -907,19 +1079,16 @@ export default {
     const onTermine = () => { vue.value = 'liste'; fetchProgrammes() }
 
     const onModifie = async () => {
-      await fetchProgrammes()
-      await fetchMonCercle()
-      await fetchGroupes()
-      if (programmeActif.value) programmeActif.value = programmes.value.find(p => p.id === programmeActif.value.id)
+      await Promise.all([fetchProgrammes(), fetchMonCercle(), fetchGroupes(), chargerResumes()])
+      if (programmeActif.value) programmeActif.value = programmes.value.find(p => p.id === programmeActif.value.id) || null
     }
 
     const logout = () => { authStore.logout(); router.push('/') }
     const initiales = (nom) => nom.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
 
     onMounted(async () => {
-      await fetchProgrammes()
-      await fetchMonCercle()
-      await fetchGroupes()
+      visites[onglet.value] = true
+      await Promise.all([fetchMonCercle(), chargerResumes(), fetchProgrammes(), fetchGroupes()])
     })
 
     const mettreAJourExercice = (exo) => signaler(async () => {
@@ -990,9 +1159,12 @@ export default {
       seanceEnEdition.value = null
     })
     return {
-      sensOnglet,
+      ONGLETS, onglet, allerOnglet, visites, panneaux, seancesPanel, nouvellesSeances,
+      athleteOuvertId, ficheOnglet, ouvrirAthlete, fermerAthlete, changerOngletFiche,
+      testOuvertId, ouvrirTest, fermerTest, ouvrirProgramme, fermerProgramme,
+      resumes, chargementResumes, resumesParId,
       programmes, programmeActif, seances, monCercle, groupes,
-      loadingSeances, modalAssigner, vue, onglet, vueLabel,
+      loadingSeances, modalAssigner, vue, vueLabel,
       onTabSwipeStart, onTabSwipeEnd, onTabSwipeCancel,
       editMode, editNom, editDesc,
       nouvelleSeance, jours, typeSeance, labelTypeSeance, iconeTypeSeance, letterFor, grouperExercices,
@@ -1047,8 +1219,22 @@ export default {
 @media (max-width: 768px) {
   .toast-erreur { bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom) + var(--spacing-sm)); }
 }
-.dashboard-root { display: flex; flex: 1; flex-direction: column; overflow: hidden; min-height: 0; touch-action: pan-y; }
+.dashboard-root { position: relative; display: flex; flex: 1; flex-direction: column; overflow: hidden; min-height: 0; touch-action: pan-y; }
+/* Les onglets déjà ouverts restent en place, superposés : seul l'onglet
+   affiché est visible (les autres gardent leur défilement). */
+.dashboard-root > .panneau { position: absolute; inset: 0; }
+.dashboard-root > .panneau:not(.panneau-actif) { visibility: hidden; pointer-events: none; }
 .onglet-wrapper { display: flex; flex: 1; overflow: hidden; min-height: 0; }
+
+/* Pastille des nouvelles séances sur l'onglet Séances */
+.nav-icone { position: relative; display: inline-flex; }
+.nav-pastille {
+  position: absolute; top: -7px; left: calc(100% - 7px);
+  min-width: 18px; height: 18px; padding: 0 5px;
+  border: 2px solid var(--color-bg); border-radius: var(--radius-full);
+  background: var(--color-primary-dark); color: var(--color-on-primary);
+  font-size: 10px; font-weight: 800; line-height: 14px; text-align: center; font-style: normal;
+}
 .onglet-programmes { flex-direction: column; }
 
 /* --- Sous-onglets de Programmes : Mes programmes / Atelier --- */

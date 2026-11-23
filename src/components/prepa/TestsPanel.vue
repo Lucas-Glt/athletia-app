@@ -128,9 +128,12 @@ export default {
   components: { NouveauTestModal, AjouterResultatModal },
   props: {
     monCercle: { type: Array, default: () => [] },
-    actif: { type: Boolean, default: false }
+    actif: { type: Boolean, default: false },
+    // Test ouvert, porté par l'adresse de la page (bouton retour du téléphone)
+    testId: { type: Number, default: null }
   },
-  setup(props) {
+  emits: ['ouvrir-test', 'fermer-test'],
+  setup(props, { emit }) {
     const api = useApi()
     const authStore = useAuthStore()
     const estSuperPrepa = computed(() => authStore.role === 'super_prepa')
@@ -179,7 +182,7 @@ export default {
     }
 
     // --- Détail d'un test : résultats par athlète (recherche + tri vivent ici) ---
-    const testSelectionne = ref(null)
+    const testSelectionne = computed(() => tests.value.find((t) => t.id === props.testId) || null)
     const resultats = ref([])
     const loadingResultats = ref(false)
     const modalAjouterResultat = ref(false)
@@ -198,14 +201,15 @@ export default {
       }
     }
 
-    const ouvrirTest = (t) => {
-      testSelectionne.value = t
+    const ouvrirTest = (t) => emit('ouvrir-test', t.id)
+    const fermerTest = () => emit('fermer-test')
+    // Test ouvert (clic, retour arrière, lien) : ses résultats, filtres remis à zéro
+    watch(() => testSelectionne.value?.id, (id) => {
+      if (!id) return
       rechercheNom.value = ''
       tri.value = 'recent'
-      fetchResultats(t.id)
-    }
-
-    const fermerTest = () => { testSelectionne.value = null }
+      fetchResultats(id)
+    }, { immediate: true })
 
     const resultatsFiltres = computed(() => {
       const liste = resultats.value.filter(

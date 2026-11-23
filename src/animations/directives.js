@@ -115,17 +115,21 @@ export const vTrace = {
 
 // v-entree-onglet="sens" : le panneau d'un onglet arrive en glissant depuis
 // la droite (sens 1) ou la gauche (sens -1). Sens 0 (premier affichage) :
-// pas d'animation.
+// pas d'animation. animerEntreeOnglet fait de même pour un panneau gardé
+// en place (masqué puis réaffiché plutôt que recréé).
+export function animerEntreeOnglet(el, sens) {
+  if (!el || !sens || mouvementReduit()) return
+  animate(el, {
+    opacity: { from: 0 },
+    translateX: { from: 32 * Math.sign(sens) },
+    duration: 340,
+    ease: 'outCubic',
+    onComplete: (a) => cleanInlineStyles(a)
+  })
+}
 export const vEntreeOnglet = {
   mounted(el, { value }) {
-    if (!value || mouvementReduit()) return
-    animate(el, {
-      opacity: { from: 0 },
-      translateX: { from: 32 * Math.sign(value) },
-      duration: 340,
-      ease: 'outCubic',
-      onComplete: (a) => cleanInlineStyles(a)
-    })
+    animerEntreeOnglet(el, value)
   }
 }
 
