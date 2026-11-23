@@ -132,6 +132,7 @@ import CarteTitre from './CarteTitre.vue'
 // (app/progression_calc.py) : garder ces libellés alignés dessus.
 const BAREME = [
   { icone: 'ti-barbell', label: 'Séance validée', xp: '+500' },
+  { icone: 'ti-run', label: 'Séance hors programme', note: 'une par jour', xp: '+100' },
   { icone: 'ti-heart-rate-monitor', label: 'Wellness du jour', xp: '+100' },
   { icone: 'ti-mood-smile', label: 'Ressenti de séance', xp: '+50' },
   { icone: 'ti-scale', label: 'Pesée', xp: '+50' },

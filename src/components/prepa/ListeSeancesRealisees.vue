@@ -57,7 +57,8 @@
             </span>
             <span class="ligne-secondaire">
               <span v-if="afficherAthlete" class="seance-nom-sec">{{ s.seance_nom }}</span>
-              <span class="programme">{{ s.programme_nom }}<template v-if="s.semaine"> · sem. {{ s.semaine }}</template></span>
+              <span v-if="s.hors_programme" class="programme hors-programme"><i class="ti ti-plus"></i> Hors programme</span>
+              <span v-else class="programme">{{ s.programme_nom }}<template v-if="s.semaine"> · sem. {{ s.semaine }}</template></span>
             </span>
           </span>
 
@@ -91,9 +92,11 @@
           />
           <p v-else class="detail-indispo">
             <i class="ti ti-info-circle"></i>
-            {{ s.faites === null
-              ? 'Aucune série enregistrée pour cette séance : elle a été validée sans détail.'
-              : "Séance d'un programme d'un autre préparateur : son détail lui est réservé." }}
+            {{ s.hors_programme
+              ? "Séance faite en plus du programme et déclarée par l'athlète : son ressenti et sa durée comptent dans sa charge, sans détail de séries."
+              : s.faites === null
+                ? 'Aucune série enregistrée pour cette séance : elle a été validée sans détail.'
+                : "Séance d'un programme d'un autre préparateur : son détail lui est réservé." }}
           </p>
           <div v-if="afficherAthlete" class="detail-actions">
             <button type="button" class="btn btn-sm" @click="$emit('ouvrir-athlete', s.athlete_id)">
@@ -349,6 +352,8 @@ export default {
 }
 .seance-nom-sec { font-weight: 600; color: var(--color-text-body); }
 .avec-athlete .ligne-secondaire { flex-direction: column; }
+.hors-programme { display: inline-flex; align-items: center; gap: 3px; font-weight: 600; color: var(--color-primary-text); }
+.hors-programme .ti { font-size: 12px; }
 .pastille-nouvelle {
   padding: 1px 7px; border-radius: var(--radius-full);
   background: color-mix(in srgb, var(--color-accent) 16%, transparent); color: var(--color-accent);

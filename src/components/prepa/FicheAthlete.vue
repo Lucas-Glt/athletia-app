@@ -103,7 +103,7 @@
         <button type="button" class="tuile tuile-large" @click="allerA('seances')">
           <span class="tuile-label"><i class="ti ti-history"></i> Dernière séance</span>
           <template v-if="derniereSeance">
-            <span class="tuile-valeur tuile-texte">{{ derniereSeance.seance_nom }}</span>
+            <span class="tuile-valeur tuile-texte">{{ derniereSeance.seance_nom }}<small v-if="derniereSeance.hors_programme"> hors programme</small></span>
             <span class="tuile-sous">
               {{ formatJourRelatif(derniereSeance.date) }} à {{ heureDe(derniereSeance.date) }}
               <span v-if="derniereSeance.total" class="mini-badge" :class="classeTaux(tauxSeance(derniereSeance))">{{ derniereSeance.faites }}/{{ derniereSeance.total }} séries</span>

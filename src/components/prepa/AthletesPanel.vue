@@ -229,6 +229,7 @@
                     :class="classeTaux(tauxSeance(a.resume.derniere_seance_info))"
                   >{{ a.resume.derniere_seance_info.faites }}/{{ a.resume.derniere_seance_info.total }}</span>
                   <span v-if="a.resume.derniere_seance_info.rpe !== null">RPE {{ a.resume.derniere_seance_info.rpe }}</span>
+                  <span v-if="a.resume.derniere_seance_info.hors_programme">hors programme</span>
                 </span>
               </template>
               <span v-else class="valeur-vide">Aucune séance</span>

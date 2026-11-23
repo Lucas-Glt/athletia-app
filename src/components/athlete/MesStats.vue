@@ -106,6 +106,16 @@
           <p v-if="erreurWellness" class="stat-card-erreur">{{ erreurWellness }}</p>
         </template>
       </div>
+
+      <!-- Séance faite en plus du programme : à déclarer pour la charge -->
+      <button type="button" class="ajout-libre" @click="modaleLibre = true">
+        <span class="ajout-libre-icone"><i class="ti ti-plus"></i></span>
+        <span class="ajout-libre-texte">
+          <strong>Séance hors programme</strong>
+          <span>Footing, match, nage… déclare-la pour ton prépa</span>
+        </span>
+        <i class="ti ti-chevron-right ajout-libre-chevron"></i>
+      </button>
     </div>
 
     <div v-cascade class="colonne">
@@ -170,12 +180,17 @@
              positionné sur cette date). -->
         <div class="jour-detail" v-if="jourDetail">
           <div class="jour-detail-date">{{ formatJourLong(jourDetail.date) }}</div>
-          <div class="jour-detail-ligne" v-for="s in jourDetail.seances" :key="s.seance_id">
+          <div class="jour-detail-ligne" v-for="s in jourDetail.seances" :key="s.libre_id ? `libre-${s.libre_id}` : s.seance_id">
             <span class="jour-detail-nom">
               <span class="jour-detail-puce" :style="{ background: couleurType(s.type_seance) }"></span>
               {{ s.nom }}
+              <span v-if="s.libre_id" class="hors-programme">hors programme · RPE {{ s.rpe }} · {{ s.duree_minutes }} min</span>
             </span>
+            <button v-if="s.libre_id" class="btn-supprimer-libre" :disabled="suppression === s.libre_id" @click="supprimerLibre(s)">
+              <i class="ti ti-trash"></i> Supprimer
+            </button>
             <button
+              v-else
               class="btn-resultats"
               @click="$emit('voir-seance', { seanceId: s.seance_id, programmeId: s.programme_id, date: jourDetail.date })"
             >
@@ -199,6 +214,8 @@
         Valide ta première séance pour commencer à voir tes stats ici.
       </div>
     </div>
+
+    <SeanceLibreModal v-if="modaleLibre" @fermer="modaleLibre = false" @ajoutee="surSeanceLibre" />
   </div>
 </template>
 
@@ -208,7 +225,10 @@ import { useApi } from '../../services/api'
 import { useProgressionStore } from '../../stores/progression'
 import CarteNiveau from './CarteNiveau.vue'
 import CalendrierDiete from './CalendrierDiete.vue'
+import SeanceLibreModal from './SeanceLibreModal.vue'
+import { afficherToast } from '../../composables/useToast'
 import { SOMMEIL_MIN, SOMMEIL_MAX, SOMMEIL_PAS, SOMMEIL_DEFAUT, formatHeures } from '../../data/sommeil'
+import { DUREE_MAX, DUREE_A_CONFIRMER, labelRpe, dureeEnHeures as formatDuree } from '../../data/ressenti'
 
 const LABELS_TYPE = { musculation: 'Musculation', natation: 'Natation', athletisme: 'Athlétisme', pliometrie: 'Pliométrie' }
 
@@ -219,18 +239,8 @@ const COULEUR_TYPE = {
   pliometrie: 'var(--color-type-pliometrie-text)'
 }
 
-// Durée de séance déclarée : maximum accepté par l'API, et seuil au-delà
-// duquel on fait confirmer (ressenti non modifiable une fois envoyé).
-const DUREE_MAX = 600
-const DUREE_A_CONFIRMER = 240
-
-const LABELS_RPE = {
-  0: 'Repos', 1: 'Très très facile', 2: 'Facile', 3: 'Modéré', 4: 'Assez dur',
-  5: 'Dur', 6: 'Très dur', 7: 'Très dur', 8: 'Très très dur', 9: 'Très très dur', 10: 'Maximal'
-}
-
 export default {
-  components: { CarteNiveau, CalendrierDiete },
+  components: { CarteNiveau, CalendrierDiete, SeanceLibreModal },
   // ressenti-envoye / wellness-envoye : la bannière du dashboard propose le
   // même questionnaire. Sans ces signaux, y répondre ici la laissait affichée,
   // à proposer quelque chose qui venait d'être fait.
@@ -263,8 +273,6 @@ export default {
       { champ: 'courbatures', label: 'Courbatures' },
       { champ: 'stress', label: 'Stress' }
     ]
-
-    const labelRpe = (v) => LABELS_RPE[v] || ''
 
     // Premier appui : on part de SOMMEIL_DEFAUT sans appliquer le pas, pour
     // que « + » comme « − » amènent au même point de départ.
@@ -318,10 +326,7 @@ export default {
     const erreurRessenti = ref('')
     const erreurWellness = ref('')
 
-    const dureeEnHeures = computed(() => {
-      const minutes = Math.round(Number(dureeForm.value) || 0)
-      return `${Math.floor(minutes / 60)} h ${String(minutes % 60).padStart(2, '0')}`
-    })
+    const dureeEnHeures = computed(() => formatDuree(dureeForm.value))
 
     const envoyerRessenti = async () => {
       if (rpeForm.value === null || !dureeForm.value) return
@@ -374,6 +379,27 @@ export default {
     }
 
     const labelType = (t) => LABELS_TYPE[t] || t
+
+    // --- Séance hors programme : déclarée, ou supprimée en cas d'erreur ---
+    const modaleLibre = ref(false)
+    const suppression = ref(null)
+    const surSeanceLibre = async () => {
+      modaleLibre.value = false
+      progression.actualiser('Séance hors programme')
+      await fetchStats().catch(e => console.error('Erreur rechargement stats:', e))
+    }
+    const supprimerLibre = async (s) => {
+      if (!confirm(`Supprimer « ${s.nom} » ? Elle sortira de ta charge d'entraînement.`)) return
+      suppression.value = s.libre_id
+      try {
+        await api.del(`/seances-libres/${s.libre_id}`)
+        await Promise.all([fetchStats(), progression.charger()])
+      } catch (e) {
+        afficherToast(e.message || "La séance n'a pas pu être supprimée", 'erreur')
+      } finally {
+        suppression.value = null
+      }
+    }
 
     // Date locale au format ISO : toISOString() bascule en UTC et décalait la
     // grille d'un jour entre minuit et 2 h du matin (France en UTC+1/+2),
@@ -492,7 +518,8 @@ export default {
       vueRegularite, choisirVueRegularite,
       derniersJours, styleJour,
       jourOuvert, jourDetail, basculerJour, formatJourLong, couleurType,
-      ressentiEl, wellnessEl
+      ressentiEl, wellnessEl,
+      modaleLibre, surSeanceLibre, supprimerLibre, suppression
     }
   }
 }
@@ -718,8 +745,35 @@ export default {
   gap: var(--spacing-sm);
   flex-wrap: wrap;
 }
-.jour-detail-nom { display: flex; align-items: center; gap: 6px; font-size: var(--font-size-sm); font-weight: 600; }
+.jour-detail-nom { display: flex; align-items: center; flex-wrap: wrap; gap: 2px 6px; min-width: 0; font-size: var(--font-size-sm); font-weight: 600; }
 .jour-detail-puce { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+/* --- Séance hors programme --- */
+.ajout-libre {
+  display: flex; align-items: center; gap: var(--spacing-md);
+  width: 100%; padding: var(--spacing-md) var(--spacing-lg);
+  border: 1px dashed var(--color-border-strong); border-radius: var(--radius-lg);
+  background: transparent; color: inherit; font-family: inherit; text-align: left; cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+.ajout-libre:hover { border-color: var(--color-primary); background: var(--color-bg); }
+.ajout-libre-icone {
+  flex-shrink: 0; width: 36px; height: 36px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--color-primary-light); color: var(--color-primary-dark); font-size: var(--font-size-lg);
+}
+.ajout-libre-texte { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.ajout-libre-texte strong { font-size: var(--font-size-sm); }
+.ajout-libre-texte span { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+.ajout-libre-chevron { color: var(--color-text-muted); }
+.hors-programme { font-size: var(--font-size-xs); font-weight: 500; color: var(--color-text-secondary); }
+.btn-supprimer-libre {
+  display: inline-flex; align-items: center; gap: 4px;
+  min-height: var(--tap-min); padding: 0 var(--spacing-md);
+  border: 1px solid var(--color-border); border-radius: var(--radius-md);
+  background: transparent; color: var(--color-danger-text);
+  font-family: inherit; font-size: var(--font-size-sm); font-weight: 600; cursor: pointer;
+}
+.btn-supprimer-libre:disabled { opacity: 0.5; cursor: default; }
 .btn-resultats {
   display: inline-flex;
   align-items: center;
