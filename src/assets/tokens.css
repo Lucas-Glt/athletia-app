@@ -105,6 +105,25 @@ input, select, textarea, button {
   --color-type-pliometrie-border: #FDBA74;
   --color-type-pliometrie-bg: #FED7AA;
   --color-type-pliometrie-text: #9A3412;
+  --color-type-match-border: #67E8F9;
+  --color-type-match-bg: #CFFAFE;
+  --color-type-match-text: #0E7490;
+  --color-type-autre-border: #CBD5E1;
+  --color-type-autre-bg: #E2E8F0;
+  --color-type-autre-text: #475569;
+
+  /* --- Graphiques par type de séance : une teinte par type, dans l'ordre
+         d'empilement (natation en bas → athlétisme en haut). Ordre validé
+         daltonisme sur la surface des cartes (scripts du skill dataviz) :
+         ne pas réordonner sans revalider. Distinct des badges de type, trop
+         sombres pour des aplats côte à côte. --- */
+  --color-chart-natation: #2a78d6;
+  --color-chart-pliometrie: #eb6834;
+  --color-chart-match: #1baf7a;
+  --color-chart-autre: #eda100;
+  --color-chart-musculation: #e87ba4;
+  --color-chart-athletisme: #008300;
+  --color-chart-grille: #e5e7eb;
 
   /* --- Macronutriments (camembert de la diète) — ordre et teintes validés
          pour les daltonismes ; jamais seuls : la légende porte les chiffres --- */
@@ -277,6 +296,20 @@ input, select, textarea, button {
   --color-type-pliometrie-border: #9A3412;
   --color-type-pliometrie-bg: #431407;
   --color-type-pliometrie-text: #FDBA74;
+  --color-type-match-border: #0E7490;
+  --color-type-match-bg: #083344;
+  --color-type-match-text: #67E8F9;
+  --color-type-autre-border: #475569;
+  --color-type-autre-bg: #1E293B;
+  --color-type-autre-text: #CBD5E1;
+
+  --color-chart-natation: #3987e5;
+  --color-chart-pliometrie: #d95926;
+  --color-chart-match: #199e70;
+  --color-chart-autre: #c98500;
+  --color-chart-musculation: #d55181;
+  --color-chart-athletisme: #0ca30c;
+  --color-chart-grille: #2C2660;
 
   --color-macro-proteines: #3987e5;
   --color-macro-glucides: #d95926;

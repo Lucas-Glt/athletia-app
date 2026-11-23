@@ -106,16 +106,6 @@
           <p v-if="erreurWellness" class="stat-card-erreur">{{ erreurWellness }}</p>
         </template>
       </div>
-
-      <!-- Séance faite en plus du programme : à déclarer pour la charge -->
-      <button type="button" class="ajout-libre" @click="modaleLibre = true">
-        <span class="ajout-libre-icone"><i class="ti ti-plus"></i></span>
-        <span class="ajout-libre-texte">
-          <strong>Séance hors programme</strong>
-          <span>Footing, match, nage… déclare-la pour ton prépa</span>
-        </span>
-        <i class="ti ti-chevron-right ajout-libre-chevron"></i>
-      </button>
     </div>
 
     <div v-cascade class="colonne">
@@ -186,6 +176,14 @@
               {{ s.nom }}
               <span v-if="s.libre_id" class="hors-programme">hors programme · RPE {{ s.rpe }} · {{ s.duree_minutes }} min</span>
             </span>
+            <span v-if="s.records?.length || s.mots_prepa?.length" class="jour-detail-extras">
+              <span v-for="r in s.records || []" :key="r.exercice" class="jour-record">
+                <i class="ti ti-trophy"></i> Record {{ r.exercice }} : {{ texteRecord(r) }}
+              </span>
+              <span v-for="(m, k) in s.mots_prepa || []" :key="k" class="jour-mot">
+                <i class="ti ti-message-2"></i> Ton prépa : « {{ m }} »
+              </span>
+            </span>
             <button v-if="s.libre_id" class="btn-supprimer-libre" :disabled="suppression === s.libre_id" @click="supprimerLibre(s)">
               <i class="ti ti-trash"></i> Supprimer
             </button>
@@ -214,8 +212,6 @@
         Valide ta première séance pour commencer à voir tes stats ici.
       </div>
     </div>
-
-    <SeanceLibreModal v-if="modaleLibre" @fermer="modaleLibre = false" @ajoutee="surSeanceLibre" />
   </div>
 </template>
 
@@ -225,22 +221,23 @@ import { useApi } from '../../services/api'
 import { useProgressionStore } from '../../stores/progression'
 import CarteNiveau from './CarteNiveau.vue'
 import CalendrierDiete from './CalendrierDiete.vue'
-import SeanceLibreModal from './SeanceLibreModal.vue'
 import { afficherToast } from '../../composables/useToast'
 import { SOMMEIL_MIN, SOMMEIL_MAX, SOMMEIL_PAS, SOMMEIL_DEFAUT, formatHeures } from '../../data/sommeil'
 import { DUREE_MAX, DUREE_A_CONFIRMER, labelRpe, dureeEnHeures as formatDuree } from '../../data/ressenti'
-
-const LABELS_TYPE = { musculation: 'Musculation', natation: 'Natation', athletisme: 'Athlétisme', pliometrie: 'Pliométrie' }
+import { labelTypeSeance } from '../../data/typesSeance'
+import { texteRecord } from '../../data/seancesRealisees'
 
 const COULEUR_TYPE = {
   musculation: 'var(--color-type-musculation-text)',
   natation: 'var(--color-type-natation-text)',
   athletisme: 'var(--color-type-athletisme-text)',
-  pliometrie: 'var(--color-type-pliometrie-text)'
+  pliometrie: 'var(--color-type-pliometrie-text)',
+  match: 'var(--color-type-match-text)',
+  autre: 'var(--color-type-autre-text)'
 }
 
 export default {
-  components: { CarteNiveau, CalendrierDiete, SeanceLibreModal },
+  components: { CarteNiveau, CalendrierDiete },
   // ressenti-envoye / wellness-envoye : la bannière du dashboard propose le
   // même questionnaire. Sans ces signaux, y répondre ici la laissait affichée,
   // à proposer quelque chose qui venait d'être fait.
@@ -378,16 +375,11 @@ export default {
       emit('wellness-envoye')
     }
 
-    const labelType = (t) => LABELS_TYPE[t] || t
+    const labelType = (t) => labelTypeSeance(t)
 
-    // --- Séance hors programme : déclarée, ou supprimée en cas d'erreur ---
-    const modaleLibre = ref(false)
+    // --- Séance hors programme (déclarée dans l'onglet Séances) : supprimée
+    // depuis la grille en cas d'erreur ---
     const suppression = ref(null)
-    const surSeanceLibre = async () => {
-      modaleLibre.value = false
-      progression.actualiser('Séance hors programme')
-      await fetchStats().catch(e => console.error('Erreur rechargement stats:', e))
-    }
     const supprimerLibre = async (s) => {
       if (!confirm(`Supprimer « ${s.nom} » ? Elle sortira de ta charge d'entraînement.`)) return
       suppression.value = s.libre_id
@@ -519,7 +511,7 @@ export default {
       derniersJours, styleJour,
       jourOuvert, jourDetail, basculerJour, formatJourLong, couleurType,
       ressentiEl, wellnessEl,
-      modaleLibre, surSeanceLibre, supprimerLibre, suppression
+      supprimerLibre, suppression, texteRecord
     }
   }
 }
@@ -747,24 +739,15 @@ export default {
 }
 .jour-detail-nom { display: flex; align-items: center; flex-wrap: wrap; gap: 2px 6px; min-width: 0; font-size: var(--font-size-sm); font-weight: 600; }
 .jour-detail-puce { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
-/* --- Séance hors programme --- */
-.ajout-libre {
-  display: flex; align-items: center; gap: var(--spacing-md);
-  width: 100%; padding: var(--spacing-md) var(--spacing-lg);
-  border: 1px dashed var(--color-border-strong); border-radius: var(--radius-lg);
-  background: transparent; color: inherit; font-family: inherit; text-align: left; cursor: pointer;
-  transition: border-color var(--transition-fast), background var(--transition-fast);
-}
-.ajout-libre:hover { border-color: var(--color-primary); background: var(--color-bg); }
-.ajout-libre-icone {
-  flex-shrink: 0; width: 36px; height: 36px; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  background: var(--color-primary-light); color: var(--color-primary-dark); font-size: var(--font-size-lg);
-}
-.ajout-libre-texte { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-.ajout-libre-texte strong { font-size: var(--font-size-sm); }
-.ajout-libre-texte span { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
-.ajout-libre-chevron { color: var(--color-text-muted); }
+/* --- Records et mots du prépa, sous la séance du jour --- */
+.jour-detail-extras { flex-basis: 100%; order: 3; display: flex; flex-direction: column; gap: 4px; padding-left: 16px; }
+.jour-record, .jour-mot { display: flex; gap: 6px; font-size: var(--font-size-xs); }
+.jour-record { font-weight: 600; color: var(--color-warning-text-strong); }
+.jour-mot { color: var(--color-text-body); }
+.jour-mot .ti { color: var(--color-primary-dark); }
+.jour-record .ti, .jour-mot .ti { flex-shrink: 0; margin-top: 1px; }
+
+/* --- Séance hors programme (dans la grille) --- */
 .hors-programme { font-size: var(--font-size-xs); font-weight: 500; color: var(--color-text-secondary); }
 .btn-supprimer-libre {
   display: inline-flex; align-items: center; gap: 4px;

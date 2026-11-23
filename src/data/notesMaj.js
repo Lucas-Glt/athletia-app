@@ -19,7 +19,7 @@ export const NOTES_MAJ = [
     date: '23 novembre 2026',
     titre: 'Une séance en plus ? Déclare-la',
     points: [
-      'Un footing, un match, de la natation en plus de ton programme ? Sur l\'accueil, touche « Séance hors programme » : le type, comment tu l\'as trouvée et combien de temps elle a duré.',
+      'Un match, un footing, de la pliométrie en plus de ton programme ? Dans l\'onglet Séances, touche « Séance hors programme » : le type, comment tu l\'as trouvée et combien de temps elle a duré.',
       'Ton prépa voit ainsi ta vraie charge d\'entraînement. Elle rapporte 100 XP, une fois par jour : ton programme reste la priorité.'
     ]
   },

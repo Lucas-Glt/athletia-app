@@ -118,6 +118,8 @@
 .type-badge-natation { background: var(--color-type-natation-bg); color: var(--color-type-natation-text); }
 .type-badge-athletisme { background: var(--color-type-athletisme-bg); color: var(--color-type-athletisme-text); }
 .type-badge-pliometrie { background: var(--color-type-pliometrie-bg); color: var(--color-type-pliometrie-text); }
+.type-badge-match { background: var(--color-type-match-bg); color: var(--color-type-match-text); }
+.type-badge-autre { background: var(--color-type-autre-bg); color: var(--color-type-autre-text); }
 
 /* Pastille d'icône d'un type de séance (cf. src/data/typesSeance.js), sur
    les couleurs des badges de type ; variante « programme » en couleur marque. */
@@ -137,6 +139,8 @@
 .type-icone-natation { background: var(--color-type-natation-bg); color: var(--color-type-natation-text); }
 .type-icone-athletisme { background: var(--color-type-athletisme-bg); color: var(--color-type-athletisme-text); }
 .type-icone-pliometrie { background: var(--color-type-pliometrie-bg); color: var(--color-type-pliometrie-text); }
+.type-icone-match { background: var(--color-type-match-bg); color: var(--color-type-match-text); }
+.type-icone-autre { background: var(--color-type-autre-bg); color: var(--color-type-autre-text); }
 .type-icone-programme { background: var(--color-primary-light); color: var(--color-primary-dark); }
 
 /* --- Champs --- */

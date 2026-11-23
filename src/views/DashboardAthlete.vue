@@ -63,6 +63,16 @@
       @non="marquerReactionsVues"
     />
     <PopupBanniere
+      v-else-if="banniereMot"
+      icone="ti-message-2"
+      :titre="banniereMot.titre"
+      :sous-titre="banniereMot.sousTitre"
+      :texte-oui="banniereMot.peutOuvrir ? 'Voir la séance' : 'OK'"
+      :texte-non="banniereMot.peutOuvrir ? 'OK' : 'Plus tard'"
+      @oui="banniereMot.peutOuvrir ? voirMot() : marquerMotsVus()"
+      @non="banniereMot.peutOuvrir ? marquerMotsVus() : (motsNouveaux = [])"
+    />
+    <PopupBanniere
       v-else-if="popupWellness"
       icone="ti-heart-rate-monitor"
       titre="Remplir mon wellness du jour ?"
@@ -141,6 +151,8 @@
         <i class="ti ti-calendar-off empty-icon"></i>
         <p>Aucun programme assigné pour le moment.</p>
         <span>Contactez votre préparateur physique.</span>
+        <!-- Sans programme, un match ou un footing compte quand même dans la charge -->
+        <div class="ajout-libre-sans-programme"><AjoutSeanceLibre /></div>
       </div>
 
       <!-- ONGLET PROGRAMME -->
@@ -239,6 +251,9 @@
                 <i class="ti ti-calendar-plus"></i> Créer ma semaine d'entraînement
               </button>
             </template>
+
+            <!-- Une séance faite en plus du programme (match, footing…) -->
+            <AjoutSeanceLibre v-if="!loadingSeances" />
 
             <PlanningHebdoModal
               v-if="modalPlanning"
@@ -944,6 +959,7 @@ import { useAuthStore } from '../stores/auth'
 import AppLayout from '../components/AppLayout.vue'
 import CourbeProgression from '../components/athlete/CourbeProgression.vue'
 import MesStats from '../components/athlete/MesStats.vue'
+import AjoutSeanceLibre from '../components/athlete/AjoutSeanceLibre.vue'
 import ProgressionExercice from '../components/athlete/ProgressionExercice.vue'
 import CelebrationXp from '../components/athlete/CelebrationXp.vue'
 import RecapSemaineModal from '../components/athlete/RecapSemaineModal.vue'
@@ -961,6 +977,8 @@ import { typeGroupe, labelTypeGroupe } from '../data/typesGroupe'
 import { cleOccurrence, jourDeLaDate } from '../data/joursSemaine'
 import { parseValeurSerie, inputmodeSaisie } from '../utils/valeurSerie'
 import { formatJourRelatif } from '../data/activite'
+import { texteRecord } from '../data/seancesRealisees'
+import { afficherToast } from '../composables/useToast'
 
 // Distance horizontale minimale pour valider un swipe. Volontairement haute :
 // un doigt qui ripe sur un simple appui ne doit jamais changer d'écran.
@@ -1081,7 +1099,7 @@ const DUREE_BROUILLON_MS = 48 * 60 * 60 * 1000
 
 export default {
   components: {
-    AppLayout, CourbeProgression, MesStats, ProgressionExercice, CelebrationXp, RecapSemaineModal, BlessuresPanel, DietePanel, PopupBanniere,
+    AppLayout, CourbeProgression, MesStats, AjoutSeanceLibre, ProgressionExercice, CelebrationXp, RecapSemaineModal, BlessuresPanel, DietePanel, PopupBanniere,
     PlanningCalendrier, PlanningHebdoModal, ExerciceImage, ReactionArrivee
   },
   setup() {
@@ -2322,8 +2340,10 @@ export default {
       // sans rpe/durée : la séance se valide quand même, le ressenti reste
       // saisissable après coup (cf. MesStats.vue), jamais bloquant ici.
       let chargeEnregistree = true
+      let records = []
       try {
-        await api.post(`/seances/${seanceActive.value.id}/charge`, { session_id: sessionSaisieId.value })
+        const reponse = await api.post(`/seances/${seanceActive.value.id}/charge`, { session_id: sessionSaisieId.value })
+        records = reponse?.records || []
       } catch (e) {
         chargeEnregistree = false
         console.error('Erreur enregistrement complétion séance:', e)
@@ -2339,6 +2359,11 @@ export default {
       // Séance faite : confettis et XP gagnée
       progression.feter(origineFete)
       progression.actualiser('Séance validée')
+      // Record(s) battu(s) pendant la séance (calculés par l'API)
+      if (records.length) {
+        const liste = records.map(r => `${r.exercice} ${texteRecord(r)}`).join(' · ')
+        afficherToast(`🏆 ${records.length > 1 ? 'Nouveaux records' : 'Nouveau record'} : ${liste}`, 'succes', 9000)
+      }
       // Le calendrier de la semaine type colore les séances faites à partir de
       // l'historique : sans ce rafraîchissement, celle qu'on vient de valider
       // y resterait « à faire » jusqu'au prochain chargement de l'écran.
@@ -2399,6 +2424,44 @@ export default {
       } catch {
         // API pas encore à jour ou hors ligne : pas de bannière, rien à signaler
       }
+      chargerMots()
+    }
+
+    // --- Mot du prépa sur une séance : même rythme que les réactions ---
+    const motsNouveaux = ref([])
+    const chargerMots = async () => {
+      try {
+        motsNouveaux.value = await api.get('/mes-stats/mots/nouveaux')
+      } catch {
+        // API pas encore à jour ou hors ligne : pas de bannière
+      }
+    }
+    const banniereMot = computed(() => {
+      const liste = motsNouveaux.value
+      if (!liste.length) return null
+      const dernier = liste[0]
+      const autres = liste.length > 1 ? ` (+${liste.length - 1})` : ''
+      return {
+        titre: `Ton prépa t'a laissé un mot${autres}`,
+        sousTitre: `« ${dernier.texte} » — ${dernier.seance_nom}, ${formatJourRelatif(dernier.date)}`,
+        peutOuvrir: !!dernier.seance_id && !!dernier.programme_id
+      }
+    })
+    // Seuls les mots montrés passent en vus (cf. POST /mes-stats/mots/vus)
+    const marquerMotsVus = async () => {
+      const ids = motsNouveaux.value.map(m => m.id)
+      motsNouveaux.value = []
+      if (!ids.length) return
+      try {
+        await api.post('/mes-stats/mots/vus', { ids })
+      } catch (e) {
+        console.error('Erreur mots vus:', e)
+      }
+    }
+    const voirMot = async () => {
+      const dernier = motsNouveaux.value[0]
+      await marquerMotsVus()
+      if (dernier) await ouvrirDepuisRegularite({ seanceId: dernier.seance_id, programmeId: dernier.programme_id, date: dernier.date })
     }
     const surRetourDansLAppli = () => {
       if (document.visibilityState === 'visible' && Date.now() - derniereVerifReactions > 60000) chargerReactions()
@@ -2757,6 +2820,7 @@ export default {
       etatExo, basculerExo,
       recapPropose, recapOuvert, ouvrirRecap, marquerRecapVu,
       banniereReaction, voirReaction, marquerReactionsVues, arriveeReaction, sensOnglet,
+      motsNouveaux, banniereMot, marquerMotsVus, voirMot,
       programmesAffiches, programmeEpingleId, estEpingle, basculerEpingleProgramme,
       isGroupeComplete,
       progressionSeance,
@@ -2933,6 +2997,7 @@ export default {
 
 /* Proposition de semaine type, sous la liste : discrète tant que l'athlète
    n'en a pas créé, elle disparaît ensuite au profit du calendrier. */
+.ajout-libre-sans-programme { width: 100%; max-width: 420px; margin-top: var(--spacing-lg); text-align: left; }
 .btn-creer-semaine {
   width: 100%;
   margin-top: var(--spacing-sm);

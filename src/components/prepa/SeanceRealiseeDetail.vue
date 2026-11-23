@@ -22,6 +22,9 @@
             <span v-if="groupe.exercices.length > 1" class="exo-repere exo-lettre">{{ lettre(eidx) }}</span>
             <span v-else class="exo-repere">{{ exo.ordre }}</span>
             <span class="exo-nom">{{ exo.nom }}</span>
+            <span v-if="recordDe(exo)" class="exo-record" :title="`Record personnel battu : ${texteRecord(recordDe(exo))}`">
+              <i class="ti ti-trophy"></i> Record {{ texteRecord(recordDe(exo)) }}
+            </span>
             <span class="exo-bilan" :class="classeTaux(tauxExo(exo))">{{ faitesExo(exo) }}/{{ exo.logs.length }}</span>
           </div>
 
@@ -84,7 +87,7 @@ import { useApi } from '../../services/api'
 import { afficherToast } from '../../composables/useToast'
 import { grouperExercices, typeGroupe, labelTypeGroupe } from '../../data/typesGroupe'
 import {
-  REACTIONS_PREPA, ICONES_STATUT_SERIE, textePrescrit, texteRealise, statutSerie, classeTaux
+  REACTIONS_PREPA, ICONES_STATUT_SERIE, textePrescrit, texteRealise, statutSerie, classeTaux, cleExercice, texteRecord
 } from '../../data/seancesRealisees'
 
 // Le détail d'une séance réalisée : chaque exercice, série par série, le
@@ -129,6 +132,9 @@ export default {
       return grouperExercices([...parExo.values()])
     })
 
+    // Record battu sur cet exercice pendant la séance (calculé par l'API)
+    const recordDe = (exo) => (props.seance.records || []).find((r) => cleExercice(r.exercice) === cleExercice(exo.nom)) || null
+
     const faitesExo = (exo) => exo.logs.filter((l) => l.fait).length
     const tauxExo = (exo) => (exo.logs.length ? Math.round((faitesExo(exo) / exo.logs.length) * 100) : null)
     const lettre = (idx) => String.fromCharCode(65 + idx)
@@ -153,7 +159,7 @@ export default {
     return {
       REACTIONS_PREPA, ICONES_STATUT_SERIE,
       logs, chargement, erreur, charger, groupes, type, reactionOuverte, reagir,
-      faitesExo, tauxExo, lettre, prenom,
+      faitesExo, tauxExo, lettre, prenom, recordDe, texteRecord,
       typeGroupe, labelTypeGroupe, textePrescrit, texteRealise, statutSerie, classeTaux
     }
   }
@@ -194,6 +200,12 @@ export default {
 }
 .exo-lettre { background: var(--color-primary); color: var(--color-on-primary); }
 .exo-nom { flex: 1; min-width: 0; font-size: var(--font-size-base); font-weight: 600; overflow-wrap: anywhere; }
+.exo-record {
+  display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0;
+  padding: 2px 8px; border-radius: var(--radius-full);
+  background: var(--color-warning-bg); color: var(--color-warning-text-strong);
+  font-size: var(--font-size-xs); font-weight: 700; white-space: nowrap;
+}
 .exo-bilan {
   flex-shrink: 0; padding: 2px 8px; border-radius: var(--radius-full);
   font-size: var(--font-size-xs); font-weight: 700; font-variant-numeric: tabular-nums;

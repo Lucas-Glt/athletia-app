@@ -110,13 +110,20 @@
 import { ref, computed } from 'vue'
 import { useApi } from '../../services/api'
 import { DUREE_MAX, DUREE_A_CONFIRMER, labelRpe, dureeEnHeures } from '../../data/ressenti'
+import { CLES_TYPES_SEANCE_LIBRE, labelTypeSeance, iconeTypeSeance } from '../../data/typesSeance'
 
 // Les types proposés : ceux de l'API (TYPES_SEANCE_LIBRE, app/schemas/monitoring.py).
-const TYPES = [
-  { valeur: 'musculation', label: 'Musculation', icone: 'ti-barbell', exemple: 'Séance perso, circuit…' },
-  { valeur: 'athletisme', label: 'Athlétisme', icone: 'ti-run', exemple: 'Footing, fractionné, match…' },
-  { valeur: 'natation', label: 'Natation', icone: 'ti-swimming', exemple: 'Nage libre, 2 km…' }
-]
+const EXEMPLES = {
+  musculation: 'Séance perso, circuit…',
+  athletisme: 'Footing, fractionné…',
+  natation: 'Nage libre, 2 km…',
+  pliometrie: 'Sauts, bondissements…',
+  match: 'Match de foot, de hand…',
+  autre: 'Vélo, escalade, yoga…'
+}
+const TYPES = CLES_TYPES_SEANCE_LIBRE.map((valeur) => ({
+  valeur, label: labelTypeSeance(valeur), icone: iconeTypeSeance(valeur), exemple: EXEMPLES[valeur]
+}))
 // Le ressenti se donne à chaud : le jour même ou le lendemain.
 const JOURS = [
   { valeur: 'aujourdhui', label: "Aujourd'hui" },
@@ -186,7 +193,7 @@ export default {
 .types { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--spacing-sm); }
 .type-choix {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
-  min-height: 72px; padding: var(--spacing-sm);
+  min-height: 68px; padding: var(--spacing-sm);
   border: 1px solid var(--color-border); border-radius: var(--radius-lg);
   background: var(--color-bg); color: var(--color-text-body);
   font-family: inherit; font-size: var(--font-size-sm); font-weight: 600; cursor: pointer;
@@ -194,13 +201,14 @@ export default {
 }
 .type-choix .ti { font-size: 24px; }
 .type-choix:active { transform: scale(0.96); }
-.type-musculation .ti { color: var(--color-type-musculation-text); }
-.type-athletisme .ti { color: var(--color-type-athletisme-text); }
-.type-natation .ti { color: var(--color-type-natation-text); }
-.type-choix.active { border-width: 2px; }
-.type-musculation.active { border-color: var(--color-type-musculation-text); background: var(--color-type-musculation-bg); color: var(--color-type-musculation-text); }
-.type-athletisme.active { border-color: var(--color-type-athletisme-text); background: var(--color-type-athletisme-bg); color: var(--color-type-athletisme-text); }
-.type-natation.active { border-color: var(--color-type-natation-text); background: var(--color-type-natation-bg); color: var(--color-type-natation-text); }
+.type-choix .ti { color: var(--type-texte); }
+.type-choix.active { border-width: 2px; border-color: var(--type-texte); background: var(--type-fond); color: var(--type-texte); }
+.type-musculation { --type-texte: var(--color-type-musculation-text); --type-fond: var(--color-type-musculation-bg); }
+.type-athletisme { --type-texte: var(--color-type-athletisme-text); --type-fond: var(--color-type-athletisme-bg); }
+.type-natation { --type-texte: var(--color-type-natation-text); --type-fond: var(--color-type-natation-bg); }
+.type-pliometrie { --type-texte: var(--color-type-pliometrie-text); --type-fond: var(--color-type-pliometrie-bg); }
+.type-match { --type-texte: var(--color-type-match-text); --type-fond: var(--color-type-match-bg); }
+.type-autre { --type-texte: var(--color-type-autre-text); --type-fond: var(--color-type-autre-bg); }
 
 .jours { display: flex; gap: var(--spacing-sm); }
 .jour-choix {

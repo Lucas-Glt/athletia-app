@@ -88,3 +88,13 @@ export const statutSerie = (log, type) => {
 }
 
 export const ICONES_STATUT_SERIE = { done: 'ti-check', warn: 'ti-alert-triangle', skip: 'ti-x' }
+
+// Exercice reconnu à son nom, sans accents ni casse (même règle que
+// cle_exercice dans app/records.py).
+export const cleExercice = (nom) =>
+  String(nom || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().split(/\s+/).filter(Boolean).join(' ')
+
+const nombreFr = (v) => Number(v).toLocaleString('fr-FR', { maximumFractionDigits: 2 })
+
+// Record battu : « 55 kg (avant 50) », « 10 reps (avant 8) »
+export const texteRecord = (r) => `${nombreFr(r.valeur)} ${r.unite} (avant ${nombreFr(r.precedent)})`

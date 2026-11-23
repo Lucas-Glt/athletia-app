@@ -230,6 +230,9 @@
                   >{{ a.resume.derniere_seance_info.faites }}/{{ a.resume.derniere_seance_info.total }}</span>
                   <span v-if="a.resume.derniere_seance_info.rpe !== null">RPE {{ a.resume.derniere_seance_info.rpe }}</span>
                   <span v-if="a.resume.derniere_seance_info.hors_programme">hors programme</span>
+                  <span v-if="a.resume.derniere_seance_info.records?.length" class="mini-record" :title="`Record${a.resume.derniere_seance_info.records.length > 1 ? 's' : ''} : ${a.resume.derniere_seance_info.records.map((r) => r.exercice).join(', ')}`">
+                    <i class="ti ti-trophy"></i>{{ a.resume.derniere_seance_info.records.length }}
+                  </span>
                 </span>
               </template>
               <span v-else class="valeur-vide">Aucune séance</span>
@@ -964,10 +967,13 @@ export default {
 .type-natation { color: var(--color-type-natation-text); }
 .type-athletisme { color: var(--color-type-athletisme-text); }
 .type-pliometrie { color: var(--color-type-pliometrie-text); }
+.type-match { color: var(--color-type-match-text); }
+.type-autre { color: var(--color-type-autre-text); }
 .seance-meta { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: var(--font-size-xs); color: var(--color-text-secondary); }
 .seance-meta > span + span::before { content: '·'; margin-right: 6px; color: var(--color-text-muted); }
 .seance-meta > .mini-badge::before { content: none; }
 .quand-recent { font-weight: 600; color: var(--color-valid-text-strong); }
+.mini-record { display: inline-flex; align-items: center; gap: 2px; font-weight: 700; color: var(--color-warning-text-strong); }
 .valeur-vide { font-size: var(--font-size-xs); color: var(--color-text-muted); }
 
 .cell-stats { grid-area: stats; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--spacing-sm); }

@@ -109,6 +109,9 @@
               <span v-if="derniereSeance.total" class="mini-badge" :class="classeTaux(tauxSeance(derniereSeance))">{{ derniereSeance.faites }}/{{ derniereSeance.total }} séries</span>
               <span v-if="texteRessenti(derniereSeance)" class="mini-badge mini-badge-ressenti">{{ texteRessenti(derniereSeance) }}</span>
             </span>
+            <span v-if="derniereSeance.records?.length" class="tuile-sous tuile-record">
+              <i class="ti ti-trophy"></i> {{ derniereSeance.records.map((r) => `${r.exercice} ${texteRecord(r)}`).join(' · ') }}
+            </span>
           </template>
           <span v-else class="tuile-valeur tuile-vide">Aucune séance</span>
           <i class="ti ti-chevron-right tuile-chevron" aria-hidden="true"></i>
@@ -186,6 +189,9 @@
       </div>
       <div v-if="loadingApercu" class="empty">Chargement…</div>
       <template v-else-if="detail">
+        <div class="stat-card" v-if="detail.charge_par_type?.length">
+          <GraphiqueChargeJours :jours="detail.charge_par_type" />
+        </div>
         <div class="stat-card">
           <GraphiqueAcwrZones :points="pointsAcwr" :actuel="detail.acwr_actuel" />
         </div>
@@ -514,6 +520,7 @@ import CourbeProgression from '../athlete/CourbeProgression.vue'
 import GraphiqueDouble from '../monitoring/GraphiqueDouble.vue'
 import GraphiqueAcwrZones from '../monitoring/GraphiqueAcwrZones.vue'
 import GraphiqueBarres from '../monitoring/GraphiqueBarres.vue'
+import GraphiqueChargeJours from '../monitoring/GraphiqueChargeJours.vue'
 import GroupesManagerModal from './GroupesManagerModal.vue'
 import AssignerProgrammeModal from './AssignerProgrammeModal.vue'
 import ListeSeancesRealisees from './ListeSeancesRealisees.vue'
@@ -523,7 +530,7 @@ import { labelDureeBlessure, formatDateBlessure, labelAnciennete } from '../../d
 import { formatHeures, labelNiveauSommeil } from '../../data/sommeil'
 import { FENETRE_ACTIVITE, LABELS_NIVEAU_ACTIVITE, niveauActivite, libelleActivite, formatJourRelatif } from '../../data/activite'
 import { typeSeance, labelTypeSeance, iconeTypeSeance } from '../../data/typesSeance'
-import { heureDe, texteRessenti, tauxSeance, classeTaux } from '../../data/seancesRealisees'
+import { heureDe, texteRessenti, tauxSeance, classeTaux, texteRecord } from '../../data/seancesRealisees'
 import { signauxDe } from '../../data/signaux'
 import { parseValeurSerie } from '../../utils/valeurSerie'
 
@@ -557,7 +564,7 @@ const pad2 = (n) => String(n).padStart(2, '0')
 
 export default {
   components: {
-    CourbeProgression, GraphiqueDouble, GraphiqueAcwrZones, GraphiqueBarres,
+    CourbeProgression, GraphiqueDouble, GraphiqueAcwrZones, GraphiqueBarres, GraphiqueChargeJours,
     GroupesManagerModal, AssignerProgrammeModal, ListeSeancesRealisees, TitreAthlete
   },
   emits: ['fermer', 'modifie', 'ouvrir-programme', 'changer-onglet'],
@@ -1019,7 +1026,7 @@ export default {
       profil, photoUrl, lignesProfil, urlApi, fr, formatDecimal, iconeTendance,
       progression, pourcentageNiveau, derniereSeance, signauxDe, LIBELLES_WELLNESS,
       FENETRE_ACTIVITE, LABELS_NIVEAU_ACTIVITE, niveauActivite, libelleActivite, formatJourRelatif,
-      typeSeance, labelTypeSeance, iconeTypeSeance, heureDe, texteRessenti, tauxSeance, classeTaux,
+      typeSeance, labelTypeSeance, iconeTypeSeance, heureDe, texteRessenti, tauxSeance, classeTaux, texteRecord,
       detail, loadingApercu, pointsAcwr, pointsAigueChronique, pointsMonotonie, pointsContrainte,
       pointsHooper, dernierWellness, barresDernierWellness, formatDateCourt,
       pointsSommeil, formatHeures, labelNiveauSommeil,
@@ -1169,6 +1176,7 @@ button.tuile:hover { border-color: var(--color-primary); box-shadow: var(--shado
 .tuile-sous .ok { color: var(--color-valid-text); }
 .tuile-sous.sommeil-modere { color: var(--color-warning-text-strong); font-weight: 600; }
 .tuile-sous.sommeil-eleve { color: var(--color-danger-text); font-weight: 600; }
+.tuile-record { font-weight: 600; color: var(--color-warning-text-strong); }
 .tuile-coupe { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tuile-chevron { position: absolute; top: var(--spacing-md); right: var(--spacing-md); color: var(--color-text-muted); }
 .tendance { font-size: var(--font-size-lg); color: var(--color-text-secondary); }

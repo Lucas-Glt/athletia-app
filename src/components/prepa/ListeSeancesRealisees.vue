@@ -72,6 +72,12 @@
             <span v-else class="badge-ressenti en-attente" :title="ressentiEnAttente(s) ? 'L\'athlète a 24 h pour donner son ressenti' : 'Ressenti jamais donné'">
               <i class="ti ti-hourglass"></i>{{ ressentiEnAttente(s) ? 'Ressenti à venir' : 'Sans ressenti' }}
             </span>
+            <span v-if="s.records?.length" class="badge-record" :title="s.records.map((r) => `${r.exercice} ${texteRecord(r)}`).join(' · ')">
+              <i class="ti ti-trophy"></i>{{ s.records.length }} record{{ s.records.length > 1 ? 's' : '' }}
+            </span>
+            <span v-if="s.mot_prepa" class="badge-mot" :title="`Ton mot : « ${s.mot_prepa} »${s.mot_prepa_vu ? ' (lu)' : ''}`">
+              <i class="ti" :class="s.mot_prepa_vu ? 'ti-checks' : 'ti-message-2'"></i>Mot
+            </span>
             <span v-if="s.reactions" class="badge-reactions" :title="`${s.reactions} réaction${s.reactions > 1 ? 's' : ''} de ta part`">
               <i class="ti ti-mood-heart"></i>{{ s.reactions }}
             </span>
@@ -90,6 +96,10 @@
             :athlete-nom="s.athlete_nom"
             @reaction="(delta) => (s.reactions += delta)"
           />
+          <p v-else-if="s.records?.length" class="records-liste">
+            <i class="ti ti-trophy"></i>
+            <span>Records : {{ s.records.map((r) => `${r.exercice} ${texteRecord(r)}`).join(' · ') }}</span>
+          </p>
           <p v-else class="detail-indispo">
             <i class="ti ti-info-circle"></i>
             {{ s.hors_programme
@@ -98,6 +108,7 @@
                 ? 'Aucune série enregistrée pour cette séance : elle a été validée sans détail.'
                 : "Séance d'un programme d'un autre préparateur : son détail lui est réservé." }}
           </p>
+          <MotSeance :seance="s" @maj="(ligne) => Object.assign(s, ligne)" />
           <div v-if="afficherAthlete" class="detail-actions">
             <button type="button" class="btn btn-sm" @click="$emit('ouvrir-athlete', s.athlete_id)">
               <i class="ti ti-user"></i> Fiche de {{ prenom(s.athlete_nom) }}
@@ -120,9 +131,10 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useApi, urlApi } from '../../services/api'
 import SeanceRealiseeDetail from './SeanceRealiseeDetail.vue'
 import TitreAthlete from './TitreAthlete.vue'
+import MotSeance from './MotSeance.vue'
 import { typeSeance, iconeTypeSeance } from '../../data/typesSeance'
 import {
-  jourDe, heureDe, libelleJour, texteRessenti, tauxSeance, classeTaux
+  jourDe, heureDe, libelleJour, texteRessenti, tauxSeance, classeTaux, texteRecord
 } from '../../data/seancesRealisees'
 
 const TAILLE_PAGE = 30
@@ -135,7 +147,7 @@ const DELAI_RESSENTI_MS = 24 * 60 * 60 * 1000
 // cercle (onglet Séances) ou un athlète (sa fiche). Une séance se déplie sur
 // son détail série par série, où le prépa peut réagir.
 export default {
-  components: { SeanceRealiseeDetail, TitreAthlete },
+  components: { SeanceRealiseeDetail, TitreAthlete, MotSeance },
   props: {
     // null : tout le cercle ; [] : aucun athlète (filtre sans résultat)
     athleteIds: { type: Array, default: null },
@@ -262,7 +274,7 @@ export default {
     return {
       seances, suite, chargement, chargementSuite, erreur, ouvertes, jours,
       charger, chargerSuite, basculer, estNouvelle, progressionDe, ressentiEnAttente, initiales, prenom,
-      urlApi, typeSeance, iconeTypeSeance, heureDe, texteRessenti, tauxSeance, classeTaux
+      urlApi, typeSeance, iconeTypeSeance, heureDe, texteRessenti, tauxSeance, classeTaux, texteRecord
     }
   }
 }
@@ -361,18 +373,22 @@ export default {
 }
 
 .seance-badges { grid-area: badges; display: flex; flex-wrap: wrap; gap: 6px; }
-.badge-taux, .badge-ressenti, .badge-reactions {
+.badge-taux, .badge-ressenti, .badge-reactions, .badge-record, .badge-mot {
   display: inline-flex; align-items: center; gap: 4px;
   padding: 3px 9px; border-radius: var(--radius-full);
   font-size: var(--font-size-xs); font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums;
   background: var(--color-bg-tertiary); color: var(--color-text-secondary);
 }
-.badge-taux .ti, .badge-ressenti .ti, .badge-reactions .ti { font-size: 14px; }
+.badge-taux .ti, .badge-ressenti .ti, .badge-reactions .ti, .badge-record .ti, .badge-mot .ti { font-size: 14px; }
 .badge-taux.taux-done { background: var(--color-valid-bg); color: var(--color-valid-text-strong); }
 .badge-taux.taux-warn { background: var(--color-warning-bg); color: var(--color-warning-text-strong); }
 .badge-taux.taux-skip { background: var(--color-danger-bg); color: var(--color-danger-text); }
 .badge-ressenti { background: var(--color-primary-light); color: var(--color-primary-text); }
 .badge-ressenti.en-attente { background: transparent; border: 1px dashed var(--color-border-strong); color: var(--color-text-muted); font-weight: 500; }
+.badge-record { background: var(--color-warning-bg); color: var(--color-warning-text-strong); }
+.badge-mot { background: var(--color-bg-tertiary); color: var(--color-text-secondary); }
+.records-liste { display: flex; gap: 6px; margin: 0; font-size: var(--font-size-sm); color: var(--color-text-body); }
+.records-liste .ti { flex-shrink: 0; margin-top: 2px; color: var(--color-warning-icon); }
 .badge-reactions { background: color-mix(in srgb, var(--color-accent) 12%, transparent); color: var(--color-accent); }
 
 .seance-fin { grid-area: fin; display: flex; align-items: center; gap: 6px; align-self: start; }
