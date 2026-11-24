@@ -31,67 +31,71 @@
          La reprise, elle, est bloquante : tant qu'on n'a pas tranché, la
          saisie en attente et celle qu'on démarrerait s'écraseraient l'une
          l'autre — il faut donc répondre avant de toucher à l'app. -->
-    <PopupBanniere
-      v-if="brouillonPropose"
-      bloquant
-      icone="ti-player-play"
-      titre="Reprendre la séance là où vous l'avez quittée ?"
-      :sous-titre="sousTitreBrouillon"
-      texte-oui="Reprendre"
-      texte-non="Abandonner"
-      @oui="reprendreBrouillon"
-      @non="abandonnerBrouillon"
-    />
-    <PopupBanniere
-      v-else-if="popupRessenti"
-      icone="ti-mood-smile"
-      titre="Noter son ressenti de séance ?"
-      texte-oui="Oui"
-      texte-non="Non merci"
-      @oui="repondreRessenti"
-      @non="popupRessenti = null"
-    />
-    <PopupBanniere
-      v-else-if="banniereReaction"
-      icone="ti-message-heart"
-      :emoji="banniereReaction.emoji"
-      :titre="banniereReaction.titre"
-      :sous-titre="banniereReaction.sousTitre"
-      texte-oui="Voir"
-      texte-non="OK"
-      @oui="voirReaction"
-      @non="marquerReactionsVues"
-    />
-    <PopupBanniere
-      v-else-if="banniereMot"
-      icone="ti-message-2"
-      :titre="banniereMot.titre"
-      :sous-titre="banniereMot.sousTitre"
-      :texte-oui="banniereMot.peutOuvrir ? 'Voir la séance' : 'OK'"
-      :texte-non="banniereMot.peutOuvrir ? 'OK' : 'Plus tard'"
-      @oui="banniereMot.peutOuvrir ? voirMot() : marquerMotsVus()"
-      @non="banniereMot.peutOuvrir ? marquerMotsVus() : (motsNouveaux = [])"
-    />
-    <PopupBanniere
-      v-else-if="popupWellness"
-      icone="ti-heart-rate-monitor"
-      titre="Remplir mon wellness du jour ?"
-      sous-titre="5 questions, moins de 30 secondes"
-      texte-oui="Oui"
-      texte-non="Non merci"
-      @oui="repondreWellness"
-      @non="popupWellness = false"
-    />
-    <PopupBanniere
-      v-else-if="recapPropose"
-      icone="ti-confetti"
-      titre="Ton récap de la semaine est prêt"
-      sous-titre="Séances, XP, régularité : ta semaine en un coup d'œil"
-      texte-oui="Voir"
-      texte-non="Plus tard"
-      @oui="ouvrirRecap"
-      @non="marquerRecapVu"
-    />
+    <!-- Rien ne s'ouvre sous le voile « code de votre préparateur » :
+         les propositions arrivent une fois l'appli débloquée. -->
+    <template v-if="!authStore.sansPrepa">
+      <PopupBanniere
+        v-if="brouillonPropose"
+        bloquant
+        icone="ti-player-play"
+        titre="Reprendre la séance là où vous l'avez quittée ?"
+        :sous-titre="sousTitreBrouillon"
+        texte-oui="Reprendre"
+        texte-non="Abandonner"
+        @oui="reprendreBrouillon"
+        @non="abandonnerBrouillon"
+      />
+      <PopupBanniere
+        v-else-if="popupRessenti"
+        icone="ti-mood-smile"
+        titre="Noter son ressenti de séance ?"
+        texte-oui="Oui"
+        texte-non="Non merci"
+        @oui="repondreRessenti"
+        @non="popupRessenti = null"
+      />
+      <PopupBanniere
+        v-else-if="banniereReaction"
+        icone="ti-message-heart"
+        :emoji="banniereReaction.emoji"
+        :titre="banniereReaction.titre"
+        :sous-titre="banniereReaction.sousTitre"
+        texte-oui="Voir"
+        texte-non="OK"
+        @oui="voirReaction"
+        @non="marquerReactionsVues"
+      />
+      <PopupBanniere
+        v-else-if="banniereMot"
+        icone="ti-message-2"
+        :titre="banniereMot.titre"
+        :sous-titre="banniereMot.sousTitre"
+        :texte-oui="banniereMot.peutOuvrir ? 'Voir la séance' : 'OK'"
+        :texte-non="banniereMot.peutOuvrir ? 'OK' : 'Plus tard'"
+        @oui="banniereMot.peutOuvrir ? voirMot() : marquerMotsVus()"
+        @non="banniereMot.peutOuvrir ? marquerMotsVus() : (motsNouveaux = [])"
+      />
+      <PopupBanniere
+        v-else-if="popupWellness"
+        icone="ti-heart-rate-monitor"
+        titre="Remplir mon wellness du jour ?"
+        sous-titre="5 questions, moins de 30 secondes"
+        texte-oui="Oui"
+        texte-non="Non merci"
+        @oui="repondreWellness"
+        @non="popupWellness = false"
+      />
+      <PopupBanniere
+        v-else-if="recapPropose"
+        icone="ti-confetti"
+        titre="Ton récap de la semaine est prêt"
+        sous-titre="Séances, XP, régularité : ta semaine en un coup d'œil"
+        texte-oui="Voir"
+        texte-non="Plus tard"
+        @oui="ouvrirRecap"
+        @non="marquerRecapVu"
+      />
+    </template>
 
     <!-- XP gagnée, confettis, passage de niveau -->
     <CelebrationXp />
@@ -2807,7 +2811,7 @@ export default {
     })
 
     return {
-      programmes, programmeActif, seances, seanceActive, logs, historique,
+      authStore, programmes, programmeActif, seances, seanceActive, logs, historique,
       loadingSeances, onglet,
       menuSuiviOuvert, ongletsSuivi, ITEMS_SUIVI, choisirSuivi,
       seancesAffichees,

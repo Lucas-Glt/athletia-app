@@ -1,6 +1,7 @@
 <template>
   <!-- Inscription libre : athlète ou préparateur, avec un vrai email comme
-       identifiant. Le code (club ou coach) est facultatif. -->
+       identifiant. Le code (club ou coach) est facultatif : un athlète sans
+       préparateur le saisit ensuite dans la fenêtre qui voile l'appli. -->
   <form class="inscription" @submit.prevent="inscrire">
     <div class="field">
       <label>Je suis</label>
@@ -63,11 +64,11 @@
     </div>
 
     <div class="field">
-      <label for="insc-code">{{ form.role === 'athlete' ? 'Code club ou code coach' : 'Code club (préparateurs)' }} <span class="facultatif">(facultatif)</span></label>
-      <input id="insc-code" v-model="form.code" autocapitalize="characters" autocomplete="off" placeholder="Ex : K7P4QX9M" />
+      <label for="insc-code">{{ form.role === 'athlete' ? 'Code de votre préparateur' : 'Code club (préparateurs)' }} <span class="facultatif">(facultatif)</span></label>
+      <input id="insc-code" v-model="form.code" autocapitalize="characters" autocomplete="off" :placeholder="form.role === 'athlete' ? 'Ex : K7P4QX' : 'Ex : K7P4QX9M'" />
       <span class="aide">
         {{ form.role === 'athlete'
-          ? 'Donné par votre club ou votre préparateur. Sans code, votre compte est indépendant : vous pourrez en saisir un plus tard dans votre profil.'
+          ? "6 lettres et chiffres donnés par votre préparateur physique (un code de club marche aussi). Vous pouvez aussi le saisir juste après l'inscription : l'application vous le demandera."
           : "Donné par l'administrateur de votre club. Sans code, vous êtes indépendant : vos athlètes vous rejoindront avec votre code coach." }}
       </span>
     </div>

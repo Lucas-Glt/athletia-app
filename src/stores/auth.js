@@ -33,6 +33,11 @@ export const useAuthStore = defineStore('auth', {
   },
 
   getters: {
-    isAuthenticated: (state) => !!state.token
+    isAuthenticated: (state) => !!state.token,
+    // Athlète suivi par aucun préparateur : l'appli est voilée jusqu'à la
+    // saisie d'un code coach (cf. VoileCodePrepa.vue). false explicite
+    // seulement : un compte gardé en mémoire avant cette version n'a pas le
+    // champ, on attend le compte relu par AppLayout.
+    sansPrepa: (state) => state.user?.role === 'athlete' && state.user?.a_un_prepa === false
   }
 })

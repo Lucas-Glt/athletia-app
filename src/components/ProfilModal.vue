@@ -94,16 +94,16 @@
 
         <!-- Rejoindre un club ou un coach -->
         <div class="profil-codes">
-          <div v-if="profil.code_coach" class="code-coach">
+          <div v-if="profil.code_coach" class="profil-code-coach">
             <span class="code-titre">Votre code coach</span>
-            <span class="code-valeur">{{ profil.code_coach }}</span>
-            <span class="aide">Donnez-le à vos athlètes : ils vous rejoignent en le saisissant dans leur profil ou à leur inscription.</span>
+            <CodeCoach v-model:code="profil.code_coach" />
+            <span class="aide">Donnez-le à vos athlètes : ils le saisissent à leur inscription ou à leur première connexion, et vous recevez une notification quand ils vous rejoignent.</span>
           </div>
           <span v-if="profil.organisation" class="aide">Club : <b>{{ profil.organisation.nom }}</b></span>
           <form v-if="peutSaisirCode" class="code-saisie" @submit.prevent="saisirCode">
             <label for="profil-code">{{ libelleCode }}</label>
             <div class="code-ligne">
-              <input id="profil-code" v-model="code" autocapitalize="characters" autocomplete="off" placeholder="Ex : K7P4QX9M" />
+              <input id="profil-code" v-model="code" autocapitalize="characters" autocomplete="off" :placeholder="profil.role === 'athlete' ? 'Code du club ou de votre préparateur' : 'Ex : K7P4QX9M'" />
               <button class="btn btn-sm" type="submit" :disabled="!code.trim() || envoiCode">Valider</button>
             </div>
           </form>
@@ -127,6 +127,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useApi, urlApi } from '../services/api'
 import { afficherToast } from '../composables/useToast'
 import PolitiqueConfidentialite from './PolitiqueConfidentialite.vue'
+import CodeCoach from './prepa/CodeCoach.vue'
 
 const SEXES = [
   { valeur: 'homme', label: 'Homme' },
@@ -163,7 +164,7 @@ const preparerPhoto = (fichier) => new Promise((resolve, reject) => {
 const pad2 = (n) => String(n).padStart(2, '0')
 
 export default {
-  components: { PolitiqueConfidentialite },
+  components: { PolitiqueConfidentialite, CodeCoach },
   emits: ['fermer', 'modifie'],
   setup(_, { emit }) {
     const api = useApi()
@@ -363,9 +364,8 @@ export default {
   padding-top: var(--spacing-md);
   border-top: 1px solid var(--color-border);
 }
-.code-coach { display: flex; flex-direction: column; gap: 2px; }
+.profil-code-coach { display: flex; flex-direction: column; gap: 6px; }
 .code-titre { font-size: var(--font-size-sm); font-weight: 600; color: var(--color-text-body); }
-.code-valeur { font-size: var(--font-size-lg); font-weight: 800; letter-spacing: 2px; color: var(--color-primary-text); font-variant-numeric: tabular-nums; }
 .code-saisie { display: flex; flex-direction: column; gap: 6px; }
 .code-saisie label { font-size: var(--font-size-sm); font-weight: 500; color: var(--color-text-body); }
 .code-ligne { display: flex; gap: var(--spacing-sm); }

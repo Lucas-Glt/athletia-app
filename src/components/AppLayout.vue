@@ -81,9 +81,13 @@
         <button class="btn btn-sm" @click="ignorerInstallation(30)">OK</button>
       </div>
     </div>
-    <div class="main-content">
+    <!-- Athlète sans préparateur : contenu voilé et inerte (cf. VoileCodePrepa) -->
+    <div class="main-content" :class="{ 'sous-voile': voileCodePrepa }" :inert="voileCodePrepa || null">
       <slot />
     </div>
+    <Transition name="voile">
+      <VoileCodePrepa v-if="voileCodePrepa" />
+    </Transition>
 
     <!-- Barre d'onglets mobile : la navigation sous le pouce, identique pour tous les rôles -->
     <nav ref="barreBas" class="bottom-nav">
@@ -142,6 +146,7 @@ import { useApi, urlApi } from '../services/api'
 import ProfilModal from './ProfilModal.vue'
 import ConsentementModal from './ConsentementModal.vue'
 import BienvenueModal from './BienvenueModal.vue'
+import VoileCodePrepa from './VoileCodePrepa.vue'
 import { promptInstallation as installPrompt } from '../services/installationPwa'
 import { erreurMotDePasse } from '../utils/motDePasse'
 import { animate, set, spring } from 'animejs'
@@ -158,7 +163,7 @@ const installationIgnoree = () => {
 }
 
 export default {
-  components: { ProfilModal, ConsentementModal, BienvenueModal },
+  components: { ProfilModal, ConsentementModal, BienvenueModal, VoileCodePrepa },
   props: {
     title: { type: String, required: true }
   },
@@ -234,6 +239,7 @@ export default {
     const bienvenueFermee = ref(false)
     const bienvenueRequise = computed(() => !bienvenueFermee.value && authStore.user?.bienvenue_vue_le === null)
     onMounted(rafraichirUtilisateur)
+    const voileCodePrepa = computed(() => authStore.sansPrepa)
 
     // --- Indicateur de l'onglet actif (barre du bas, mobile) ---
     // Les onglets viennent du slot #nav de chaque dashboard : on suit leur
@@ -365,7 +371,7 @@ export default {
 
     return {
       authStore, themeStore, roleLabel, initiales, urlApi, barreBas, indicateur,
-      profilOuvert, ouvrirProfil, rafraichirUtilisateur, accordRequis, bienvenueFermee, bienvenueRequise,
+      profilOuvert, ouvrirProfil, rafraichirUtilisateur, accordRequis, bienvenueFermee, bienvenueRequise, voileCodePrepa,
       menuOuvert, toggleMenu, avatarRef, deconnexion,
       modalePassword, ouvrirModalePassword, fermerModalePassword,
       form, changerPassword, loadingPassword, passwordError, passwordSuccess,
@@ -477,6 +483,16 @@ export default {
 .dropdown-item.danger:hover { background: var(--color-danger-bg-soft); }
 
 .main-content { flex: 1; overflow: hidden; display: flex; flex-direction: column; min-height: 0; }
+/* Sous le voile : tout le contenu (fenêtres et bannières fixes comprises)
+   passe dessous, l'en-tête et la barre du bas restent au-dessus. */
+.main-content.sous-voile { position: relative; z-index: 0; }
+.voile-enter-from, .voile-leave-to { opacity: 0; }
+.voile-enter-active { transition: opacity 0.3s ease; }
+/* Le code accepté : le voile se dissipe et la carte s'envole */
+.voile-leave-active { transition: opacity 0.6s ease, backdrop-filter 0.6s ease, -webkit-backdrop-filter 0.6s ease; }
+.voile-leave-to { backdrop-filter: blur(0); -webkit-backdrop-filter: blur(0); }
+.voile-leave-active :deep(.voile-carte) { transition: transform 0.5s cubic-bezier(0.5, 0, 0.75, 0), opacity 0.45s ease; }
+.voile-leave-to :deep(.voile-carte) { transform: translateY(-24px) scale(1.06); opacity: 0; }
 
 /* --- Barre d'onglets mobile --- */
 .bottom-nav {

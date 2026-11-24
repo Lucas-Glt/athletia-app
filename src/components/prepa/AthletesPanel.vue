@@ -24,30 +24,33 @@
       </div>
 
       <Transition name="deplier">
-        <form v-if="ajoutOuvert" class="ajout-athlete" @submit.prevent="rechercherAthlete">
-          <label class="ajout-athlete-titre" for="email-athlete">Ajouter un athlète à votre cercle</label>
-          <div class="ajout-athlete-ligne">
-            <input id="email-athlete" v-model="searchEmail" placeholder="Email de l'athlète" type="email" autocomplete="off" />
-            <button class="btn" type="submit" :disabled="!searchEmail">Rechercher</button>
-          </div>
-          <div v-if="athleteTrouve" class="athlete-trouve">
-            <span class="avatar-athlete">
-              <img v-if="athleteTrouve.photo_url" class="avatar-photo" :src="urlApi(athleteTrouve.photo_url)" alt="" />
-              <template v-else>{{ initiales(athleteTrouve.nom) }}</template>
-            </span>
-            <div class="athlete-trouve-info">
-              <div class="athlete-trouve-nom">{{ athleteTrouve.nom }}</div>
-              <div class="athlete-trouve-email">{{ athleteTrouve.email }}</div>
-            </div>
-            <button class="btn btn-sm btn-primary" type="button" @click="ajouterAuCercle"><i class="ti ti-plus"></i> Ajouter</button>
-          </div>
-          <div v-if="searchError" class="error">{{ searchError }}</div>
-          <p v-if="codeCoach" class="code-coach-aide">
-            <i class="ti ti-key"></i>
-            Vos athlètes peuvent aussi vous rejoindre eux-mêmes avec votre code coach <b>{{ codeCoach }}</b>
-            (à l'inscription ou dans leur profil).
+        <div v-if="ajoutOuvert" class="ajout-athlete">
+          <span class="ajout-athlete-titre">Ajouter un athlète à votre cercle</span>
+          <p class="ajout-aide">
+            Le plus simple : donnez votre code coach à l'athlète. Il suffit de le saisir à l'inscription ou à
+            la première connexion, et une notification vous prévient de son arrivée dans votre cercle.
           </p>
-        </form>
+          <CodeCoach v-if="codeCoach" v-model:code="codeCoach" />
+          <template v-if="ajoutParEmail">
+            <div class="ajout-separateur" role="separator"><span>ou par email</span></div>
+            <form class="ajout-athlete-ligne" @submit.prevent="rechercherAthlete">
+              <input id="email-athlete" v-model="searchEmail" aria-label="Email de l'athlète" placeholder="Email de l'athlète" type="email" autocomplete="off" />
+              <button class="btn" type="submit" :disabled="!searchEmail">Rechercher</button>
+            </form>
+            <div v-if="athleteTrouve" class="athlete-trouve">
+              <span class="avatar-athlete">
+                <img v-if="athleteTrouve.photo_url" class="avatar-photo" :src="urlApi(athleteTrouve.photo_url)" alt="" />
+                <template v-else>{{ initiales(athleteTrouve.nom) }}</template>
+              </span>
+              <div class="athlete-trouve-info">
+                <div class="athlete-trouve-nom">{{ athleteTrouve.nom }}</div>
+                <div class="athlete-trouve-email">{{ athleteTrouve.email }}</div>
+              </div>
+              <button class="btn btn-sm btn-primary" type="button" @click="ajouterAuCercle"><i class="ti ti-plus"></i> Ajouter</button>
+            </div>
+            <div v-if="searchError" class="error">{{ searchError }}</div>
+          </template>
+        </div>
       </Transition>
 
       <section class="indicateurs" v-if="resumes.length > 0">
@@ -419,6 +422,7 @@ import { useAuthStore } from '../../stores/auth'
 import FicheAthlete from './FicheAthlete.vue'
 import GroupesManagerModal from './GroupesManagerModal.vue'
 import TitreAthlete from './TitreAthlete.vue'
+import CodeCoach from './CodeCoach.vue'
 import { formatHeures, estSommeilInsuffisant } from '../../data/sommeil'
 import { typeSeance, iconeTypeSeance } from '../../data/typesSeance'
 import { tauxSeance, classeTaux } from '../../data/seancesRealisees'
@@ -546,7 +550,7 @@ const COLONNES = [
 ]
 
 export default {
-  components: { FicheAthlete, GroupesManagerModal, TitreAthlete },
+  components: { FicheAthlete, GroupesManagerModal, TitreAthlete, CodeCoach },
   emits: ['modifie', 'ouvrir-programme', 'ouvrir-athlete', 'fermer-athlete', 'changer-onglet-fiche'],
   props: {
     monCercle: { type: Array, default: () => [] },
@@ -563,6 +567,12 @@ export default {
     const api = useApi()
     const authStore = useAuthStore()
     const estSuperPrepa = computed(() => authStore.role === 'super_prepa')
+    // Préparateur inscrit seul, sans club : pas d'ajout par email (refusé
+    // par l'API), ses athlètes le rejoignent avec son code coach.
+    const ajoutParEmail = computed(() => {
+      const u = authStore.user
+      return !(authStore.role === 'prepa' && u?.inscription_libre && !u?.organisation_id)
+    })
 
     const rechercheNom = ref('')
     const groupeFiltre = ref('tous')
@@ -589,15 +599,16 @@ export default {
     const searchEmail = ref('')
     const athleteTrouve = ref(null)
     const searchError = ref('')
-    // Code coach du préparateur, rappelé dans le formulaire d'ajout : les
-    // athlètes peuvent rejoindre son cercle eux-mêmes.
+    // Code coach du préparateur, en tête du formulaire d'ajout : les
+    // athlètes rejoignent son cercle eux-mêmes en le saisissant.
     const codeCoach = ref('')
     const basculerAjout = async () => {
       ajoutOuvert.value = !ajoutOuvert.value
       searchEmail.value = ''
       athleteTrouve.value = null
       searchError.value = ''
-      if (ajoutOuvert.value && !codeCoach.value) {
+      // Relu à chaque ouverture : le code a pu changer depuis le profil.
+      if (ajoutOuvert.value) {
         try {
           codeCoach.value = (await api.get('/users/me/profil')).code_coach || ''
         } catch {
@@ -695,7 +706,7 @@ export default {
       FENETRE_ACTIVITE, SEUIL_REGULIER, SEUIL_INACTIF_JOURS, LABELS_NIVEAU_ACTIVITE,
       niveauActivite, libelleActivite, formatJourRelatif, joursDepuis, signauxDe,
       rechercheNom, groupeFiltre, organisationFiltre, organisationsCercle, athletesFiltres,
-      estSuperPrepa, athleteSelectionne, aideOuverte,
+      estSuperPrepa, ajoutParEmail, athleteSelectionne, aideOuverte,
       modalGroupes, athleteFocusGroupes, ouvrirGestionGroupes, groupesDe,
       ajoutOuvert, basculerAjout, searchEmail, athleteTrouve, searchError, rechercherAthlete, ajouterAuCercle,
       iconeTendance, initiales, formatHeures, formatDecimal,
@@ -753,8 +764,12 @@ export default {
 .athlete-trouve-info { flex: 1; min-width: 0; }
 .athlete-trouve-nom { font-size: var(--font-size-sm); font-weight: 600; }
 .athlete-trouve-email { font-size: var(--font-size-xs); color: var(--color-text-secondary); overflow-wrap: anywhere; }
-.code-coach-aide { margin: 0; font-size: var(--font-size-xs); color: var(--color-text-secondary); display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; }
-.code-coach-aide b { color: var(--color-primary-text); letter-spacing: 1px; }
+.ajout-aide { margin: 0; font-size: var(--font-size-sm); color: var(--color-text-secondary); line-height: 1.45; }
+.ajout-separateur {
+  display: flex; align-items: center; gap: var(--spacing-sm);
+  font-size: var(--font-size-xs); color: var(--color-text-secondary);
+}
+.ajout-separateur::before, .ajout-separateur::after { content: ''; flex: 1; height: 1px; background: var(--color-border); }
 
 .deplier-enter-active, .deplier-leave-active { transition: opacity var(--transition-base), transform var(--transition-base); }
 .deplier-enter-from, .deplier-leave-to { opacity: 0; transform: translateY(-6px); }

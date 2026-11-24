@@ -26,6 +26,18 @@
       </button>
     </template>
 
+    <!-- Athlète(s) qui viennent de rejoindre le cercle avec le code coach -->
+    <PopupBanniere
+      v-if="banniereCercle"
+      icone="ti-user-plus"
+      :titre="banniereCercle.titre"
+      :sous-titre="banniereCercle.sousTitre"
+      :texte-oui="banniereCercle.texteOui"
+      texte-non="OK"
+      @oui="voirNouveauxAthletes"
+      @non="marquerNotificationsVues"
+    />
+
     <div class="dashboard-root" @pointerdown="onTabSwipeStart" @pointerup="onTabSwipeEnd" @pointercancel="onTabSwipeCancel">
       <!-- Échec d'une action sur un programme : affiché quel que soit le
            défilement, au lieu de l'échec silencieux d'avant. -->
@@ -556,6 +568,8 @@ import TestsPanel from '../components/prepa/TestsPanel.vue'
 import AtelierProgramme from '../components/prepa/AtelierProgramme.vue'
 import ExerciceAutocomplete from '../components/prepa/ExerciceAutocomplete.vue'
 import ExerciceImage from '../components/ExerciceImage.vue'
+import PopupBanniere from '../components/athlete/PopupBanniere.vue'
+import { formatJourRelatif } from '../data/activite'
 import { TYPES_GROUPE, TYPE_GROUPE_DEFAUT, typeGroupe, labelTypeGroupe } from '../data/typesGroupe'
 import { typeSeance, labelTypeSeance, iconeTypeSeance } from '../data/typesSeance'
 import { useActionUnique } from '../utils/actionUnique'
@@ -579,7 +593,7 @@ const FRAICHEUR_RESUMES_MS = 2 * 60 * 1000
 const estMobile = () => window.matchMedia('(max-width: 768px)').matches
 
 export default {
-  components: { AppLayout, ProgrammeForm, AssignerAthleteModal, AthletesPanel, SeancesPanel, TestsPanel, AtelierProgramme, ExerciceAutocomplete, ExerciceImage },
+  components: { AppLayout, ProgrammeForm, AssignerAthleteModal, AthletesPanel, SeancesPanel, TestsPanel, AtelierProgramme, ExerciceAutocomplete, ExerciceImage, PopupBanniere },
   setup() {
     const programmes = ref([])
     const programmeActif = ref(null)
@@ -906,6 +920,7 @@ export default {
       if (document.visibilityState !== 'visible') return
       if (Date.now() - resumesChargesLe > FRAICHEUR_RESUMES_MS) chargerResumes()
       seancesPanel.value?.rafraichirSiAncien()
+      if (Date.now() - notificationsLuesLe > INTERVALLE_NOTIFICATIONS_MS) chargerNotifications()
     }
     onMounted(() => document.addEventListener('visibilitychange', auRetourSurLAppli))
     onUnmounted(() => document.removeEventListener('visibilitychange', auRetourSurLAppli))
@@ -1086,9 +1101,59 @@ export default {
     const logout = () => { authStore.logout(); router.push('/') }
     const initiales = (nom) => nom.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
 
+    // --- Athlètes qui ont rejoint le cercle avec le code coach : bannière à
+    // l'ouverture de l'appli et au retour dessus (au plus une lecture par
+    // minute). Ils apparaissent aussitôt dans la liste.
+    const INTERVALLE_NOTIFICATIONS_MS = 60 * 1000
+    const notificationsCercle = ref([])
+    let notificationsLuesLe = 0
+    const chargerNotifications = async () => {
+      notificationsLuesLe = Date.now()
+      try {
+        const nouvelles = (await api.get('/notifications/nouvelles')).filter(n => n.type === 'athlete_lie' && n.athlete)
+        if (nouvelles.some(n => !monCercle.value.some(a => a.id === n.athlete.id))) {
+          await Promise.all([fetchMonCercle(), chargerResumes()])
+        }
+        notificationsCercle.value = nouvelles
+      } catch {
+        // la bannière attendra le prochain retour sur l'appli
+      }
+    }
+    const banniereCercle = computed(() => {
+      const liste = notificationsCercle.value
+      if (!liste.length) return null
+      const quand = formatJourRelatif(liste[0].cree_le)
+      if (liste.length === 1) {
+        return {
+          titre: `${liste[0].athlete.nom} a rejoint votre cercle`,
+          sousTitre: `Avec votre code coach, ${quand}`,
+          texteOui: 'Voir sa fiche'
+        }
+      }
+      const noms = liste.map(n => n.athlete.nom)
+      return {
+        titre: `${liste.length} athlètes ont rejoint votre cercle`,
+        sousTitre: `${noms.slice(0, -1).join(', ')} et ${noms[noms.length - 1]}, avec votre code coach`,
+        texteOui: 'Voir'
+      }
+    })
+    // Seulement celles que la bannière a montrées (cf. POST /notifications/vues).
+    const marquerNotificationsVues = () => {
+      const ids = notificationsCercle.value.map(n => n.id)
+      notificationsCercle.value = []
+      if (ids.length) api.post('/notifications/vues', { ids }).catch(() => {})
+    }
+    const voirNouveauxAthletes = () => {
+      const liste = notificationsCercle.value
+      marquerNotificationsVues()
+      if (liste.length === 1) ouvrirAthlete(liste[0].athlete.id)
+      else naviguer({})
+    }
+
     onMounted(async () => {
       visites[onglet.value] = true
       await Promise.all([fetchMonCercle(), chargerResumes(), fetchProgrammes(), fetchGroupes()])
+      chargerNotifications()
     })
 
     const mettreAJourExercice = (exo) => signaler(async () => {
@@ -1159,6 +1224,7 @@ export default {
       seanceEnEdition.value = null
     })
     return {
+      banniereCercle, voirNouveauxAthletes, marquerNotificationsVues,
       ONGLETS, onglet, allerOnglet, visites, panneaux, seancesPanel, nouvellesSeances,
       athleteOuvertId, ficheOnglet, ouvrirAthlete, fermerAthlete, changerOngletFiche,
       testOuvertId, ouvrirTest, fermerTest, ouvrirProgramme, fermerProgramme,
