@@ -3,7 +3,7 @@
        navigation utilisable (en-tête, barre du bas), mais le contenu est
        voilé tant que le code de son préparateur n'est pas saisi. Le code
        saisi, le voile se dissipe. -->
-  <div class="voile" role="dialog" aria-modal="false" aria-labelledby="voile-titre">
+  <div class="voile" :class="{ remonte }" role="dialog" aria-modal="false" aria-labelledby="voile-titre">
     <div ref="carte" class="voile-carte" :class="{ ouverte: deverrouille }">
       <span class="voile-icone" aria-hidden="true">
         <i class="ti" :class="deverrouille ? 'ti-lock-open' : 'ti-lock'"></i>
@@ -11,7 +11,7 @@
 
       <template v-if="!deverrouille">
         <h2 id="voile-titre">Entrez le code de votre préparateur physique</h2>
-        <p class="voile-texte">
+        <p class="voile-texte voile-explication">
           6 lettres et chiffres, donnés par votre préparateur. Une fois le code saisi,
           il suit votre entraînement et toute l'application se débloque.
         </p>
@@ -33,7 +33,7 @@
               :disabled="envoi"
               aria-describedby="voile-aide"
               @input="saisir"
-              @focus="focus = true"
+              @focus="auFocus"
               @blur="focus = false"
             />
             <span
@@ -87,6 +87,14 @@ export default {
     const succes = ref('')
     const deverrouille = ref(false)
     const focus = ref(false)
+    // Au téléphone, le clavier couvre la moitié basse de l'écran : dès la
+    // première saisie, la fenêtre remonte (et le reste, même clavier fermé,
+    // pour que rien ne bouge sous le doigt au moment de toucher un bouton).
+    const remonte = ref(false)
+    const auFocus = () => {
+      focus.value = true
+      if (!pointeurFin()) remonte.value = true
+    }
     const champ = ref(null)
     const cases = ref(null)
     const carte = ref(null)
@@ -146,7 +154,7 @@ export default {
       if (pointeurFin()) champ.value?.focus({ preventScroll: true })
     })
 
-    return { LONGUEUR, code, envoi, erreur, info, succes, deverrouille, focus, champ, cases, carte, saisir, valider }
+    return { LONGUEUR, code, envoi, erreur, info, succes, deverrouille, focus, remonte, auFocus, champ, cases, carte, saisir, valider }
   }
 }
 </script>
@@ -187,6 +195,11 @@ export default {
   animation: arrivee 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.15) backwards;
   transition: box-shadow 0.4s ease, border-color 0.4s ease;
 }
+/* Clavier ouvert : la fenêtre en haut, sans le texte d'explication, pour
+   garder les cases et le message d'erreur au-dessus du clavier. */
+.voile.remonte { align-items: flex-start; padding-top: var(--spacing-md); }
+.remonte .voile-explication { display: none; }
+
 .voile-carte.ouverte { border-color: var(--color-primary); box-shadow: var(--shadow-modal), var(--glow-neon); }
 
 .voile-icone {
