@@ -1,11 +1,12 @@
-// Atelier de programme (prototype côté prépa) : un programme pensé comme une
+// Atelier de programme (côté prépa) : un programme pensé comme une
 // suite de semaines. L'athlète avance à son rythme — il passe à la semaine
 // suivante quand il a fait les séances de la sienne — et aucun jour n'est
 // imposé : chaque semaine est une suite ordonnée de séances, avec au plus un
 // jour conseillé. Une séance = un modèle + les semaines où elle a lieu + une
 // progression automatique d'une semaine à l'autre ; des tests en début et/ou
 // en fin de cycle, dont l'athlète saisit lui-même les résultats.
-// Tout se calcule ici à partir du brouillon : rien n'est envoyé à l'API.
+// Tout se calcule ici à partir du brouillon ; à la création, le programme
+// part déplié semaine par semaine (cf. programmePourApi).
 
 export const JOURS = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche']
 export const NB_SEMAINES_MAX = 16
@@ -217,3 +218,53 @@ export const exempleBrouillon = () => ({
     }
   ]
 })
+
+// --- Création du programme ---
+// Ce qui empêche de créer le programme (le serveur le refuserait, ou
+// l'athlète se retrouverait devant une séance vide).
+export const problemesCreation = (b) => {
+  const problemes = []
+  if (!b.nom.trim()) problemes.push('Donne un nom au programme (étape Cadre).')
+  if (!b.seances.some(s => semainesDeSeance(b, s).length > 0)) problemes.push('Ajoute au moins une séance placée sur une semaine.')
+  b.seances.forEach(s => {
+    if (semainesDeSeance(b, s).length === 0) return
+    const nom = s.nom.trim() || 'Séance sans nom'
+    if (!s.nom.trim()) problemes.push('Une séance n\'a pas de nom.')
+    if (s.exercices.length === 0) problemes.push(`« ${nom} » n'a pas d'exercice.`)
+    if (s.exercices.some(e => !e.nom.trim())) problemes.push(`« ${nom} » a un exercice sans nom.`)
+    if (s.exercices.some(e => !(Number(e.series) >= 1))) problemes.push(`« ${nom} » a un exercice sans série.`)
+  })
+  return [...new Set(problemes)]
+}
+
+const texteOuNull = (v) => String(v ?? '').trim() || null
+
+// Le programme tel que POST /programmes/atelier l'attend : déplié semaine par
+// semaine, progression déjà appliquée. `categorieTest(nom)` donne la
+// catégorie d'un test créé dans l'onglet Tests du prépa.
+export const programmePourApi = (b, categorieTest) => {
+  const semaines = toutesLesSemaines(b)
+  return {
+    nom: b.nom.trim(),
+    seances: semaines.flatMap(w => w.seances.map(s => ({
+      semaine: w.numero,
+      nom: s.nom.trim(),
+      type_seance: s.type || 'musculation',
+      jour: s.jour || null,
+      exercices: s.exercices.map(e => ({
+        nom: e.nom.trim(),
+        catalogue_id: e.catalogueId ?? null,
+        series: e.prescrit.series,
+        volume: texteOuNull(e.prescrit.volume),
+        intensite: texteOuNull(e.prescrit.intensite),
+        repos: texteOuNull(e.prescrit.repos)
+      }))
+    }))),
+    tests: semaines.filter(w => w.tests).flatMap(w => w.tests.liste.map(t => ({
+      semaine: w.numero,
+      nom: t.nom,
+      unite: t.unite || '',
+      categorie: categorieTest(t.nom)
+    })))
+  }
+}

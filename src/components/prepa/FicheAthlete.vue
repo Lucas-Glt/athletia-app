@@ -748,7 +748,7 @@ export default {
         if (serie.bonds) parts.push(`${serie.bonds} bonds`)
         if (serie.intensite) parts.push(serie.intensite)
       } else {
-        if (serie.nb_reps) parts.push(`${serie.nb_reps} reps`)
+        if (serie.nb_reps) parts.push(/^[\d\s+,.-]+$/.test(serie.nb_reps) ? `${serie.nb_reps} reps` : serie.nb_reps)
         if (serie.poids_cible) parts.push(serie.poids_cible)
         if (serie.rm) parts.push(serie.rm)
         if (serie.tempo) parts.push(serie.tempo)

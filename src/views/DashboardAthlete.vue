@@ -206,6 +206,17 @@
               <p v-if="programmeActif.description">{{ programmeActif.description }}</p>
             </div>
 
+            <!-- Programme de l'Atelier : la semaine en cours, ses tests -->
+            <SemaineProgramme
+              v-if="semainesProgramme && !loadingSeances"
+              :semaines="semainesProgramme"
+              :courante="semaineCourante"
+              :tests="testsSemaine"
+              :envoi="envoiSuivi"
+              @passer="passerSemaine"
+              @noter="noterTest"
+            />
+
             <div v-if="loadingSeances" class="empty">Chargement...</div>
 
             <!-- Semaine type créée : le calendrier du mois remplace la liste.
@@ -964,6 +975,7 @@ import AppLayout from '../components/AppLayout.vue'
 import CourbeProgression from '../components/athlete/CourbeProgression.vue'
 import MesStats from '../components/athlete/MesStats.vue'
 import AjoutSeanceLibre from '../components/athlete/AjoutSeanceLibre.vue'
+import SemaineProgramme from '../components/athlete/SemaineProgramme.vue'
 import ProgressionExercice from '../components/athlete/ProgressionExercice.vue'
 import CelebrationXp from '../components/athlete/CelebrationXp.vue'
 import RecapSemaineModal from '../components/athlete/RecapSemaineModal.vue'
@@ -1103,7 +1115,7 @@ const DUREE_BROUILLON_MS = 48 * 60 * 60 * 1000
 
 export default {
   components: {
-    AppLayout, CourbeProgression, MesStats, AjoutSeanceLibre, ProgressionExercice, CelebrationXp, RecapSemaineModal, BlessuresPanel, DietePanel, PopupBanniere,
+    AppLayout, CourbeProgression, MesStats, AjoutSeanceLibre, SemaineProgramme, ProgressionExercice, CelebrationXp, RecapSemaineModal, BlessuresPanel, DietePanel, PopupBanniere,
     PlanningCalendrier, PlanningHebdoModal, ExerciceImage, ReactionArrivee
   },
   setup() {
@@ -1707,7 +1719,8 @@ export default {
       const t = seanceActive.value?.type_seance || 'musculation'
       const parts = []
       if (t === 'musculation') {
-        if (s.nb_reps) parts.push(`${s.nb_reps} reps`)
+        // « 8 » ou « 3+3 » sont des reps ; « 45 s » ou « 1 min » se lisent tels quels
+        if (s.nb_reps) parts.push(/^[\d\s+,.-]+$/.test(s.nb_reps) ? `${s.nb_reps} reps` : s.nb_reps)
         if (s.poids_cible) parts.push(s.poids_cible)
         if (s.rm) parts.push(s.rm)
         if (s.tempo) parts.push(`tempo ${s.tempo}`)
@@ -1990,7 +2003,94 @@ export default {
     // validée, ou la dernière si tout est fait (la séance boucle alors sur
     // cette dernière semaine indéfiniment, comme une programmation sans
     // progression).
+    // --- Programme de l'Atelier : une semaine à la fois, au rythme de
+    // l'athlète. La semaine en cours est la première ni faite (séances
+    // validées et tests notés) ni passée. Les programmes classiques gardent
+    // l'affichage par créneau ci-dessous.
+    const suiviSemaines = ref(null)
+    const envoiSuivi = ref(false)
+    const chargerSuiviSemaines = async (p) => {
+      suiviSemaines.value = null
+      if (!p?.par_semaines) return
+      try {
+        suiviSemaines.value = await api.get(`/programmes/${p.id}/suivi-semaines`)
+      } catch (e) {
+        // sans suivi, les séances restent affichées semaine 1 par semaine 1
+        console.error('Erreur chargement suivi des semaines:', e)
+        suiviSemaines.value = { semaines_passees: [], tests: [] }
+      }
+    }
+    const semainesProgramme = computed(() => {
+      if (!programmeActif.value?.par_semaines || !suiviSemaines.value) return null
+      const { semaines_passees: passees, tests } = suiviSemaines.value
+      const numeros = [...new Set([...seances.value.map(s => s.semaine || 1), ...tests.map(t => t.semaine)])].sort((a, b) => a - b)
+      return numeros.map(numero => {
+        const testsSemaine = tests.filter(t => t.semaine === numero)
+        return {
+          numero,
+          faite: seances.value.filter(s => (s.semaine || 1) === numero).every(s => seancesCompletees.value.has(s.id))
+            && testsSemaine.every(t => t.resultat),
+          passee: passees.includes(numero),
+          test: testsSemaine.length > 0
+        }
+      })
+    })
+    const semaineCourante = computed(() =>
+      semainesProgramme.value?.find(s => !s.faite && !s.passee)?.numero ?? null
+    )
+    // Programme fini : ses séances de la dernière semaine restent ouvertes.
+    const semaineAffichee = computed(() => {
+      const semaines = semainesProgramme.value
+      if (!semaines?.length) return 1
+      return semaineCourante.value ?? semaines[semaines.length - 1].numero
+    })
+    const testsSemaine = computed(() =>
+      semaineCourante.value === null ? [] : (suiviSemaines.value?.tests || []).filter(t => t.semaine === semaineCourante.value)
+    )
+    // Semaine bouclée en validant sa dernière séance (ou son dernier test) :
+    // on le dit, la suivante s'affiche d'elle-même.
+    watch(semaineCourante, (nouvelle, ancienne) => {
+      if (ancienne === null || ancienne === undefined || envoiSuivi.value) return
+      if (nouvelle !== null && nouvelle <= ancienne) return
+      const faite = semainesProgramme.value?.find(s => s.numero === ancienne)?.faite
+      if (!faite) return
+      afficherToast(nouvelle === null
+        ? '🏆 Programme terminé : bravo !'
+        : `💪 Semaine ${ancienne} terminée : place à la semaine ${nouvelle}`, 'succes', 7000)
+    })
+    const passerSemaine = async (semaine) => {
+      const p = programmeActif.value
+      if (!p || envoiSuivi.value) return
+      envoiSuivi.value = true
+      try {
+        suiviSemaines.value = await api.post(`/programmes/${p.id}/semaines/${semaine}/passer`)
+      } catch (e) {
+        afficherToast(e.message || 'Impossible de passer la semaine', 'erreur')
+      } finally {
+        envoiSuivi.value = false
+      }
+    }
+    const noterTest = async (id, valeur, apres) => {
+      const p = programmeActif.value
+      if (!p || envoiSuivi.value) return
+      envoiSuivi.value = true
+      try {
+        suiviSemaines.value = await api.put(`/programmes/${p.id}/tests/${id}/resultat`, { valeur })
+        apres?.()
+        afficherToast('Résultat noté : ton prépa le voit', 'succes')
+      } catch (e) {
+        afficherToast(e.message || "Impossible d'enregistrer ce résultat", 'erreur')
+      } finally {
+        envoiSuivi.value = false
+      }
+    }
+
     const seancesAffichees = computed(() => {
+      if (programmeActif.value?.par_semaines) {
+        return seances.value
+          .filter(s => (s.semaine || 1) === semaineAffichee.value)
+          .sort((a, b) => a.ordre - b.ordre)
+      }
       const creneaux = {}
       seances.value.forEach(s => {
         const cle = `${s.nom}||${s.jour}||${s.ordre}`
@@ -2176,6 +2276,8 @@ export default {
     }
 
     const selectProgramme = async (p) => {
+      // Le suivi d'un autre programme ne doit pas se mêler à ses séances
+      suiviSemaines.value = null
       programmeActif.value = p
       seanceActive.value = null
       loadingSeances.value = true
@@ -2193,6 +2295,8 @@ export default {
 
       // Charge les logs existants après les séances
       await chargerLogsExistants(p.id)
+      // Programme de l'Atelier : semaines passées et tests notés
+      await chargerSuiviSemaines(p)
       // Semaine type : propre à chaque programme, rechargée à chaque bascule
       await chargerPlanning()
       // Précharge l'historique complet : nécessaire dès l'écran de saisie
@@ -2811,7 +2915,8 @@ export default {
     })
 
     return {
-      authStore, programmes, programmeActif, seances, seanceActive, logs, historique,
+      authStore, semainesProgramme, semaineCourante, testsSemaine, envoiSuivi, passerSemaine, noterTest,
+      programmes, programmeActif, seances, seanceActive, logs, historique,
       loadingSeances, onglet,
       menuSuiviOuvert, ongletsSuivi, ITEMS_SUIVI, choisirSuivi,
       seancesAffichees,

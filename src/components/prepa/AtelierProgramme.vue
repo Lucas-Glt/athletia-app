@@ -7,8 +7,8 @@
       <div>
         <h2 class="atelier-titre">Atelier de programme <span class="badge-beta">bêta</span></h2>
         <p class="atelier-sous-titre">
-          Prototype pour essayer une nouvelle façon de construire un programme. Rien n'est enregistré sur le
-          serveur ni envoyé aux athlètes : le brouillon reste sur cet appareil.
+          Construis ton programme semaine par semaine, puis crée-le à l'étape 4 : il rejoint « Mes programmes »
+          et tu l'assignes à tes athlètes. D'ici là, le brouillon reste sur cet appareil.
         </p>
       </div>
       <div class="atelier-actions">
@@ -341,12 +341,33 @@
               @click="semaineApercu = w"
             ><i v-if="semainesTestSet.has(w)" class="ti ti-flag-3"></i>S{{ w }}</button>
           </div>
-          <div class="suite">
-            <i class="ti ti-bulb"></i>
-            <span>
-              Si cette façon de construire te convient, l'étape suivante sera d'enregistrer le programme, de l'assigner à
-              des athlètes et d'adapter leur appli pour qu'elle suive les semaines à leur rythme.
-            </span>
+          <!-- Création : le programme part tel que l'aperçu le montre -->
+          <div v-if="programmeCree" class="creation creation-ok" role="status">
+            <div class="creation-titre"><i class="ti ti-circle-check"></i> « {{ programmeCree.nom }} » est créé</div>
+            <p>Il est dans « Mes programmes ». Assigne-le à tes athlètes : ils le suivront semaine par semaine.</p>
+            <div class="creation-actions">
+              <button class="btn btn-primary" @click="$emit('cree', programmeCree)">
+                <i class="ti ti-user-plus"></i> Assigner à des athlètes
+              </button>
+              <button class="btn btn-ghost" @click="nouveauProgramme">
+                <i class="ti ti-file-plus"></i> Nouveau programme
+              </button>
+            </div>
+          </div>
+          <div v-else class="creation">
+            <div class="creation-titre"><i class="ti ti-rocket"></i> Créer le programme</div>
+            <ul v-if="problemes.length" class="points">
+              <li v-for="(p, i) in problemes" :key="i"><i class="ti ti-alert-triangle"></i> {{ p }}</li>
+            </ul>
+            <p v-else>
+              {{ b.nbSemaines }} semaine{{ b.nbSemaines > 1 ? 's' : '' }}, {{ nbSeancesTotal }} séance{{ nbSeancesTotal > 1 ? 's' : '' }}<template v-if="nbTestsTotal"> et {{ nbTestsTotal }} test{{ nbTestsTotal > 1 ? 's' : '' }} à saisir par l'athlète</template>.
+              Tu pourras encore le modifier dans « Mes programmes ».
+            </p>
+            <p v-if="erreurCreation" class="error" role="alert">{{ erreurCreation }}</p>
+            <button class="btn btn-primary" :disabled="problemes.length > 0 || envoiCreation" @click="creerProgramme">
+              <i class="ti" :class="envoiCreation ? 'ti-loader-2' : 'ti-rocket'"></i>
+              {{ envoiCreation ? 'Création…' : 'Créer le programme' }}
+            </button>
           </div>
         </div>
         <AtelierApercuAthlete :brouillon="b" :semaine="semaineApercu" />
@@ -369,9 +390,10 @@ import { CLES_TYPES_SEANCE, typeSeance, labelTypeSeance, iconeTypeSeance } from 
 import {
   JOURS, NB_SEMAINES_MAX, PROGRESSIONS, champsType, labelProgression, nouvelleCle,
   semainesTest, semainesDeSeance, libelleSemaines,
-  prescriptionSemaine, toutesLesSemaines, pointsAttention,
+  prescriptionSemaine, toutesLesSemaines, pointsAttention, problemesCreation, programmePourApi,
   nouvelExercice, nouvelleSeance, nouveauBrouillon, migrerBrouillon, exempleBrouillon
 } from '../../utils/programmeAtelier'
+import { CATALOGUE_TESTS } from '../../data/catalogueTests'
 
 const ETAPES = [
   { cle: 'cadre', label: 'Cadre' },
@@ -400,6 +422,7 @@ const ecrireBrouillon = (brouillon) => {
 
 export default {
   components: { ExerciceAutocomplete, AtelierApercuAthlete },
+  emits: ['cree'],
   setup() {
     const api = useApi()
 
@@ -538,6 +561,43 @@ export default {
       exempleCharge.value = true
       etape.value = 'cadre'
     }
+    // --- Création du programme ---
+    const problemes = computed(() => problemesCreation(b.value))
+    const nbSeancesTotal = computed(() => semaines.value.reduce((n, w) => n + w.seances.length, 0))
+    const nbTestsTotal = computed(() => semaines.value.reduce((n, w) => n + (w.tests?.liste.length || 0), 0))
+    const programmeCree = ref(null)
+    const envoiCreation = ref(false)
+    const erreurCreation = ref('')
+    // Catégorie d'un test créé dans l'onglet Tests : celle du test du prépa
+    // ou du catalogue qui porte ce nom, « Test de forme » sinon.
+    const categorieTest = (nom) => {
+      const n = nom.trim().toLowerCase()
+      return testsCatalogue.value.find(t => t.type_test.trim().toLowerCase() === n)?.categorie
+        || CATALOGUE_TESTS.find(t => t.label.toLowerCase() === n)?.categorie
+        || 'forme'
+    }
+    const creerProgramme = async () => {
+      if (envoiCreation.value || problemes.value.length) return
+      envoiCreation.value = true
+      erreurCreation.value = ''
+      try {
+        programmeCree.value = await api.post('/programmes/atelier', programmePourApi(b.value, categorieTest))
+      } catch (e) {
+        erreurCreation.value = e.message || 'Le programme n\'a pas pu être créé'
+      } finally {
+        envoiCreation.value = false
+      }
+    }
+    // Brouillon modifié après la création : il pourra être créé à nouveau,
+    // comme un autre programme.
+    watch(b, () => { programmeCree.value = null }, { deep: true })
+    const nouveauProgramme = () => {
+      b.value = nouveauBrouillon()
+      seanceCle.value = null
+      exempleCharge.value = false
+      etape.value = 'cadre'
+    }
+
     const repartirDeZero = () => {
       if (brouillonEntame() && !confirm("Effacer le brouillon et repartir d'une page blanche ?")) return
       b.value = nouveauBrouillon()
@@ -556,6 +616,7 @@ export default {
       basculerSemaine, ajouterExercice, deplacerExercice, changerProgression, apercuProgression,
       deplacerSeance, ouvrirSeance, points, semaineApercu,
       chargerExemple, repartirDeZero,
+      problemes, nbSeancesTotal, nbTestsTotal, programmeCree, envoiCreation, erreurCreation, creerProgramme, nouveauProgramme,
       libelleSemaines, labelProgression,
       typeSeance, labelTypeSeance, iconeTypeSeance
     }
@@ -824,12 +885,18 @@ button.puce:hover { box-shadow: var(--shadow-sm); transform: translateY(-1px); }
 .semaine-nav { display: flex; align-items: center; gap: var(--spacing-sm); }
 .semaine-nav-label { flex: 1; text-align: center; font-size: var(--font-size-lg); font-weight: 700; }
 .semaine-nav-label small { font-size: var(--font-size-sm); font-weight: 500; color: var(--color-text-muted); }
-.suite {
-  display: flex; align-items: flex-start; gap: var(--spacing-sm);
+.creation {
+  display: flex; flex-direction: column; align-items: flex-start; gap: var(--spacing-sm);
   padding: var(--spacing-md); border-radius: var(--radius-md);
-  background: var(--color-bg-secondary); font-size: var(--font-size-sm); color: var(--color-text-secondary); line-height: 1.5;
+  border: 1px solid var(--color-primary-lighter); background: var(--color-primary-light);
+  font-size: var(--font-size-sm); color: var(--color-text-body); line-height: 1.5;
 }
-.suite .ti { color: var(--color-warning-icon); font-size: var(--font-size-lg); }
+.creation p { margin: 0; }
+.creation .points { margin: 0; }
+.creation-titre { display: flex; align-items: center; gap: var(--spacing-sm); font-weight: 700; color: var(--color-primary-text); }
+.creation-ok { border-color: var(--color-valid-bg-strong); background: var(--color-valid-bg-soft); }
+.creation-ok .creation-titre { color: var(--color-valid-text-strong); }
+.creation-actions { display: flex; gap: var(--spacing-sm); flex-wrap: wrap; }
 
 @media (max-width: 768px) {
   .atelier { padding: var(--spacing-md) var(--spacing-lg); }

@@ -89,7 +89,7 @@
 
         <ProgrammeForm v-if="vue === 'form'" @termine="onTermine" />
 
-        <AtelierProgramme v-else-if="sousOngletProgrammes === 'atelier'" />
+        <AtelierProgramme v-else-if="sousOngletProgrammes === 'atelier'" @cree="assignerProgrammeAtelier" />
 
         <div v-else class="content-body" :class="{ 'detail-ouvert': mobileDetail }">
           <!-- Liste des programmes : colonne desktop, écran plein mobile -->
@@ -137,6 +137,9 @@
             <div class="detail-top">
               <div class="detail-info" v-if="!editMode">
                 <h3>{{ programmeActif.nom }}</h3>
+                <span v-if="programmeActif.par_semaines" class="badge badge-purple badge-semaines" title="Créé dans l'Atelier : l'athlète voit une semaine à la fois et passe à la suivante quand il a tout fait">
+                  <i class="ti ti-stairs-up"></i> Semaine par semaine, au rythme de l'athlète
+                </span>
                 <p v-if="programmeActif.description">{{ programmeActif.description }}</p>
               </div>
               <div class="detail-edit" v-else>
@@ -1003,6 +1006,18 @@ export default {
       naviguer({ onglet: 'programmes', programme: programme.id })
     }
 
+    // Programme tout juste créé dans l'Atelier : il s'ouvre dans « Mes
+    // programmes », fenêtre d'assignation ouverte.
+    const assignerProgrammeAtelier = async (programme) => {
+      await fetchProgrammes()
+      const cree = programmes.value.find(p => p.id === programme.id)
+      if (!cree) return
+      sousOngletProgrammes.value = 'mes-programmes'
+      vue.value = 'liste'
+      ouvrirProgramme(cree)
+      modalAssigner.value = true
+    }
+
     const startEditMode = () => {
       editNom.value = programmeActif.value.nom
       editDesc.value = programmeActif.value.description || ''
@@ -1224,6 +1239,7 @@ export default {
       seanceEnEdition.value = null
     })
     return {
+      assignerProgrammeAtelier,
       banniereCercle, voirNouveauxAthletes, marquerNotificationsVues,
       ONGLETS, onglet, allerOnglet, visites, panneaux, seancesPanel, nouvellesSeances,
       athleteOuvertId, ficheOnglet, ouvrirAthlete, fermerAthlete, changerOngletFiche,
@@ -1428,6 +1444,7 @@ export default {
 
 .detail-top { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--spacing-md); flex-shrink: 0; flex-wrap: wrap; }
 .detail-info h3 { font-size: var(--font-size-xl); font-weight: 700; margin: 0 0 3px; }
+.badge-semaines { display: inline-flex; align-items: center; gap: 4px; margin-bottom: 4px; }
 .detail-info p { font-size: var(--font-size-sm); color: var(--color-text-secondary); margin: 0; }
 .detail-edit { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 200px; }
 .detail-edit input {
