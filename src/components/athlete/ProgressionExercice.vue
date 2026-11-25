@@ -9,6 +9,7 @@
       :points="courbeExerciceChoisi"
       :label="exerciceChoisi.exercice_nom"
       :unite="exerciceChoisi.unite"
+      :objectif="objectifChoisi"
     />
   </div>
 </template>
@@ -18,6 +19,7 @@ import { ref, computed, watch } from 'vue'
 import { useApi } from '../../services/api'
 import CourbeProgression from './CourbeProgression.vue'
 import { parseValeurSerie } from '../../utils/valeurSerie'
+import { objectifDe } from '../../data/objectifs'
 
 // Courbe d'un exercice suivi (étoile), moyenne de chaque tentative. Vit dans
 // l'onglet Perfs, à côté des meilleures performances : l'accueil ne garde que
@@ -26,7 +28,9 @@ export default {
   components: { CourbeProgression },
   props: {
     // Exercices suivis, tels que renvoyés par /performances/moi
-    performances: { type: Array, default: () => [] }
+    performances: { type: Array, default: () => [] },
+    // Objectifs du prépa par clé d'exercice (cf. data/objectifs.js)
+    objectifs: { type: Object, default: () => ({}) }
   },
   setup(props) {
     const api = useApi()
@@ -34,6 +38,12 @@ export default {
     const historiqueExercice = ref([])
 
     const exerciceChoisi = computed(() => props.performances.find(p => p.exercice_id === exerciceChoisiId.value))
+    // Une charge : n'a de sens que sur la courbe d'un exercice de musculation
+    const objectifChoisi = computed(() =>
+      exerciceChoisi.value?.type_seance === 'musculation'
+        ? objectifDe(props.objectifs, exerciceChoisi.value.exercice_nom)?.poids ?? null
+        : null
+    )
 
     // Premier exercice choisi d'office, et de nouveau si celui affiché n'est
     // plus suivi.
@@ -77,7 +87,7 @@ export default {
         .sort((a, b) => new Date(a.date) - new Date(b.date))
     })
 
-    return { exerciceChoisiId, exerciceChoisi, courbeExerciceChoisi }
+    return { exerciceChoisiId, exerciceChoisi, courbeExerciceChoisi, objectifChoisi }
   }
 }
 </script>

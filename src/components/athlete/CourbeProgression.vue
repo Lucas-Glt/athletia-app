@@ -2,7 +2,12 @@
   <div class="courbe">
     <div class="courbe-head">
       <span class="courbe-label">{{ label }}<span v-if="unite.trim()" class="courbe-unite"> ({{ unite.trim() }})</span></span>
-      <span v-if="delta" class="courbe-delta" :class="delta.classe">{{ delta.texte }}</span>
+      <span class="courbe-badges">
+        <span v-if="objectif" class="courbe-objectif-badge" title="Objectif fixé par ton prépa">
+          <i class="ti ti-target-arrow"></i> {{ formatValeur(objectif) }}
+        </span>
+        <span v-if="delta" class="courbe-delta" :class="delta.classe">{{ delta.texte }}</span>
+      </span>
     </div>
 
     <div v-if="points.length < 2" class="courbe-vide">
@@ -17,6 +22,12 @@
         </div>
         <!-- v-trace : la ligne se dessine, puis les points apparaissent -->
         <svg v-trace="lignePoints" class="courbe-svg" viewBox="0 0 300 120" preserveAspectRatio="none">
+          <line
+            v-if="objectifY !== null"
+            class="courbe-objectif"
+            :x1="0" :x2="300" :y1="objectifY" :y2="objectifY"
+            vector-effect="non-scaling-stroke"
+          />
           <polyline class="courbe-ligne" :points="lignePoints" data-trace />
           <circle
             v-for="(p, i) in coords"
@@ -45,6 +56,7 @@
         <span class="courbe-legende-item"><i class="courbe-dot" :class="classeVariation(1)"></i> En hausse</span>
         <span class="courbe-legende-item"><i class="courbe-dot diff-neutre"></i> Stable</span>
         <span class="courbe-legende-item"><i class="courbe-dot" :class="classeVariation(-1)"></i> En baisse</span>
+        <span v-if="objectif" class="courbe-legende-item"><i class="courbe-tiret"></i> Objectif</span>
       </div>
     </template>
   </div>
@@ -72,28 +84,33 @@ export default {
     // (poids soulevé, distance). À passer à false pour les indicateurs où une
     // valeur haute est mauvaise — Hooper Index, monotonie, contrainte : monter
     // y est un signal négatif, et le vert de la hausse disait l'inverse.
-    hausseFavorable: { type: Boolean, default: true }
+    hausseFavorable: { type: Boolean, default: true },
+    // Objectif fixé par le prépa (même unité) : ligne pointillée, comprise
+    // dans l'échelle pour rester visible même loin des points.
+    objectif: { type: Number, default: null }
   },
   setup(props) {
-    const minY = computed(() => Math.min(...props.points.map(p => p.valeur)))
-    const maxY = computed(() => Math.max(...props.points.map(p => p.valeur)))
+    const valeursEchelle = computed(() => [...props.points.map(p => p.valeur), ...(props.objectif ? [props.objectif] : [])])
+    const minY = computed(() => Math.min(...valeursEchelle.value))
+    const maxY = computed(() => Math.max(...valeursEchelle.value))
+    const bornes = () => (minY.value === maxY.value ? [minY.value - 1, maxY.value + 1] : [minY.value, maxY.value])
+    const yDe = (valeur) => {
+      const [min, max] = bornes()
+      return MARGE.haut + (1 - (valeur - min) / (max - min)) * (HAUTEUR - MARGE.haut - MARGE.bas)
+    }
 
     const coords = computed(() => {
       const n = props.points.length
       if (n === 0) return []
-      let min = minY.value
-      let max = maxY.value
-      if (min === max) { min -= 1; max += 1 }
-
       const largeurUtile = LARGEUR - MARGE.gauche - MARGE.droite
-      const hauteurUtile = HAUTEUR - MARGE.haut - MARGE.bas
       const pas = n > 1 ? largeurUtile / (n - 1) : 0
 
       return props.points.map((p, i) => ({
         x: MARGE.gauche + (n > 1 ? i * pas : largeurUtile / 2),
-        y: MARGE.haut + (1 - (p.valeur - min) / (max - min)) * hauteurUtile
+        y: yDe(p.valeur)
       }))
     })
+    const objectifY = computed(() => (props.objectif && props.points.length ? yDe(props.objectif) : null))
 
     const lignePoints = computed(() => coords.value.map(p => `${p.x},${p.y}`).join(' '))
 
@@ -132,7 +149,7 @@ export default {
     const formatValeur = (v) => `${nombre(v)}${uniteValeur.value}`
     const formatDateAxe = (d) => new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
 
-    return { coords, lignePoints, delta, minY, maxY, couleurPoint, classeVariation, formatValeur, formatDateAxe }
+    return { coords, lignePoints, objectifY, delta, minY, maxY, couleurPoint, classeVariation, formatValeur, formatDateAxe }
   }
 }
 </script>
@@ -147,6 +164,20 @@ export default {
 }
 .courbe-label { font-size: var(--font-size-xs); font-weight: 700; color: var(--color-text-secondary); }
 .courbe-unite { font-weight: 400; }
+.courbe-badges { display: inline-flex; align-items: center; gap: 6px; }
+.courbe-objectif-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: var(--radius-full, 999px);
+  background: var(--color-warning-bg);
+  color: var(--color-warning-text);
+}
+.courbe-objectif { stroke: var(--color-warning-icon); stroke-width: 1.5; stroke-dasharray: 5 4; }
+.courbe-tiret { width: 12px; height: 0; border-top: 2px dashed var(--color-warning-icon); display: inline-block; }
 .courbe-delta {
   font-size: 11px;
   font-weight: 700;

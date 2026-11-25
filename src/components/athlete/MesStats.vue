@@ -212,6 +212,9 @@
         Valide ta première séance pour commencer à voir tes stats ici.
       </div>
     </div>
+
+    <!-- Nouveautés de l'appli, tout en bas -->
+    <NotesMaj class="accueil-notes" />
   </div>
 </template>
 
@@ -221,6 +224,7 @@ import { useApi } from '../../services/api'
 import { useProgressionStore } from '../../stores/progression'
 import CarteNiveau from './CarteNiveau.vue'
 import CalendrierDiete from './CalendrierDiete.vue'
+import NotesMaj from './NotesMaj.vue'
 import { afficherToast } from '../../composables/useToast'
 import { SOMMEIL_MIN, SOMMEIL_MAX, SOMMEIL_PAS, SOMMEIL_DEFAUT, formatHeures } from '../../data/sommeil'
 import { DUREE_MAX, DUREE_A_CONFIRMER, labelRpe, dureeEnHeures as formatDuree } from '../../data/ressenti'
@@ -237,7 +241,7 @@ const COULEUR_TYPE = {
 }
 
 export default {
-  components: { CarteNiveau, CalendrierDiete },
+  components: { CarteNiveau, CalendrierDiete, NotesMaj },
   // ressenti-envoye / wellness-envoye : la bannière du dashboard propose le
   // même questionnaire. Sans ces signaux, y répondre ici la laissait affichée,
   // à proposer quelque chose qui venait d'être fait.
@@ -550,7 +554,7 @@ export default {
     gap: var(--spacing-xl);
     padding: var(--spacing-2xl) max(var(--spacing-2xl), calc((100% - 1080px) / 2));
   }
-  .mes-stats > .carte-niveau { grid-column: 1 / -1; }
+  .mes-stats > .carte-niveau, .mes-stats > .accueil-notes { grid-column: 1 / -1; }
   .colonne { display: flex; flex-direction: column; gap: var(--spacing-lg); min-width: 0; }
 }
 @media (min-width: 769px) {

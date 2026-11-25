@@ -382,6 +382,12 @@
                     <span v-else class="exo-ligne-prescrit">
                       <span v-for="(s, i) in exo.series" :key="s.id">S{{ i + 1 }} {{ valeursSerie(exo, i) || '—' }}</span>
                     </span>
+                    <template v-for="obj in [objectifExo(exo)]" :key="obj?.id ?? 'sans-objectif'">
+                      <span v-if="obj" class="exo-ligne-objectif" :class="{ atteint: obj.atteint_le }">
+                        <i class="ti" :class="obj.atteint_le ? 'ti-circle-check' : 'ti-target-arrow'"></i>
+                        Objectif {{ texteObjectif(obj) }}{{ obj.atteint_le ? ' atteint' : '' }}
+                      </span>
+                    </template>
                   </button>
                 </div>
                 <span v-if="reposSerie(groupe, 0)" class="exo-bloc-repos">
@@ -568,6 +574,20 @@
                       </button>
                     </span>
                   </div>
+                  <!-- Objectif fixé par le prépa : la charge à aller chercher -->
+                  <template v-for="(exo, eidx) in groupe.exercices" :key="'obj' + exo.id">
+                    <template v-for="obj in [objectifExo(exo)]" :key="obj?.id ?? 'sans-objectif'">
+                      <div v-if="obj" class="saisie-objectif" :class="{ atteint: obj.atteint_le }">
+                        <i class="ti" :class="obj.atteint_le ? 'ti-circle-check' : 'ti-target-arrow'"></i>
+                        <span>
+                          <span class="exo-letter-mini" v-if="groupe.exercices.length > 1">{{ letterFor(eidx) }}</span>
+                          Objectif de ton prépa : <strong>{{ texteObjectif(obj) }}</strong>
+                          <template v-if="obj.atteint_le"> · atteint</template>
+                          <template v-else-if="obj.meilleure_charge"> · ton meilleur : {{ texteCharge(obj.meilleure_charge) }}</template>
+                        </span>
+                      </div>
+                    </template>
+                  </template>
                   <div class="saisie-swipe-hint">
                     <span class="swipe-hint-item"><i class="ti ti-chevron-left"></i> Historique</span>
                     <span class="swipe-hint-item">Courbe progression <i class="ti ti-chevron-right"></i></span>
@@ -619,6 +639,7 @@
                     :points="courbeExo(exo, champ.champ)"
                     :label="champ.label"
                     :unite="champ.unite"
+                    :objectif="champ.champ === 'poids_realise' ? objectifExo(exo)?.poids ?? null : null"
                   />
                 </div>
               </template>
@@ -869,7 +890,27 @@
 
       <!-- ONGLET PERFORMANCES -->
       <div v-if="onglet === 'performances'" v-entree-onglet="sensOnglet" v-cascade class="performances-page">
-        <ProgressionExercice :performances="performances" />
+        <!-- Objectifs fixés par le prépa : où en est l'athlète sur chacun -->
+        <section v-if="listeObjectifs.length" class="objectifs-perfs">
+          <div class="section-title">Objectifs de ton prépa</div>
+          <div v-for="o in listeObjectifs" :key="o.id" class="objectif-perf" :class="{ atteint: o.atteint_le }">
+            <div class="objectif-perf-tete">
+              <span class="objectif-perf-nom">{{ o.exercice_nom }}</span>
+              <span class="objectif-perf-cible">
+                <i class="ti" :class="o.atteint_le ? 'ti-circle-check' : 'ti-target-arrow'"></i> {{ texteObjectif(o) }}
+              </span>
+            </div>
+            <div class="objectif-perf-jauge" role="progressbar" :aria-valuenow="avancementObjectif(o)" aria-valuemin="0" aria-valuemax="100" :aria-label="`Avancement vers l'objectif ${o.exercice_nom}`">
+              <span :style="{ width: avancementObjectif(o) + '%' }"></span>
+            </div>
+            <div class="objectif-perf-sous">
+              <template v-if="o.atteint_le">Atteint le {{ formatDateCourt(o.atteint_le) }}</template>
+              <template v-else-if="o.meilleure_charge">Ton meilleur : {{ texteCharge(o.meilleure_charge) }}<template v-if="o.meilleure_charge < o.poids"> · encore {{ texteCharge(o.poids - o.meilleure_charge) }}</template></template>
+              <template v-else>Pas encore de série faite sur cet exercice</template>
+            </div>
+          </div>
+        </section>
+        <ProgressionExercice :performances="performances" :objectifs="objectifs" />
         <div class="section-title">Meilleures performances</div>
         <div v-if="performances.length === 0" class="empty">
           Aucun exercice suivi pour l'instant. Touche l'étoile à côté d'un exercice dans le panneau de saisie pour le faire apparaître ici.
@@ -889,6 +930,10 @@
               </button>
             </span>
             <span class="performance-meta">{{ perf.seance_nom }} · {{ perf.programme_nom }}</span>
+            <span v-if="objectifPerf(perf)" class="performance-objectif" :class="{ atteint: objectifPerf(perf).atteint_le }">
+              <i class="ti" :class="objectifPerf(perf).atteint_le ? 'ti-circle-check' : 'ti-target-arrow'"></i>
+              Objectif {{ texteObjectif(objectifPerf(perf)) }}{{ objectifPerf(perf).atteint_le ? ' atteint' : '' }}
+            </span>
           </div>
           <div class="performance-valeur" v-if="perf.meilleure_valeur !== null">
             <div class="performance-valeur-main">
@@ -1047,6 +1092,7 @@ import { cleOccurrence, jourDeLaDate } from '../data/joursSemaine'
 import { parseValeurSerie, inputmodeSaisie } from '../utils/valeurSerie'
 import { formatJourRelatif } from '../data/activite'
 import { texteRecord } from '../data/seancesRealisees'
+import { objectifDe, objectifsParCle, texteCharge, texteObjectif } from '../data/objectifs'
 import { afficherToast } from '../composables/useToast'
 import { useBarreRangee } from '../composables/useBarreRangee'
 
@@ -2521,11 +2567,20 @@ export default {
       // Séance faite : confettis et XP gagnée
       progression.feter(origineFete)
       progression.actualiser('Séance validée')
-      // Record(s) battu(s) pendant la séance (calculés par l'API)
+      // Objectif(s) du prépa atteint(s) et record(s) battu(s) pendant la
+      // séance (calculés par l'API), dans un même message.
+      const objectifsAvant = objectifs.value
+      await chargerObjectifs()
+      const atteints = Object.values(objectifs.value).filter(o => o.atteint_le && !objectifsAvant[o.exercice_cle]?.atteint_le)
+      const annonces = []
+      if (atteints.length) {
+        annonces.push(`🎯 ${atteints.length > 1 ? 'Objectifs atteints' : 'Objectif atteint'} : ${atteints.map(o => `${o.exercice_nom} ${texteObjectif(o)}`).join(' · ')}`)
+      }
       if (records.length) {
         const liste = records.map(r => `${r.exercice} ${texteRecord(r)}`).join(' · ')
-        afficherToast(`🏆 ${records.length > 1 ? 'Nouveaux records' : 'Nouveau record'} : ${liste}`, 'succes', 9000)
+        annonces.push(`🏆 ${records.length > 1 ? 'Nouveaux records' : 'Nouveau record'} : ${liste}`)
       }
+      if (annonces.length) afficherToast(annonces.join(' — '), 'succes', 9000)
       // Le calendrier de la semaine type colore les séances faites à partir de
       // l'historique : sans ce rafraîchissement, celle qu'on vient de valider
       // y resterait « à faire » jusqu'au prochain chargement de l'écran.
@@ -2961,6 +3016,26 @@ export default {
       }
     })
 
+    // Objectifs de charge fixés par le prépa (musculation) : dans la séance,
+    // la saisie, les courbes et l'onglet Perfs.
+    const objectifs = ref({})
+    const chargerObjectifs = async () => {
+      try {
+        objectifs.value = objectifsParCle(await api.get('/objectifs/moi'))
+      } catch {
+        // rien à montrer : la séance reste la même
+      }
+    }
+    onMounted(chargerObjectifs)
+    const objectifExo = (exo) => {
+      const type = seanceActive.value?.type_seance
+      return type && type !== 'musculation' ? null : objectifDe(objectifs.value, exo.nom)
+    }
+    const objectifPerf = (perf) => (perf.type_seance === 'musculation' ? objectifDe(objectifs.value, perf.exercice_nom) : null)
+    const listeObjectifs = computed(() => Object.values(objectifs.value))
+    // Jauge : meilleure charge rapportée à l'objectif
+    const avancementObjectif = (o) => (o.atteint_le ? 100 : Math.min(100, Math.round(((o.meilleure_charge || 0) / o.poids) * 100)))
+
     const isGroupeComplete = (groupe) => {
       const nbSeries = nbSeriesGroupe(groupe)
       if (nbSeries === 0) return false
@@ -2997,6 +3072,7 @@ export default {
       labelType, iconeType, estAujourdhuiSeance, letterFor, grouperExercices,
       nbSeriesGroupe, exosDeLaSerie, reposSerie,
       getLogs, isGroupeDone, erreurValidation, planificationSaison,
+      objectifs, objectifExo, objectifPerf, listeObjectifs, avancementObjectif, texteObjectif, texteCharge,
       feuilleSeance, barreValiderEl, barreValider,
       estEnEdition,
       etatBoutonSerie, toggleSerie, historiqueGroupeExiste, supprimerSeanceHistorique,
@@ -3518,6 +3594,24 @@ export default {
   font-variant-numeric: tabular-nums;
 }
 .exo-ligne-prescrit.is-vide { color: var(--color-text-muted); font-style: italic; }
+/* Objectif de charge fixé par le prépa (cf. data/objectifs.js) */
+.exo-ligne-objectif, .performance-objectif {
+  display: inline-flex; align-items: center; gap: 4px; align-self: flex-start;
+  margin-top: 2px; padding: 1px 8px; border-radius: var(--radius-full);
+  background: var(--color-warning-bg); color: var(--color-warning-text-strong);
+  font-size: var(--font-size-xs); font-weight: 700;
+}
+.exo-ligne-objectif.atteint, .performance-objectif.atteint { background: var(--color-valid-bg); color: var(--color-valid-text-strong); }
+.saisie-objectif {
+  display: flex; align-items: center; gap: 6px; margin-top: 4px;
+  padding: 4px 10px; border-radius: var(--radius-md);
+  background: var(--color-warning-bg-soft); border: 1px solid var(--color-warning-border);
+  font-size: var(--font-size-xs); color: var(--color-text-secondary);
+}
+.saisie-objectif strong { color: var(--color-warning-text-strong); }
+.saisie-objectif > .ti { font-size: 16px; color: var(--color-warning-icon); flex-shrink: 0; }
+.saisie-objectif.atteint { background: var(--color-valid-bg-soft); border-color: var(--color-valid-border); }
+.saisie-objectif.atteint > .ti, .saisie-objectif.atteint strong { color: var(--color-valid-text-strong); }
 .exo-bloc-repos {
   display: inline-flex;
   align-items: center;
@@ -4127,6 +4221,28 @@ export default {
 .performance-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .performance-exo { font-size: var(--font-size-sm); font-weight: 600; color: var(--color-text-body); }
 .performance-meta { font-size: var(--font-size-xs); color: var(--color-text-muted); }
+.objectifs-perfs { display: flex; flex-direction: column; gap: var(--spacing-sm); }
+.objectif-perf {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: var(--spacing-md); background: var(--color-bg);
+  border: 1px solid var(--color-border); border-radius: var(--radius-lg);
+}
+.objectif-perf-tete { display: flex; align-items: center; justify-content: space-between; gap: var(--spacing-sm); }
+.objectif-perf-nom { font-size: var(--font-size-sm); font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
+.objectif-perf-cible {
+  display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0;
+  padding: 1px 8px; border-radius: var(--radius-full);
+  background: var(--color-warning-bg); color: var(--color-warning-text-strong);
+  font-size: var(--font-size-xs); font-weight: 700;
+}
+.objectif-perf.atteint .objectif-perf-cible { background: var(--color-valid-bg); color: var(--color-valid-text-strong); }
+.objectif-perf-jauge { height: 8px; border-radius: var(--radius-full); background: var(--color-bg-tertiary); overflow: hidden; }
+.objectif-perf-jauge span { display: block; height: 100%; border-radius: inherit; background: var(--color-warning-icon); transition: width 0.6s var(--ease-standard); }
+.objectif-perf.atteint .objectif-perf-jauge span { background: var(--color-valid-text); }
+.objectif-perf-sous { font-size: var(--font-size-xs); color: var(--color-text-secondary); }
+@media (prefers-reduced-motion: reduce) {
+  .objectif-perf-jauge span { transition: none; }
+}
 .performance-valeur { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; }
 .performance-valeur-main { display: flex; align-items: baseline; gap: 4px; }
 .performance-valeur-sub { display: flex; align-items: center; gap: 6px; }

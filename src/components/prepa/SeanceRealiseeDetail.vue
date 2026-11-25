@@ -25,8 +25,39 @@
             <span v-if="recordDe(exo)" class="exo-record" :title="`Record personnel battu : ${texteRecord(recordDe(exo))}`">
               <i class="ti ti-trophy"></i> Record {{ texteRecord(recordDe(exo)) }}
             </span>
+            <!-- Objectif de charge : l'athlète le voit dans sa séance et ses courbes -->
+            <button
+              v-if="objectifs"
+              type="button"
+              class="exo-objectif"
+              :class="{ pose: objectifDe(objectifs, exo.nom), atteint: objectifDe(objectifs, exo.nom)?.atteint_le }"
+              :aria-expanded="objectifOuvert === exo.id"
+              :title="objectifDe(objectifs, exo.nom)?.atteint_le ? 'Objectif atteint' : 'Objectif de charge'"
+              @click="ouvrirObjectif(exo)"
+            >
+              <i class="ti" :class="objectifDe(objectifs, exo.nom)?.atteint_le ? 'ti-circle-check' : 'ti-target-arrow'"></i>
+              {{ objectifDe(objectifs, exo.nom) ? texteObjectif(objectifDe(objectifs, exo.nom)) : 'Objectif' }}
+            </button>
             <span class="exo-bilan" :class="classeTaux(tauxExo(exo))">{{ faitesExo(exo) }}/{{ exo.logs.length }}</span>
           </div>
+
+          <form v-if="objectifOuvert === exo.id" class="objectif-edition" @submit.prevent="enregistrerObjectif(exo)">
+            <label class="objectif-champ">
+              <span>Objectif</span>
+              <input v-model="brouillonObjectif.poids" type="number" inputmode="decimal" step="0.5" min="0.5" max="1000" required aria-label="Charge visée en kg" />
+              <span>kg</span>
+            </label>
+            <label class="objectif-champ">
+              <span>×</span>
+              <input v-model="brouillonObjectif.reps" type="number" inputmode="numeric" step="1" min="1" max="100" placeholder="reps" aria-label="Répétitions (facultatif)" />
+            </label>
+            <button type="submit" class="btn btn-sm btn-primary" :disabled="objectifEnvoi">Enregistrer</button>
+            <button v-if="objectifDe(objectifs, exo.nom)" type="button" class="btn btn-sm btn-ghost" :disabled="objectifEnvoi" @click="retirerObjectif(exo)">Retirer</button>
+            <span class="objectif-aide">
+              <template v-if="objectifDe(objectifs, exo.nom)?.meilleure_charge">Meilleure charge : {{ texteCharge(objectifDe(objectifs, exo.nom).meilleure_charge) }}. </template>
+              {{ athleteNom ? prenom(athleteNom) : 'Ton athlète' }} le verra dans sa séance et ses courbes.
+            </span>
+          </form>
 
           <div class="comparatif" role="table" :aria-label="`Séries de ${exo.nom}`">
             <div class="comparatif-entete" role="row">
@@ -86,6 +117,8 @@ import { ref, computed, onMounted } from 'vue'
 import { useApi } from '../../services/api'
 import { afficherToast } from '../../composables/useToast'
 import { grouperExercices, typeGroupe, labelTypeGroupe } from '../../data/typesGroupe'
+import { objectifDe, objectifsParCle, texteCharge, texteObjectif } from '../../data/objectifs'
+import { parseValeurSerie } from '../../utils/valeurSerie'
 import {
   REACTIONS_PREPA, ICONES_STATUT_SERIE, textePrescrit, texteRealise, statutSerie, classeTaux, cleExercice, texteRecord
 } from '../../data/seancesRealisees'
@@ -108,9 +141,22 @@ export default {
 
     const type = computed(() => props.seance.type_seance)
 
+    // Objectifs de charge de l'athlète (musculation seulement) ; null tant
+    // qu'ils ne sont pas lus, et en cas d'échec : le bouton n'apparaît pas.
+    const objectifs = ref(null)
+    const chargerObjectifs = async () => {
+      if (type.value !== 'musculation') return
+      try {
+        objectifs.value = objectifsParCle(await api.get(`/objectifs/athletes/${props.seance.athlete_id}`))
+      } catch {
+        objectifs.value = null
+      }
+    }
+
     const charger = async () => {
       chargement.value = true
       erreur.value = ''
+      chargerObjectifs()
       try {
         logs.value = await api.get(`/monitoring/seances/${props.seance.id}/series`)
       } catch (e) {
@@ -154,12 +200,48 @@ export default {
       }
     }
 
+    // Ouvert sur l'objectif en place, sinon sur la meilleure charge faite
+    // pendant cette séance : le prépa n'a plus qu'à l'ajuster.
+    const objectifOuvert = ref(null)
+    const objectifEnvoi = ref(false)
+    const brouillonObjectif = ref({ poids: '', reps: '' })
+    const ouvrirObjectif = (exo) => {
+      if (objectifOuvert.value === exo.id) { objectifOuvert.value = null; return }
+      const actuel = objectifDe(objectifs.value, exo.nom)
+      const charges = exo.logs.filter((l) => l.fait).map((l) => parseValeurSerie(l.poids_realise)).filter((v) => !isNaN(v))
+      brouillonObjectif.value = actuel
+        ? { poids: actuel.poids, reps: actuel.reps ?? '' }
+        : { poids: charges.length ? Math.max(...charges) : '', reps: '' }
+      objectifOuvert.value = exo.id
+    }
+    const majObjectifs = async (requete) => {
+      objectifEnvoi.value = true
+      try {
+        objectifs.value = objectifsParCle(await requete())
+        objectifOuvert.value = null
+      } catch (e) {
+        afficherToast(e.message || "L'objectif n'a pas pu être enregistré", 'erreur')
+      } finally {
+        objectifEnvoi.value = false
+      }
+    }
+    const enregistrerObjectif = (exo) => majObjectifs(() => api.put(`/objectifs/athletes/${props.seance.athlete_id}`, {
+      exercice_nom: exo.nom,
+      poids: Number(brouillonObjectif.value.poids),
+      reps: brouillonObjectif.value.reps === '' ? null : Number(brouillonObjectif.value.reps)
+    }))
+    const retirerObjectif = (exo) => majObjectifs(() =>
+      api.del(`/objectifs/athletes/${props.seance.athlete_id}/${objectifDe(objectifs.value, exo.nom).id}`)
+    )
+
     onMounted(charger)
 
     return {
       REACTIONS_PREPA, ICONES_STATUT_SERIE,
       logs, chargement, erreur, charger, groupes, type, reactionOuverte, reagir,
       faitesExo, tauxExo, lettre, prenom, recordDe, texteRecord,
+      objectifs, objectifDe, texteObjectif, texteCharge, objectifOuvert, objectifEnvoi, brouillonObjectif,
+      ouvrirObjectif, enregistrerObjectif, retirerObjectif,
       typeGroupe, labelTypeGroupe, textePrescrit, texteRealise, statutSerie, classeTaux
     }
   }
@@ -190,7 +272,7 @@ export default {
 .superset-banner { display: flex; align-items: center; gap: 6px; font-size: var(--font-size-xs); font-weight: 600; color: var(--color-superset-text); }
 
 .exo-bloc { display: flex; flex-direction: column; gap: var(--spacing-sm); }
-.exo-entete { display: flex; align-items: center; gap: var(--spacing-sm); }
+.exo-entete { display: flex; flex-wrap: wrap; align-items: center; gap: var(--spacing-sm); }
 .exo-repere {
   width: 26px; height: 26px; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
@@ -206,6 +288,26 @@ export default {
   background: var(--color-warning-bg); color: var(--color-warning-text-strong);
   font-size: var(--font-size-xs); font-weight: 700; white-space: nowrap;
 }
+.exo-objectif {
+  display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0;
+  padding: 2px 9px; border-radius: var(--radius-full);
+  border: 1px dashed var(--color-border-strong); background: transparent;
+  font: inherit; font-size: var(--font-size-xs); font-weight: 700; white-space: nowrap;
+  color: var(--color-text-muted); cursor: pointer;
+}
+.exo-objectif:hover { color: var(--color-primary-dark); border-color: var(--color-primary); }
+.exo-objectif.pose { border-style: solid; border-color: var(--color-warning-border); background: var(--color-warning-bg); color: var(--color-warning-text-strong); }
+.exo-objectif.atteint { border-color: transparent; background: var(--color-valid-bg); color: var(--color-valid-text-strong); }
+.objectif-edition {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid var(--color-warning-border); border-radius: var(--radius-md);
+  background: var(--color-warning-bg-soft);
+  animation: reaction-arrivee 0.25s var(--ease-standard);
+}
+.objectif-champ { display: inline-flex; align-items: center; gap: 6px; font-size: var(--font-size-sm); font-weight: 600; color: var(--color-text-secondary); }
+.objectif-champ input { width: 76px; min-height: 36px; padding: 0 8px; text-align: center; }
+.objectif-aide { flex-basis: 100%; font-size: var(--font-size-xs); color: var(--color-text-muted); }
 .exo-bilan {
   flex-shrink: 0; padding: 2px 8px; border-radius: var(--radius-full);
   font-size: var(--font-size-xs); font-weight: 700; font-variant-numeric: tabular-nums;
@@ -273,7 +375,7 @@ export default {
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 @media (prefers-reduced-motion: reduce) {
-  .reaction-choix, .tourne { animation: none; }
+  .reaction-choix, .tourne, .objectif-edition { animation: none; }
   .reaction-option:hover { transform: none; }
 }
 @media (max-width: 768px) {

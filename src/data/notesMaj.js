@@ -1,5 +1,5 @@
-// Mot du prépa et notes de mise à jour, affichés sur la page de connexion
-// pour les athlètes.
+// Mot du prépa et notes de mise à jour, affichés en bas de l'accueil des
+// athlètes (cf. components/athlete/NotesMaj.vue).
 //
 // Pour annoncer une nouvelle mise à jour : ajouter une entrée EN TÊTE de
 // NOTES_MAJ (la plus récente d'abord), avec sa date, un titre court et ce qui
@@ -15,6 +15,14 @@ export const MOT_DU_PREPA = [
 export const SIGNATURE_MOT = 'À vos barres…'
 
 export const NOTES_MAJ = [
+  {
+    date: '25 novembre 2026',
+    titre: 'Les objectifs de ton prépa',
+    points: [
+      'Ton prépa peut te fixer un objectif de charge sur un exercice, par exemple 85 kg × 5 au squat.',
+      'Tu le vois dans ta séance, dans ta saisie et en pointillés sur tes courbes. Dans Perfs, une jauge montre ce qu\'il te reste à aller chercher.'
+    ]
+  },
   {
     date: '25 novembre 2026',
     titre: 'Ta saison, cycle par cycle',
