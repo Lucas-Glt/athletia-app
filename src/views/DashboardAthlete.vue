@@ -164,6 +164,7 @@
         v-if="onglet === 'programme' && programmes.length > 0"
         v-entree-onglet="sensOnglet"
         class="content-body"
+        :class="{ 'avec-barre-valider': seanceActive && vueSeance === 'seance' }"
         @click.capture="swipeVueSeance.filtrerClic"
         @pointerdown="swipeVueSeance.start"
         @pointermove="swipeVueSeance.move"
@@ -316,7 +317,16 @@
             </button>
           </div>
 
-          <div class="screen feuille" v-if="vueSeance === 'seance'" v-cascade>
+          <!-- --hauteur-barre-valider : place réservée sous le dernier
+               exercice, que la barre de validation vient occuper en fin de
+               défilement (cf. useBarreRangee) -->
+          <div
+            ref="feuilleSeance"
+            class="screen feuille"
+            :style="{ '--hauteur-barre-valider': barreValider.hauteur + 'px' }"
+            v-if="vueSeance === 'seance'"
+            v-cascade
+          >
             <!-- Une seule vue : une case par exercice, cochée = fait aux
                  valeurs prévues par le prépa. Le crayon (ou le nom) ouvre le
                  panneau de saisie du groupe : photos, N-1, valeurs réelles
@@ -789,11 +799,43 @@
             </div>
           </div>
 
-          <!-- Barre de validation collante : visible sur la feuille de séance,
-               la séance reste modifiable même après validation (juste un rappel
-               de progression). Masquée sur l'historique et les courbes, qui ne
-               sont que de la consultation. -->
-          <div class="valider-bar" v-if="vueSeance === 'seance'">
+          <!-- Barre de validation, rangée sous le bas de l'écran pendant qu'on
+               remplit la séance : elle sort en fin de défilement, comme le
+               dernier bloc de la feuille, ou d'un coup par sa languette
+               (cf. useBarreRangee). Absente de l'historique et des courbes,
+               qui ne sont que de la consultation. -->
+          <div
+            ref="barreValiderEl"
+            class="valider-bar"
+            :class="{ 'suit-defilement': barreValider.defile }"
+            :style="{
+              '--sortie': barreValider.sortie,
+              '--languette': barreValider.relevee ? 1 : 1 - barreValider.parDefilement
+            }"
+            v-if="vueSeance === 'seance'"
+          >
+            <button
+              type="button"
+              class="valider-languette"
+              :class="{
+                'est-relevee': barreValider.relevee,
+                'est-masquee': !barreValider.relevee && barreValider.parDefilement >= 0.98,
+                'est-complete': progressionSeance.total && progressionSeance.done === progressionSeance.total
+              }"
+              aria-controls="valider-contenu"
+              :aria-expanded="barreValider.sortie >= 0.98 ? 'true' : 'false'"
+              :aria-label="barreValider.relevee
+                ? 'Ranger la barre de validation'
+                : `Afficher la barre de validation : ${progressionSeance.done} exercice(s) fait(s) sur ${progressionSeance.total}`"
+              @pointerdown.stop="barreValider.languetteBas"
+              @pointerup="barreValider.languetteHaut"
+              @pointercancel="barreValider.languetteAnnulee"
+              @click="barreValider.languetteClic"
+            >
+              <i class="ti ti-chevron-up"></i>
+              <span>{{ progressionSeance.done }}/{{ progressionSeance.total }}</span>
+            </button>
+            <div id="valider-contenu" class="valider-contenu" :inert="barreValider.sortie === 0 || null">
             <div class="valider-progress">
               <div class="valider-progress-track">
                 <div
@@ -812,6 +854,7 @@
             <p class="valider-erreur" v-if="erreurValidation">
               <i class="ti ti-alert-triangle"></i> {{ erreurValidation }}
             </p>
+            </div>
           </div>
         </template>
       </div>
@@ -995,6 +1038,7 @@ import { parseValeurSerie, inputmodeSaisie } from '../utils/valeurSerie'
 import { formatJourRelatif } from '../data/activite'
 import { texteRecord } from '../data/seancesRealisees'
 import { afficherToast } from '../composables/useToast'
+import { useBarreRangee } from '../composables/useBarreRangee'
 
 // Distance horizontale minimale pour valider un swipe. Volontairement haute :
 // un doigt qui ripe sur un simple appui ne doit jamais changer d'écran.
@@ -2914,6 +2958,15 @@ export default {
       return { done: exos.filter(e => etatExo(e).complet).length, total: exos.length }
     })
 
+    // Barre « Valider la séance » rangée sous le bas de l'écran (cf.
+    // useBarreRangee). Rangée à chaque séance ou onglet ouvert ; ressortie
+    // quand la validation échoue, pour que le message soit lu.
+    const feuilleSeance = ref(null)
+    const barreValiderEl = ref(null)
+    const barreValider = useBarreRangee(feuilleSeance, barreValiderEl)
+    watch([() => seanceActive.value?.id, vueSeance], () => { barreValider.relevee = false })
+    watch(erreurValidation, (e) => { if (e) barreValider.relevee = true })
+
     return {
       authStore, semainesProgramme, semaineCourante, testsSemaine, envoiSuivi, passerSemaine, noterTest,
       programmes, programmeActif, seances, seanceActive, logs, historique,
@@ -2923,6 +2976,7 @@ export default {
       labelType, iconeType, estAujourdhuiSeance, letterFor, grouperExercices,
       nbSeriesGroupe, exosDeLaSerie, reposSerie,
       getLogs, isGroupeDone, erreurValidation,
+      feuilleSeance, barreValiderEl, barreValider,
       estEnEdition,
       etatBoutonSerie, toggleSerie, historiqueGroupeExiste, supprimerSeanceHistorique,
       selectProgramme, demarrerSeance, validerSeance,
@@ -3323,6 +3377,10 @@ export default {
 
 /* --- Feuille de séance --- */
 .feuille { gap: var(--spacing-lg); padding-bottom: var(--spacing-lg); }
+/* Place de la barre de validation sous le dernier exercice. Pseudo-élément
+   et non bloc vide : v-cascade fait entrer les enfants par une translation,
+   qui allongerait un instant la zone à défiler et fausserait la mesure. */
+.feuille::after { content: ''; flex-shrink: 0; height: var(--hauteur-barre-valider, 0px); }
 
 /* --- Feuille de séance : une case par exercice, le détail à la demande --- */
 .seance-aide {
@@ -3889,12 +3947,17 @@ export default {
 }
 
 /* --- Barre de validation collante --- */
+/* --- Barre de validation, rangée sous le bas de l'écran ---
+   Posée sur le bas de la feuille et décalée de (1 - --sortie) × sa hauteur :
+   le contenu de l'onglet coupe ce qui dépasse, la barre semble glisser sous
+   la barre d'onglets (cf. useBarreRangee). */
+.content-body.avec-barre-valider { position: relative; }
 .valider-bar {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--spacing-lg);
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 5;
   padding: var(--spacing-md) var(--spacing-lg);
   background: var(--color-bg);
   background: color-mix(in srgb, var(--color-bg) 94%, transparent);
@@ -3902,6 +3965,54 @@ export default {
   -webkit-backdrop-filter: blur(10px);
   border-top: 1px solid var(--color-border);
   box-shadow: 0 -4px 16px -4px rgba(31, 25, 84, 0.08);
+  transform: translateY(calc((1 - var(--sortie, 1)) * 100%));
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+/* En défilement, elle suit le contenu au pixel près */
+.valider-bar.suit-defilement { transition: none; }
+.valider-contenu {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--spacing-lg);
+}
+/* Languette : dépasse de la barre rangée, au-dessus de la barre d'onglets.
+   Elle recouvre le trait du haut de la barre pour faire corps avec elle, et
+   s'efface quand la barre sort d'elle-même en fin de défilement. */
+.valider-languette {
+  position: absolute;
+  bottom: calc(100% - 1px);
+  left: var(--spacing-lg);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 32px;
+  min-width: 64px;
+  justify-content: center;
+  padding: 0 var(--spacing-md);
+  border: 1px solid var(--color-border);
+  border-bottom: none;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  background: var(--color-bg);
+  box-shadow: 0 -4px 12px -4px rgba(31, 25, 84, 0.12);
+  color: var(--color-text-secondary);
+  font: inherit;
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+  opacity: var(--languette, 1);
+  transition: opacity var(--transition-base), color var(--transition-base);
+}
+.valider-languette i { font-size: 16px; transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1); }
+.valider-languette.est-relevee i { transform: rotate(180deg); }
+.valider-languette.est-masquee { pointer-events: none; }
+/* Tout est coché : la languette invite à valider */
+.valider-languette.est-complete { color: var(--color-valid-text); }
+.valider-languette:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  .valider-bar, .valider-languette i { transition: none; }
 }
 /* Pleine largeur sous la barre : le message doit être lu avant de réessayer,
    pas comprimé entre la progression et le bouton. */
@@ -3998,6 +4109,7 @@ export default {
   }
   .valider-bar { padding: var(--spacing-md) var(--spacing-2xl); }
   .valider-bar, .seance-topbar, .seance-onglets { padding-left: max(var(--spacing-2xl), calc((100% - 720px) / 2)); padding-right: max(var(--spacing-2xl), calc((100% - 720px) / 2)); }
+  .valider-languette { left: max(var(--spacing-2xl), calc((100% - 720px) / 2)); }
   .nav-item.nav-mobile { display: none; }
 }
 @media (max-width: 768px) {
