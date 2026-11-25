@@ -12,8 +12,10 @@ import { ref, computed, reactive, watch, nextTick, onBeforeUnmount } from 'vue'
 //   d'un glissé vers le haut ; un glissé vers le bas la range.
 //
 // `conteneur` : l'élément qui défile ; `barre` : la barre, positionnée en bas
-// de ce conteneur et translatée de (1 - sortie) × sa hauteur.
-export function useBarreRangee(conteneur, barre) {
+// de ce conteneur et translatée de (1 - sortie) × (sa hauteur - depasse).
+// `depasse` : hauteur (px) qui reste visible quand elle est rangée, pour
+// qu'on devine la barre sur toute la largeur.
+export function useBarreRangee(conteneur, barre, { depasse = 0 } = {}) {
   const hauteur = ref(0)
   // 0 = rangée … 1 = entièrement sortie, d'après le défilement seul
   const parDefilement = ref(0)
@@ -29,8 +31,10 @@ export function useBarreRangee(conteneur, barre) {
     if (!el || !b) return
     hauteur.value = b.offsetHeight
     const reste = el.scrollHeight - el.scrollTop - el.clientHeight
-    // < 1 px : défilement fractionnaire (zoom, écrans haute densité)
-    parDefilement.value = reste < 1 ? 1 : Math.max(0, 1 - reste / (hauteur.value || 1))
+    // Ce qui est caché sort pixel pour pixel avec le défilement. < 1 px :
+    // défilement fractionnaire (zoom, écrans haute densité).
+    const cache = Math.max(1, hauteur.value - depasse)
+    parDefilement.value = reste < 1 ? 1 : Math.max(0, 1 - reste / cache)
   }
   // L'espace réservé suit la hauteur de la barre (message d'erreur…) : la
   // longueur à défiler change au rendu suivant, on remesure à ce moment-là.
@@ -93,7 +97,7 @@ export function useBarreRangee(conteneur, barre) {
   }
 
   return reactive({
-    hauteur, parDefilement, relevee, defile, sortie,
+    hauteur, depasse, parDefilement, relevee, defile, sortie,
     languetteBas, languetteHaut, languetteAnnulee, languetteClic
   })
 }

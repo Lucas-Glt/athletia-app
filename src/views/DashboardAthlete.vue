@@ -807,9 +807,14 @@
           <div
             ref="barreValiderEl"
             class="valider-bar"
-            :class="{ 'suit-defilement': barreValider.defile }"
+            :class="{
+              'suit-defilement': barreValider.defile,
+              'est-complete': progressionSeance.total && progressionSeance.done === progressionSeance.total
+            }"
             :style="{
               '--sortie': barreValider.sortie,
+              '--depasse': barreValider.depasse + 'px',
+              '--avancement': (progressionSeance.total ? progressionSeance.done / progressionSeance.total * 100 : 0) + '%',
               '--languette': barreValider.relevee ? 1 : 1 - barreValider.parDefilement
             }"
             v-if="vueSeance === 'seance'"
@@ -2963,7 +2968,8 @@ export default {
     // quand la validation échoue, pour que le message soit lu.
     const feuilleSeance = ref(null)
     const barreValiderEl = ref(null)
-    const barreValider = useBarreRangee(feuilleSeance, barreValiderEl)
+    // 4 px restent visibles : le liseré d'avancement en haut de la barre
+    const barreValider = useBarreRangee(feuilleSeance, barreValiderEl, { depasse: 4 })
     watch([() => seanceActive.value?.id, vueSeance], () => { barreValider.relevee = false })
     watch(erreurValidation, (e) => { if (e) barreValider.relevee = true })
 
@@ -3948,9 +3954,10 @@ export default {
 
 /* --- Barre de validation collante --- */
 /* --- Barre de validation, rangée sous le bas de l'écran ---
-   Posée sur le bas de la feuille et décalée de (1 - --sortie) × sa hauteur :
-   le contenu de l'onglet coupe ce qui dépasse, la barre semble glisser sous
-   la barre d'onglets (cf. useBarreRangee). */
+   Posée sur le bas de la feuille et décalée de (1 - --sortie) × (sa hauteur
+   - --depasse) : le contenu de l'onglet coupe le reste, la barre semble
+   glisser sous la barre d'onglets en laissant dépasser son liseré
+   (cf. useBarreRangee). */
 .content-body.avec-barre-valider { position: relative; }
 .valider-bar {
   position: absolute;
@@ -3965,9 +3972,25 @@ export default {
   -webkit-backdrop-filter: blur(10px);
   border-top: 1px solid var(--color-border);
   box-shadow: 0 -4px 16px -4px rgba(31, 25, 84, 0.08);
-  transform: translateY(calc((1 - var(--sortie, 1)) * 100%));
+  transform: translateY(calc((1 - var(--sortie, 1)) * (100% - var(--depasse, 0px))));
   transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
 }
+/* Liseré d'avancement sur toute la largeur, par-dessus le trait du haut :
+   c'est lui qui dépasse quand la barre est rangée. */
+.valider-bar::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  left: 0;
+  right: 0;
+  height: var(--depasse, 4px);
+  --teinte-lisere: var(--color-primary);
+  background: linear-gradient(to right,
+    var(--teinte-lisere) var(--avancement, 0%),
+    color-mix(in srgb, var(--teinte-lisere) 28%, transparent) var(--avancement, 0%));
+  transition: background var(--transition-base);
+}
+.valider-bar.est-complete::before { --teinte-lisere: var(--color-valid-text); }
 /* En défilement, elle suit le contenu au pixel près */
 .valider-bar.suit-defilement { transition: none; }
 .valider-contenu {
@@ -3976,12 +3999,12 @@ export default {
   flex-wrap: wrap;
   gap: var(--spacing-lg);
 }
-/* Languette : dépasse de la barre rangée, au-dessus de la barre d'onglets.
-   Elle recouvre le trait du haut de la barre pour faire corps avec elle, et
-   s'efface quand la barre sort d'elle-même en fin de défilement. */
+/* Languette : posée sur le liseré, aux couleurs de l'app (verte quand tout
+   est coché), elle s'efface quand la barre sort d'elle-même en fin de
+   défilement. */
 .valider-languette {
   position: absolute;
-  bottom: calc(100% - 1px);
+  bottom: calc(100% + 1px);
   left: var(--spacing-lg);
   display: inline-flex;
   align-items: center;
@@ -3990,12 +4013,11 @@ export default {
   min-width: 64px;
   justify-content: center;
   padding: 0 var(--spacing-md);
-  border: 1px solid var(--color-border);
-  border-bottom: none;
+  border: none;
   border-radius: var(--radius-md) var(--radius-md) 0 0;
-  background: var(--color-bg);
-  box-shadow: 0 -4px 12px -4px rgba(31, 25, 84, 0.12);
-  color: var(--color-text-secondary);
+  background: var(--gradient-primary);
+  box-shadow: 0 -2px 10px -2px rgba(83, 74, 183, 0.45);
+  color: var(--color-on-primary);
   font: inherit;
   font-size: var(--font-size-xs);
   font-weight: 700;
@@ -4003,13 +4025,13 @@ export default {
   touch-action: none;
   -webkit-tap-highlight-color: transparent;
   opacity: var(--languette, 1);
-  transition: opacity var(--transition-base), color var(--transition-base);
+  transition: opacity var(--transition-base), background var(--transition-base);
 }
 .valider-languette i { font-size: 16px; transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1); }
 .valider-languette.est-relevee i { transform: rotate(180deg); }
 .valider-languette.est-masquee { pointer-events: none; }
 /* Tout est coché : la languette invite à valider */
-.valider-languette.est-complete { color: var(--color-valid-text); }
+.valider-languette.est-complete { background: var(--color-valid-text); box-shadow: 0 -2px 10px -2px rgba(22, 163, 74, 0.45); }
 .valider-languette:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) {
   .valider-bar, .valider-languette i { transition: none; }
