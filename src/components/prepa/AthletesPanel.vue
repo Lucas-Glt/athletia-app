@@ -281,6 +281,14 @@
                 <span class="signal signal-blessure" v-if="a.resume.blessures_en_cours > 0">
                   <i class="ti ti-bandage"></i> Blessé{{ a.resume.blessures_en_cours > 1 ? ` ×${a.resume.blessures_en_cours}` : '' }}
                 </span>
+                <!-- Planification : nouveau cycle lundi, un programme à préparer -->
+                <span
+                  class="signal signal-cycle"
+                  v-if="a.resume.cycle?.prochain"
+                  :title="`${developpement(a.resume.cycle.prochain.developpement).label} dès lundi prochain : programme à préparer`"
+                >
+                  <i class="ti ti-calendar-event"></i> Nouveau cycle lundi
+                </span>
                 <span
                   v-for="s in signauxDe(a.resume)"
                   :key="s.cle"
@@ -431,6 +439,7 @@ import {
   joursDepuis, formatJourRelatif, estInactif, niveauActivite, libelleActivite, comparerActivite
 } from '../../data/activite'
 import { estRAS, signauxDe } from '../../data/signaux'
+import { developpement } from '../../data/developpements'
 
 // Au-delà, un relevé wellness ne dit plus rien de l'état actuel de l'athlète :
 // on ne le compte plus comme « wellness bon ».
@@ -704,7 +713,7 @@ export default {
       urlApi, codeCoach, TRIS, COLONNES, tri, sens, trierPar,
       INDICATEURS, GROUPES_INDICATEURS, CLES_INDICATEURS, compteurs, sansZoneAcwr, indicateurFiltre, filtrerPar, estRAS, detailsOuverts,
       FENETRE_ACTIVITE, SEUIL_REGULIER, SEUIL_INACTIF_JOURS, LABELS_NIVEAU_ACTIVITE,
-      niveauActivite, libelleActivite, formatJourRelatif, joursDepuis, signauxDe,
+      niveauActivite, libelleActivite, formatJourRelatif, joursDepuis, signauxDe, developpement,
       rechercheNom, groupeFiltre, organisationFiltre, organisationsCercle, athletesFiltres,
       estSuperPrepa, ajoutParEmail, athleteSelectionne, aideOuverte,
       modalGroupes, athleteFocusGroupes, ouvrirGestionGroupes, groupesDe,
@@ -1033,6 +1042,7 @@ export default {
 }
 .signal.signal-surcharge, .signal.signal-blessure { background: var(--color-danger-bg); color: var(--color-danger-text); }
 .signal.signal-ras { background: var(--color-valid-bg); color: var(--color-valid-text-strong); }
+.signal.signal-cycle { background: var(--color-primary-light); color: var(--color-primary-dark); }
 .signal.signal-attente, .signal.signal-inactif { background: var(--color-bg-tertiary); color: var(--color-text-muted); }
 .groupes-badges { display: flex; gap: 4px; flex-wrap: wrap; }
 .groupe-badge { font-size: var(--font-size-xs); font-weight: 600; padding: 2px 8px; border-radius: var(--radius-full); }

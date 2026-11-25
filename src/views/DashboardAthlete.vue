@@ -157,6 +157,7 @@
         <span>Contactez votre préparateur physique.</span>
         <!-- Sans programme, un match ou un footing compte quand même dans la charge -->
         <div class="ajout-libre-sans-programme"><AjoutSeanceLibre /></div>
+        <div class="saison-sans-programme" v-if="Object.keys(planificationSaison).length"><PlanificationSaison :semaines="planificationSaison" /></div>
       </div>
 
       <!-- ONGLET PROGRAMME -->
@@ -201,6 +202,8 @@
                 <i class="ti" :class="estEpingle ? 'ti-pinned' : 'ti-pin'"></i>
               </button>
             </div>
+
+            <PlanificationSaison :semaines="planificationSaison" />
 
             <div class="screen-header" v-if="programmeActif">
               <h2>{{ programmeActif.nom }}</h2>
@@ -1024,6 +1027,8 @@ import CourbeProgression from '../components/athlete/CourbeProgression.vue'
 import MesStats from '../components/athlete/MesStats.vue'
 import AjoutSeanceLibre from '../components/athlete/AjoutSeanceLibre.vue'
 import SemaineProgramme from '../components/athlete/SemaineProgramme.vue'
+import PlanificationSaison from '../components/athlete/PlanificationSaison.vue'
+import { carteSemaines } from '../utils/planification'
 import ProgressionExercice from '../components/athlete/ProgressionExercice.vue'
 import CelebrationXp from '../components/athlete/CelebrationXp.vue'
 import RecapSemaineModal from '../components/athlete/RecapSemaineModal.vue'
@@ -1165,7 +1170,7 @@ const DUREE_BROUILLON_MS = 48 * 60 * 60 * 1000
 export default {
   components: {
     AppLayout, CourbeProgression, MesStats, AjoutSeanceLibre, SemaineProgramme, ProgressionExercice, CelebrationXp, RecapSemaineModal, BlessuresPanel, DietePanel, PopupBanniere,
-    PlanningCalendrier, PlanningHebdoModal, ExerciceImage, ReactionArrivee
+    PlanningCalendrier, PlanningHebdoModal, ExerciceImage, ReactionArrivee, PlanificationSaison
   },
   setup() {
     const programmes = ref([])
@@ -2946,6 +2951,16 @@ export default {
 
     onMounted(fetchProgrammes)
 
+    // Planification annuelle faite par le prépa (onglet Séances)
+    const planificationSaison = ref({})
+    onMounted(async () => {
+      try {
+        planificationSaison.value = carteSemaines((await api.get('/planification/moi')).semaines)
+      } catch {
+        // sans elle, l'onglet Séances reste celui d'avant
+      }
+    })
+
     const isGroupeComplete = (groupe) => {
       const nbSeries = nbSeriesGroupe(groupe)
       if (nbSeries === 0) return false
@@ -2981,7 +2996,7 @@ export default {
       seancesAffichees,
       labelType, iconeType, estAujourdhuiSeance, letterFor, grouperExercices,
       nbSeriesGroupe, exosDeLaSerie, reposSerie,
-      getLogs, isGroupeDone, erreurValidation,
+      getLogs, isGroupeDone, erreurValidation, planificationSaison,
       feuilleSeance, barreValiderEl, barreValider,
       estEnEdition,
       etatBoutonSerie, toggleSerie, historiqueGroupeExiste, supprimerSeanceHistorique,
@@ -3166,7 +3181,7 @@ export default {
 
 /* Proposition de semaine type, sous la liste : discrète tant que l'athlète
    n'en a pas créé, elle disparaît ensuite au profit du calendrier. */
-.ajout-libre-sans-programme { width: 100%; max-width: 420px; margin-top: var(--spacing-lg); text-align: left; }
+.ajout-libre-sans-programme, .saison-sans-programme { width: 100%; max-width: 420px; margin-top: var(--spacing-lg); text-align: left; }
 .btn-creer-semaine {
   width: 100%;
   margin-top: var(--spacing-sm);

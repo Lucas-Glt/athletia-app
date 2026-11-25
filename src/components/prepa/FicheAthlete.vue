@@ -36,6 +36,26 @@
             · {{ athlete.resume.jours_actifs_28j }} j actif{{ athlete.resume.jours_actifs_28j > 1 ? 's' : '' }} sur {{ FENETRE_ACTIVITE }}
           </span>
         </div>
+        <!-- Planification annuelle : cycle en cours, et le nouveau cycle de
+             lundi prochain (un programme à préparer) -->
+        <button
+          v-if="athlete.resume?.cycle"
+          type="button"
+          class="fiche-cycle"
+          @click="allerA('planification')"
+        >
+          <template v-if="athlete.resume.cycle.actuel">
+            <span class="fiche-cycle-pastille" :style="pastilleDev(athlete.resume.cycle.actuel.developpement)">
+              <i class="ti" :class="developpement(athlete.resume.cycle.actuel.developpement).icone"></i>
+              {{ developpement(athlete.resume.cycle.actuel.developpement).label }}
+            </span>
+            sem. {{ athlete.resume.cycle.actuel.semaine }}/{{ athlete.resume.cycle.actuel.nb_semaines }}
+          </template>
+          <span v-if="athlete.resume.cycle.prochain" class="fiche-cycle-prochain">
+            <i class="ti ti-calendar-event"></i>
+            {{ developpement(athlete.resume.cycle.prochain.developpement).label }} lundi prochain : programme à préparer
+          </span>
+        </button>
         <!-- Profil renseigné par l'athlète : âge, sports, objectif, de quoi
              le joindre. Rien ne s'affiche tant qu'il n'a rien rempli. -->
         <div class="fiche-profil">
@@ -393,6 +413,11 @@
       />
     </div>
 
+    <!-- PLANIFICATION : la saison semaine par semaine -->
+    <div v-if="sousOnglet === 'planification'" class="tab-content">
+      <PlanificationAthlete :athlete="athlete" :monCercle="monCercle" :groupes="groupes" @modifie="$emit('modifie')" />
+    </div>
+
     <!-- POIDS : calendrier des pesées + courbe, lecture seule -->
     <div v-if="sousOnglet === 'poids'" class="tab-content">
       <div v-if="loadingPoids" class="empty">Chargement…</div>
@@ -525,6 +550,8 @@ import GroupesManagerModal from './GroupesManagerModal.vue'
 import AssignerProgrammeModal from './AssignerProgrammeModal.vue'
 import ListeSeancesRealisees from './ListeSeancesRealisees.vue'
 import TitreAthlete from './TitreAthlete.vue'
+import PlanificationAthlete from './PlanificationAthlete.vue'
+import { developpement } from '../../data/developpements'
 import { grouperExercices, typeGroupe, labelTypeGroupe } from '../../data/typesGroupe'
 import { labelDureeBlessure, formatDateBlessure, labelAnciennete } from '../../data/blessures'
 import { formatHeures, labelNiveauSommeil } from '../../data/sommeil'
@@ -553,6 +580,7 @@ const ONGLETS = [
   { cle: 'apercu', label: 'Aperçu', icone: 'ti-chart-line' },
   { cle: 'seances', label: 'Séances', icone: 'ti-history' },
   { cle: 'programme', label: 'Programmes', icone: 'ti-layout-grid' },
+  { cle: 'planification', label: 'Planification', icone: 'ti-calendar-stats' },
   { cle: 'poids', label: 'Poids', icone: 'ti-scale' },
   { cle: 'blessures', label: 'Blessures', icone: 'ti-bandage' }
 ]
@@ -565,7 +593,7 @@ const pad2 = (n) => String(n).padStart(2, '0')
 export default {
   components: {
     CourbeProgression, GraphiqueDouble, GraphiqueAcwrZones, GraphiqueBarres, GraphiqueChargeJours,
-    GroupesManagerModal, AssignerProgrammeModal, ListeSeancesRealisees, TitreAthlete
+    GroupesManagerModal, AssignerProgrammeModal, ListeSeancesRealisees, TitreAthlete, PlanificationAthlete
   },
   emits: ['fermer', 'modifie', 'ouvrir-programme', 'changer-onglet'],
   props: {
@@ -950,6 +978,17 @@ export default {
       await nextTick()
       tabRefs[tab]?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
     })
+    // Fiche ouverte directement sur un onglet du bout de la barre (rappel de
+    // changement de cycle → Planification) : la barre seule défile, la page
+    // reste en haut.
+    onMounted(() => {
+      const onglet = tabRefs[sousOnglet.value]
+      const barre = onglet?.parentElement
+      if (!barre) return
+      const o = onglet.getBoundingClientRect()
+      const b = barre.getBoundingClientRect()
+      barre.scrollLeft += o.left - b.left - (b.width - o.width) / 2
+    })
 
     const allerA = (tab) => { if (tab !== sousOnglet.value) emit('changer-onglet', tab) }
 
@@ -1021,7 +1060,10 @@ export default {
 
     onMounted(fetchProfil)
 
+    const pastilleDev = (cle) => ({ background: developpement(cle).couleur, color: developpement(cle).texte })
+
     return {
+      developpement, pastilleDev,
       estSuperPrepa, sousOnglet, modalGroupes, groupesDe, initiales, retirerDuCercle, ONGLETS, erreurFiche,
       profil, photoUrl, lignesProfil, urlApi, fr, formatDecimal, iconeTendance,
       progression, pourcentageNiveau, derniereSeance, signauxDe, LIBELLES_WELLNESS,
@@ -1098,6 +1140,22 @@ export default {
 /* Les deux morceaux passent à la ligne en bloc, jamais au milieu. */
 .fiche-activite { display: flex; flex-wrap: wrap; column-gap: 4px; font-size: var(--font-size-xs); color: var(--color-text-secondary); }
 .activite-libelle, .activite-jours { white-space: nowrap; }
+.fiche-cycle {
+  display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 8px;
+  align-self: flex-start; padding: 0; border: none; background: none;
+  font: inherit; font-size: var(--font-size-xs); font-weight: 600; color: var(--color-text-secondary);
+  text-align: left; cursor: pointer;
+}
+.fiche-cycle:hover .fiche-cycle-pastille { filter: brightness(1.08); }
+.fiche-cycle-pastille {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 9px; border-radius: var(--radius-full); font-weight: 700;
+}
+.fiche-cycle-prochain {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 9px; border-radius: var(--radius-full);
+  background: var(--color-primary-light); color: var(--color-primary-dark);
+}
 .activite-libelle { font-weight: 600; color: var(--color-text-muted); }
 .activite-regulier .activite-libelle { color: var(--color-valid-text-strong); }
 .activite-irregulier .activite-libelle { color: var(--color-warning-text-strong); }

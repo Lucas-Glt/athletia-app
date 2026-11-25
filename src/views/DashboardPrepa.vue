@@ -37,6 +37,17 @@
       @oui="voirNouveauxAthletes"
       @non="marquerNotificationsVues"
     />
+    <!-- Puis : athlète(s) qui changent de cycle, un programme à préparer -->
+    <PopupBanniere
+      v-else-if="banniereCycle"
+      icone="ti-calendar-event"
+      :titre="banniereCycle.titre"
+      :sous-titre="banniereCycle.sousTitre"
+      :texte-oui="banniereCycle.texteOui"
+      texte-non="OK"
+      @oui="voirRappelsCycle"
+      @non="marquerRappelsCycleVus"
+    />
 
     <div class="dashboard-root" @pointerdown="onTabSwipeStart" @pointerup="onTabSwipeEnd" @pointercancel="onTabSwipeCancel">
       <!-- Échec d'une action sur un programme : affiché quel que soit le
@@ -573,6 +584,8 @@ import ExerciceAutocomplete from '../components/prepa/ExerciceAutocomplete.vue'
 import ExerciceImage from '../components/ExerciceImage.vue'
 import PopupBanniere from '../components/athlete/PopupBanniere.vue'
 import { formatJourRelatif } from '../data/activite'
+import { developpement } from '../data/developpements'
+import { formatDebutCycle } from '../utils/planification'
 import { TYPES_GROUPE, TYPE_GROUPE_DEFAUT, typeGroupe, labelTypeGroupe } from '../data/typesGroupe'
 import { typeSeance, labelTypeSeance, iconeTypeSeance } from '../data/typesSeance'
 import { useActionUnique } from '../utils/actionUnique'
@@ -1121,11 +1134,16 @@ export default {
     // minute). Ils apparaissent aussitôt dans la liste.
     const INTERVALLE_NOTIFICATIONS_MS = 60 * 1000
     const notificationsCercle = ref([])
+    // Rappels de la planification : un athlète commence un nouveau cycle
+    // (dès la semaine qui précède), son programme est à préparer.
+    const rappelsCycle = ref([])
     let notificationsLuesLe = 0
     const chargerNotifications = async () => {
       notificationsLuesLe = Date.now()
       try {
-        const nouvelles = (await api.get('/notifications/nouvelles')).filter(n => n.type === 'athlete_lie' && n.athlete)
+        const toutes = await api.get('/notifications/nouvelles')
+        const nouvelles = toutes.filter(n => n.type === 'athlete_lie' && n.athlete)
+        rappelsCycle.value = toutes.filter(n => n.type === 'changement_cycle' && n.athlete && n.developpement)
         if (nouvelles.some(n => !monCercle.value.some(a => a.id === n.athlete.id))) {
           await Promise.all([fetchMonCercle(), chargerResumes()])
         }
@@ -1162,6 +1180,40 @@ export default {
       const liste = notificationsCercle.value
       marquerNotificationsVues()
       if (liste.length === 1) ouvrirAthlete(liste[0].athlete.id)
+      else naviguer({})
+    }
+
+    const banniereCycle = computed(() => {
+      const liste = rappelsCycle.value
+      if (!liste.length) return null
+      if (liste.length === 1) {
+        const n = liste[0]
+        const nouveau = developpement(n.developpement).label
+        return {
+          titre: `${n.athlete.nom} : nouveau cycle ${formatDebutCycle(n.semaine)}`,
+          sousTitre: n.developpement_precedent
+            ? `${developpement(n.developpement_precedent).label} → ${nouveau}. Pensez à lui préparer un nouveau programme.`
+            : `${nouveau}, début de sa planification. Pensez à lui préparer un programme.`,
+          texteOui: 'Voir sa planification'
+        }
+      }
+      return {
+        titre: `${liste.length} athlètes changent de cycle`,
+        sousTitre: `${liste.map(n => `${n.athlete.nom} (${developpement(n.developpement).label})`).join(', ')} : de nouveaux programmes à préparer.`,
+        texteOui: 'Voir'
+      }
+    })
+    const marquerRappelsCycleVus = () => {
+      const ids = rappelsCycle.value.map(n => n.id)
+      rappelsCycle.value = []
+      if (ids.length) api.post('/notifications/vues', { ids }).catch(() => {})
+    }
+    // Un seul : sa planification. Plusieurs : la liste, où chacun porte
+    // « Nouveau cycle lundi ».
+    const voirRappelsCycle = () => {
+      const liste = rappelsCycle.value
+      marquerRappelsCycleVus()
+      if (liste.length === 1) ouvrirAthlete(liste[0].athlete.id, 'planification')
       else naviguer({})
     }
 
@@ -1241,6 +1293,7 @@ export default {
     return {
       assignerProgrammeAtelier,
       banniereCercle, voirNouveauxAthletes, marquerNotificationsVues,
+      banniereCycle, voirRappelsCycle, marquerRappelsCycleVus,
       ONGLETS, onglet, allerOnglet, visites, panneaux, seancesPanel, nouvellesSeances,
       athleteOuvertId, ficheOnglet, ouvrirAthlete, fermerAthlete, changerOngletFiche,
       testOuvertId, ouvrirTest, fermerTest, ouvrirProgramme, fermerProgramme,

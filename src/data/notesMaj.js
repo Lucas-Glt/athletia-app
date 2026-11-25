@@ -16,6 +16,14 @@ export const SIGNATURE_MOT = 'À vos barres…'
 
 export const NOTES_MAJ = [
   {
+    date: '25 novembre 2026',
+    titre: 'Ta saison, cycle par cycle',
+    points: [
+      'Ton prépa peut maintenant planifier ta saison semaine par semaine : force, prise de masse, puissance, compétition, repos…',
+      'En haut de l\'onglet Séances, tu vois ton cycle en cours et ce qui vient ensuite. Touche-le pour voir toute ta saison.'
+    ]
+  },
+  {
     date: '23 novembre 2026',
     titre: 'Une séance en plus ? Déclare-la',
     points: [
