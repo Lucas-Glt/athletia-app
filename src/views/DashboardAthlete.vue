@@ -382,6 +382,8 @@
                     <span v-else class="exo-ligne-prescrit">
                       <span v-for="(s, i) in exo.series" :key="s.id">S{{ i + 1 }} {{ valeursSerie(exo, i) || '—' }}</span>
                     </span>
+                    <!-- comment le faire : exercices de mobilité du catalogue seulement -->
+                    <span v-if="exo.consigne" class="exo-ligne-consigne">{{ exo.consigne }}</span>
                     <template v-for="obj in [objectifExo(exo)]" :key="obj?.id ?? 'sans-objectif'">
                       <span v-if="obj" class="exo-ligne-objectif" :class="{ atteint: obj.atteint_le }">
                         <i class="ti" :class="obj.atteint_le ? 'ti-circle-check' : 'ti-target-arrow'"></i>
@@ -559,6 +561,7 @@
                         :src="exo.image_url"
                         :src2="exo.image_url_2"
                         :nom="exo.nom"
+                        :consigne="exo.consigne"
                         :size="groupe.exercices.length > 1 ? 'md' : 'lg'"
                       />
                       <span class="exo-letter-mini" v-if="groupe.exercices.length > 1">{{ letterFor(eidx) }}</span>
@@ -3594,6 +3597,11 @@ export default {
   font-variant-numeric: tabular-nums;
 }
 .exo-ligne-prescrit.is-vide { color: var(--color-text-muted); font-style: italic; }
+.exo-ligne-consigne {
+  font-size: var(--font-size-xs);
+  line-height: 1.45;
+  color: var(--color-text-secondary);
+}
 /* Objectif de charge fixé par le prépa (cf. data/objectifs.js) */
 .exo-ligne-objectif, .performance-objectif {
   display: inline-flex; align-items: center; gap: 4px; align-self: flex-start;

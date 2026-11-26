@@ -69,6 +69,16 @@
         @modifie="onModifie"
       />
 
+      <CopierSeanceModal
+        v-if="seanceACopier"
+        :seance="seanceACopier"
+        :programmes="programmes"
+        :programmeCourantId="programmeActif?.id ?? null"
+        @fermer="seanceACopier = null"
+        @copiee="onSeanceCopiee"
+        @ouvrir="ouvrirProgrammeCopie"
+      />
+
       <!-- ONGLET PROGRAMMES : les programmes existants, et l'Atelier pour en
            construire autrement (prototype). Les sous-onglets disparaissent
            pendant la création classique, pour ne pas en sortir par erreur. -->
@@ -264,6 +274,14 @@
                     />
                     <span class="exo-count-badge">{{ seance.exercices?.length || 0 }} exo{{ seance.exercices?.length > 1 ? 's' : '' }}</span>
                   </template>
+                  <button
+                    class="btn-icon-copier"
+                    :title="`Copier « ${seance.nom} » dans un programme`"
+                    :aria-label="`Copier « ${seance.nom} » dans un programme`"
+                    @click.stop="seanceACopier = seance"
+                  >
+                    <i class="ti ti-copy"></i>
+                  </button>
                   <i class="ti seance-chevron" :class="isSeanceOuverte(seance.id) ? 'ti-chevron-up' : 'ti-chevron-down'"></i>
                   <button v-if="editMode" class="btn btn-sm btn-danger" :disabled="occupe" @click.stop="supprimerSeance(seance)">
                     <i class="ti ti-trash"></i>
@@ -311,7 +329,7 @@
                         <div class="exo-head">
                           <span class="exo-letter" v-if="groupe.exercices.length > 1">{{ letterFor(eidx) }}</span>
                           <span class="exo-num" v-else>{{ exo.ordre }}</span>
-                          <ExerciceImage :src="exo.image_url" :src2="exo.image_url_2" :nom="exo.nom" size="md" />
+                          <ExerciceImage :src="exo.image_url" :src2="exo.image_url_2" :nom="exo.nom" :consigne="exo.consigne" size="md" />
                           <ExerciceAutocomplete
                             v-if="editMode"
                             v-model="exo.nom"
@@ -354,7 +372,7 @@
 
                     <div v-if="groupe.exercices[0].series.length > 0">
                       <div class="groupe-series-head" @click="toggleGroupeSeries(groupe.key + '_' + seance.id)">
-                        <span class="series-count">{{ groupe.exercices[0].series.length }} séries</span>
+                        <span class="series-count">{{ groupe.exercices[0].series.length }} série{{ groupe.exercices[0].series.length > 1 ? 's' : '' }}</span>
                         <i class="ti series-chevron" :class="isGroupeSeriesOuvert(groupe.key + '_' + seance.id) ? 'ti-chevron-up' : 'ti-chevron-down'"></i>
                       </div>
 
@@ -576,6 +594,7 @@ import { animerEntreeOnglet } from '../animations/directives'
 import AppLayout from '../components/AppLayout.vue'
 import ProgrammeForm from '../components/prepa/ProgrammeForm.vue'
 import AssignerAthleteModal from '../components/prepa/AssignerAthleteModal.vue'
+import CopierSeanceModal from '../components/prepa/CopierSeanceModal.vue'
 import AthletesPanel from '../components/prepa/AthletesPanel.vue'
 import SeancesPanel from '../components/prepa/SeancesPanel.vue'
 import TestsPanel from '../components/prepa/TestsPanel.vue'
@@ -609,7 +628,7 @@ const FRAICHEUR_RESUMES_MS = 2 * 60 * 1000
 const estMobile = () => window.matchMedia('(max-width: 768px)').matches
 
 export default {
-  components: { AppLayout, ProgrammeForm, AssignerAthleteModal, AthletesPanel, SeancesPanel, TestsPanel, AtelierProgramme, ExerciceAutocomplete, ExerciceImage, PopupBanniere },
+  components: { AppLayout, ProgrammeForm, AssignerAthleteModal, CopierSeanceModal, AthletesPanel, SeancesPanel, TestsPanel, AtelierProgramme, ExerciceAutocomplete, ExerciceImage, PopupBanniere },
   setup() {
     const programmes = ref([])
     const programmeActif = ref(null)
@@ -618,6 +637,8 @@ export default {
     const groupes = ref([])
     const loadingSeances = ref(false)
     const modalAssigner = ref(false)
+    // Séance dont la fenêtre « Copier dans un programme » est ouverte
+    const seanceACopier = ref(null)
     const vue = ref('liste')
     const editMode = ref(false)
     const editNom = ref('')
@@ -1031,6 +1052,18 @@ export default {
       modalAssigner.value = true
     }
 
+    // Copie dans le programme ouvert : elle apparaît tout de suite, sur sa
+    // semaine. Ailleurs : rien à recharger, la fenêtre propose d'y aller.
+    const onSeanceCopiee = async ({ programme, seance }) => {
+      if (programme.id !== programmeActif.value?.id) return
+      await fetchSeances(programme.id)
+      semaineActive.value = seance.semaine
+    }
+    const ouvrirProgrammeCopie = (programme) => {
+      seanceACopier.value = null
+      ouvrirProgramme(programme)
+    }
+
     const startEditMode = () => {
       editNom.value = programmeActif.value.nom
       editDesc.value = programmeActif.value.description || ''
@@ -1235,6 +1268,8 @@ export default {
       // la vignette suit immédiatement le choix dans le catalogue (ou son
       // retrait quand le nom est retapé à la main), sans recharger les séances
       exo.image_url = data.image_url
+      exo.image_url_2 = data.image_url_2
+      exo.consigne = data.consigne
     })
 
     // Le type est porté par chaque exercice du groupe (le champ `groupe`
@@ -1300,6 +1335,7 @@ export default {
       resumes, chargementResumes, resumesParId,
       programmes, programmeActif, seances, monCercle, groupes,
       loadingSeances, modalAssigner, vue, vueLabel,
+      seanceACopier, onSeanceCopiee, ouvrirProgrammeCopie,
       onTabSwipeStart, onTabSwipeEnd, onTabSwipeCancel,
       editMode, editNom, editDesc,
       nouvelleSeance, jours, typeSeance, labelTypeSeance, iconeTypeSeance, letterFor, grouperExercices,
@@ -1612,6 +1648,21 @@ export default {
 .seance-meta { display: flex; align-items: center; gap: var(--spacing-sm); flex-wrap: wrap; font-size: var(--font-size-xs); color: var(--color-text-secondary); font-weight: 400; }
 .seance-jour { text-transform: capitalize; }
 .seance-chevron { color: var(--color-text-muted); font-size: var(--font-size-base); }
+.btn-icon-copier {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tap-min);
+  height: var(--tap-min);
+  margin: calc(var(--spacing-sm) * -1) 0;
+  border: none;
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-lg);
+  cursor: pointer;
+}
+.btn-icon-copier:hover { background: var(--color-primary-light); color: var(--color-primary-text); }
 .seance-body { padding: var(--spacing-md) var(--spacing-lg); display: flex; flex-direction: column; gap: var(--spacing-md); border-top: 1px solid var(--color-border); }
 .exo-count-badge {
   font-size: var(--font-size-xs);

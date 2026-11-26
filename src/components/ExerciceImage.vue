@@ -3,7 +3,7 @@
     v-if="url && !erreur"
     type="button"
     class="exo-img"
-    :class="`exo-img-${size}`"
+    :class="[`exo-img-${size}`, { 'est-picto': estPicto }]"
     :aria-label="`Agrandir l'illustration : ${nom}`"
     @click="ouvrir"
   >
@@ -14,7 +14,7 @@
   <Teleport to="body">
     <Transition name="exo-lightbox-fade">
       <div v-if="ouvert" class="exo-lightbox" @click="fermer">
-        <div class="exo-lightbox-card" :class="{ 'est-double': url2 }" @click.stop>
+        <div class="exo-lightbox-card" :class="{ 'est-double': url2, 'est-picto': estPicto }" @click.stop>
           <div class="exo-lightbox-head">
             <span class="exo-lightbox-nom">{{ nom }}</span>
             <button type="button" class="exo-lightbox-close" @click="fermer" aria-label="Fermer">
@@ -34,6 +34,7 @@
               </figure>
             </template>
           </div>
+          <p v-if="consigne" class="exo-lightbox-consigne">{{ consigne }}</p>
         </div>
       </div>
     </Transition>
@@ -54,6 +55,8 @@ export default {
     // reste sur la position de départ, les deux ne s'affichent qu'en grand
     src2: { type: String, default: null },
     nom: { type: String, default: '' },
+    // comment le faire (exercices de mobilité du catalogue), sous l'image en grand
+    consigne: { type: String, default: null },
     size: { type: String, default: 'md' } // md (42px) | lg (52px)
   },
   setup(props) {
@@ -62,6 +65,9 @@ export default {
     const posterKo = ref(false)
     const url = computed(() => (props.src ? `${BASE_URL}${props.src}` : null))
     const url2 = computed(() => (props.src2 ? `${BASE_URL}${props.src2}` : null))
+    // Pictogrammes de mobilité dessinés par Athletia (SVG sur tuile sombre) :
+    // ni plaque blanche ni bordure, la tuile fait office de cadre.
+    const estPicto = computed(() => /\.svg$/i.test(props.src || ''))
 
     // Quelques exercices du catalogue sont des GIF animés (jusqu'à 1,6 Mo,
     // 100 images) : les animer dans une vignette de 42 px au milieu d'une
@@ -96,7 +102,7 @@ export default {
 
     onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 
-    return { ouvert, erreur, url, url2, urlVignette, onErreurVignette, ouvrir, fermer }
+    return { ouvert, erreur, url, url2, estPicto, urlVignette, onErreurVignette, ouvrir, fermer }
   }
 }
 </script>
@@ -131,6 +137,7 @@ export default {
   display: block;
 }
 
+.exo-img.est-picto { border: none; background: none; border-radius: 17%; }
 .exo-img-md { width: 42px; height: 42px; }
 .exo-img-lg { width: 52px; height: 52px; }
 
@@ -243,6 +250,19 @@ export default {
   color: #6b7280;
 }
 .exo-phase-fleche { font-size: 22px; color: #9ca3af; flex-shrink: 0; }
+/* tuiles sombres : sur le fond de la carte (qui suit le thème), légendes aux tokens */
+.est-picto .exo-lightbox-img { background: none; padding-bottom: var(--spacing-sm); }
+.est-picto .exo-phase img { width: min(320px, 100%); height: auto; }
+.est-picto .exo-phase figcaption { color: var(--color-text-secondary); }
+.est-picto .exo-phase-fleche { color: var(--color-text-muted); }
+.exo-lightbox-consigne {
+  margin: 0;
+  padding: 0 var(--spacing-lg) var(--spacing-lg);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+  color: var(--color-text-body);
+  text-align: center;
+}
 .a-deux-phases .exo-phase img { max-height: 50dvh; }
 
 @media (max-width: 560px) {

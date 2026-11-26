@@ -10,7 +10,7 @@
       class="exo-autocomplete-input"
     />
     <Teleport to="body">
-      <div v-if="ouvert && resultats.length" class="autocomplete-dropdown" :style="dropdownStyle">
+      <div v-if="ouvert" class="autocomplete-dropdown" :style="dropdownStyle">
         <button
           v-for="r in resultats"
           :key="r.id"
@@ -18,21 +18,30 @@
           class="autocomplete-item"
           @mousedown.prevent="choisir(r)"
         >
-          <img :src="urlImage(r.image_url)" :alt="r.nom" loading="lazy" @error="onErreurImage($event, r)" />
+          <img :src="urlImage(r.image_url)" :alt="r.nom" loading="lazy" :class="{ 'est-picto': /\.svg$/i.test(r.image_url) }" @error="onErreurImage($event, r)" />
           <span>{{ r.nom }}</span>
+        </button>
+        <!-- toujours proposé : les étirements se cherchent mieux par zone que par nom -->
+        <button type="button" class="autocomplete-item autocomplete-parcourir" @mousedown.prevent="ouvrirMobilite">
+          <i class="ti ti-stretching"></i>
+          <span>Parcourir la mobilité et les étirements</span>
+          <i class="ti ti-chevron-right"></i>
         </button>
       </div>
     </Teleport>
+    <MobilitePicker v-if="mobiliteOuverte" @choisir="choisirMobilite" @fermer="mobiliteOuverte = false" />
   </div>
 </template>
 
 <script>
 import { ref, onBeforeUnmount } from 'vue'
 import { useApi } from '../../services/api'
+import MobilitePicker from './MobilitePicker.vue'
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 export default {
+  components: { MobilitePicker },
   props: {
     modelValue: { type: String, default: '' },
     placeholder: { type: String, default: "Nom de l'exercice" }
@@ -103,10 +112,8 @@ export default {
     }
 
     const onFocus = () => {
-      if (resultats.value.length) {
-        majPosition()
-        ouvert.value = true
-      }
+      majPosition()
+      ouvert.value = true
     }
     const onBlur = () => {
       // le mousedown.prevent d'un choix au clic garde le focus sur le champ,
@@ -122,6 +129,16 @@ export default {
       ouvert.value = false
     }
 
+    const mobiliteOuverte = ref(false)
+    const ouvrirMobilite = () => {
+      ouvert.value = false
+      mobiliteOuverte.value = true
+    }
+    const choisirMobilite = (item) => {
+      mobiliteOuverte.value = false
+      choisir(item)
+    }
+
     // Même règle que la vignette ExerciceImage : les GIF animés du catalogue
     // sont affichés figés via le poster écrit à l'import, et on retombe sur le
     // GIF si ce poster manque.
@@ -131,7 +148,10 @@ export default {
       if (e.target.src !== brut) e.target.src = brut
     }
 
-    return { resultats, ouvert, inputRef, dropdownStyle, onInput, onFocus, onBlur, choisir, urlImage, onErreurImage }
+    return {
+      resultats, ouvert, inputRef, dropdownStyle, onInput, onFocus, onBlur, choisir, urlImage, onErreurImage,
+      mobiliteOuverte, ouvrirMobilite, choisirMobilite
+    }
   }
 }
 </script>
@@ -194,4 +214,8 @@ export default {
   flex-shrink: 0;
 }
 .autocomplete-item span { flex: 1; }
+.autocomplete-item img.est-picto { border: none; background: none; border-radius: 17%; }
+.autocomplete-parcourir { border-top: 1px solid var(--color-border); color: var(--color-primary-text); font-weight: 600; }
+.autocomplete-parcourir:first-child { border-top: none; }
+.autocomplete-parcourir .ti { font-size: var(--font-size-lg); color: var(--color-primary); }
 </style>

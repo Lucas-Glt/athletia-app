@@ -16,6 +16,14 @@ export const SIGNATURE_MOT = 'À vos barres…'
 
 export const NOTES_MAJ = [
   {
+    date: '26 novembre 2026',
+    titre: 'Mobilité et étirements',
+    points: [
+      'Ton prépa peut maintenant te programmer des exercices de mobilité, d\'étirement et de rouleau, chacun avec son illustration.',
+      'Dans ta saisie, touche l\'image pour la voir en grand, avec la consigne pour bien faire le mouvement.'
+    ]
+  },
+  {
     date: '25 novembre 2026',
     titre: 'Les objectifs de ton prépa',
     points: [
